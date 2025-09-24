@@ -1,0 +1,160 @@
+{
+  "name": "New Zealand Route",
+  "created": "2025-09-21T20:19:32.259Z",
+  "places": [
+    {
+      "name": "Christchurch",
+      "coords": [
+        -43.5321,
+        172.6362
+      ]
+    },
+    {
+      "name": "Kaikoura",
+      "coords": [
+        -42.4012,
+        173.6815
+      ]
+    },
+    {
+      "name": "Hanmer Springs / Lewis Pass",
+      "coords": [
+        -42.5333,
+        172.8333
+      ]
+    },
+    {
+      "name": "Punakaiki (Pancake Rocks)",
+      "coords": [
+        -42.1167,
+        171.3267
+      ]
+    },
+    {
+      "name": "Franz Josef Glacier",
+      "coords": [
+        -43.4012,
+        170.1833
+      ]
+    },
+    {
+      "name": "Wanaka",
+      "coords": [
+        -44.7,
+        169.15
+      ]
+    },
+    {
+      "name": "Mount Cook Village",
+      "coords": [
+        -43.7344,
+        170.0967
+      ]
+    },
+    {
+      "name": "Lake Tekapo",
+      "coords": [
+        -44.0048,
+        170.4803
+      ]
+    },
+    {
+      "name": "Twizel",
+      "coords": [
+        -44.25,
+        170.1
+      ]
+    },
+    {
+      "name": "Queenstown",
+      "coords": [
+        -45.0312,
+        168.6626
+      ]
+    },
+    {
+      "name": "Te Anau",
+      "coords": [
+        -45.4167,
+        167.7167
+      ]
+    },
+    {
+      "name": "Oamaru",
+      "coords": [
+        -45.097,
+        170.969
+      ]
+    },
+    {
+      "name": "Picton",
+      "coords": [
+        -41.2924,
+        174.0018
+      ]
+    },
+    {
+      "name": "Wellington",
+      "coords": [
+        -41.2865,
+        174.7762
+      ]
+    },
+    {
+      "name": "Napier",
+      "coords": [
+        -39.4928,
+        176.912
+      ]
+    },
+    {
+      "name": "Taupo",
+      "coords": [
+        -38.6869,
+        176.0702
+      ]
+    },
+    {
+      "name": "Rotorua",
+      "coords": [
+        -38.1368,
+        176.2497
+      ]
+    },
+    {
+      "name": "Waitomo",
+      "coords": [
+        -38.2617,
+        175.1203
+      ]
+    },
+    {
+      "name": "Coromandel (Cathedral Cove)",
+      "coords": [
+        -36.8333,
+        175.8
+      ]
+    },
+    {
+      "name": "Auckland",
+      "coords": [
+        -36.8485,
+        174.7633
+      ]
+    },
+    {
+      "name": "Paihia (Bay of Islands)",
+      "coords": [
+        -35.2833,
+        174.0833
+      ]
+    },
+    {
+      "name": "Cape Reinga",
+      "coords": [
+        -34.429,
+        172.6806
+      ]
+    }
+  ]
+}

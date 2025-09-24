@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NZ Route Planner - Leaflet + Google Hybrid</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            margin: 10px;
+            overflow: hidden;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            border-radius: 20px 0 0 20px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 25px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hybrid-badge {
+            background: linear-gradient(135deg, #4285f4, #34a853);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.7rem;
+            margin-top: 5px;
+            display: inline-block;
+        }
+
+        .controls {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-google {
+            background: linear-gradient(135deg, #4285f4, #34a853);
+        }
+
+        .btn-google:hover {
+            box-shadow: 0 10px 20px rgba(66, 133, 244, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #ff7675, #fd79a8);
+        }
+
+        .places-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 20px 20px;
+        }
+
+        .place-item {
+            background: white;
+            border-radius: 15px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid #f0f0f0;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .place-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            border-color: #667eea;
+        }
+
+        .place-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .place-number {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.8rem;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .place-name {
+            flex: 1;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+
+        .place-activities {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .activity-link {
+            padding: 6px 12px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .google-maps {
+            background: #4285f4;
+            color: white;
+        }
+
+        .google-maps:hover {
+            background: #3367d6;
+            transform: scale(1.05);
+        }
+
+        .google-directions {
+            background: #34a853;
+            color: white;
+        }
+
+        .google-directions:hover {
+            background: #2d8f3f;
+            transform: scale(1.05);
+        }
+
+        .google-streetview {
+            background: #fbbc04;
+            color: #333;
+        }
+
+        .google-streetview:hover {
+            background: #f9ab00;
+            transform: scale(1.05);
+        }
+
+        .leaflet-info {
+            background: #00b894;
+            color: white;
+        }
+
+        #map {
+            flex: 1;
+            border-radius: 0 20px 20px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .map-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            padding: 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .map-btn:hover {
+            background: white;
+            transform: scale(1.05);
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.1);
+            margin: 20px;
+            padding: 15px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        .stats-value {
+            font-weight: 600;
+        }
+
+        .google-integration {
+            background: rgba(66, 133, 244, 0.1);
+            border: 1px solid rgba(66, 133, 244, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px;
+            color: #1a73e8;
+        }
+
+        .google-integration h4 {
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .google-integration ul {
+            font-size: 0.8rem;
+            margin-left: 15px;
+        }
+
+        .google-integration li {
+            margin-bottom: 3px;
+        }
+
+        .route-summary {
+            background: rgba(0, 184, 148, 0.1);
+            border: 1px solid rgba(0, 184, 148, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px;
+            color: #00b894;
+            text-align: center;
+        }
+
+        .route-summary h4 {
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .route-summary .summary-data {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1><i class="fas fa-route"></i> NZ Route Planner</h1>
+                <p>Leaflet Maps + Google Services</p>
+                <div class="hybrid-badge">
+                    <i class="fas fa-layer-group"></i> Hybrid Solution
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" onclick="showLeafletRoute()">
+                    <i class="fas fa-map"></i>
+                    Show Leaflet Route
+                </button>
+                <button class="btn btn-google" onclick="calculateGoogleRoute()">
+                    <i class="fab fa-google"></i>
+                    Calculate with Google
+                </button>
+                <button class="btn btn-secondary" onclick="exportCompleteRoute()">
+                    <i class="fas fa-download"></i>
+                    Export Full Route
+                </button>
+            </div>
+
+            <div class="google-integration">
+                <h4><i class="fab fa-google"></i> Google Integration (Kostenlos)</h4>
+                <ul>
+                    <li>✓ 1.000 kostenlose Geocoding-Anfragen/Monat</li>
+                    <li>✓ 1.000 kostenlose Directions-Anfragen/Monat</li>
+                    <li>✓ 1.000 kostenlose Place Details/Monat</li>
+                    <li>✓ Street View Links</li>
+                </ul>
+            </div>
+
+            <div class="route-summary" id="routeSummary">
+                <h4>Route Summary</h4>
+                <div class="summary-data">
+                    <span>Total Distance:</span>
+                    <span id="totalDistance">~3,200 km</span>
+                </div>
+                <div class="summary-data">
+                    <span>Estimated Time:</span>
+                    <span id="estimatedTime">~40 hours</span>
+                </div>
+                <div class="summary-data">
+                    <span>Google API Calls Used:</span>
+                    <span id="apiCalls">0/1000</span>
+                </div>
+            </div>
+
+            <div class="stats">
+                <div class="stats-item">
+                    <span>Total Places:</span>
+                    <span class="stats-value" id="totalPlaces">22</span>
+                </div>
+                <div class="stats-item">
+                    <span>Map Provider:</span>
+                    <span class="stats-value">Leaflet (Free)</span>
+                </div>
+                <div class="stats-item">
+                    <span>Services:</span>
+                    <span class="stats-value">Google (Hybrid)</span>
+                </div>
+            </div>
+            
+            <div class="places-list" id="placesList">
+                <!-- Places will be dynamically inserted here -->
+            </div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="map-controls">
+            <button class="map-btn" onclick="centerMap()" title="Center Map">
+                <i class="fas fa-crosshairs"></i>
+            </button>
+            <button class="map-btn" onclick="toggleRoute()" title="Toggle Route">
+                <i class="fas fa-route"></i>
+            </button>
+            <button class="map-btn" onclick="getGoogleDirections()" title="Google Directions">
+                <i class="fab fa-google"></i>
+            </button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Global variables
+        let map;
+        let places = [];
+        let routePolyline;
+        let markers = [];
+        let showRoute = true;
+        let googleApiCallsUsed = 0;
+
+        // Initial places data
+        const initialPlaces = [
+            { name: "Christchurch", coords: [-43.5321, 172.6362] },
+            { name: "Kaikoura", coords: [-42.4012, 173.6815] },
+            { name: "Hanmer Springs / Lewis Pass", coords: [-42.5333, 172.8333] },
+            { name: "Punakaiki (Pancake Rocks)", coords: [-42.1167, 171.3267] },
+            { name: "Franz Josef Glacier", coords: [-43.4012, 170.1833] },
+            { name: "Wanaka", coords: [-44.7, 169.15] },
+            { name: "Mount Cook Village", coords: [-43.7344, 170.0967] },
+            { name: "Lake Tekapo", coords: [-44.0048, 170.4803] },
+            { name: "Twizel", coords: [-44.25, 170.1] },
+            { name: "Queenstown", coords: [-45.0312, 168.6626] },
+            { name: "Te Anau", coords: [-45.4167, 167.7167] },
+            { name: "Oamaru", coords: [-45.097, 170.969] },
+            { name: "Picton", coords: [-41.2924, 174.0018] },
+            { name: "Wellington", coords: [-41.2865, 174.7762] },
+            { name: "Napier", coords: [-39.4928, 176.912] },
+            { name: "Taupo", coords: [-38.6869, 176.0702] },
+            { name: "Rotorua", coords: [-38.1368, 176.2497] },
+            { name: "Waitomo", coords: [-38.2617, 175.1203] },
+            { name: "Coromandel (Cathedral Cove)", coords: [-36.8333, 175.8] },
+            { name: "Auckland", coords: [-36.8485, 174.7633] },
+            { name: "Paihia (Bay of Islands)", coords: [-35.2833, 174.0833] },
+            { name: "Cape Reinga", coords: [-34.429, 172.6806] }
+        ];
+
+        // Initialize map with Leaflet (FREE)
+        function initMap() {
+            map = L.map('map').setView([-40.9006, 174.8860], 5);
+            
+            // Using free OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors | Enhanced with Google Services',
+                maxZoom: 18
+            }).addTo(map);
+
+            places = [...initialPlaces];
+            updateUI();
+        }
+
+        // Generate Google Maps link
+        function generateGoogleMapsLink(name, coords) {
+            const [lat, lng] = coords;
+            return `https://www.google.com/maps/search/${encodeURIComponent(name)}/@${lat},${lng},15z`;
+        }
+
+        // Generate Google Directions link
+        function generateDirectionsLink(index) {
+            if (index === 0) return null;
+            const current = places[index];
+            const previous = places[index - 1];
+            return `https://www.google.com/maps/dir/${previous.coords[0]},${previous.coords[1]}/${current.coords[0]},${current.coords[1]}`;
+        }
+
+        // Generate Google Street View link
+        function generateStreetViewLink(coords) {
+            const [lat, lng] = coords;
+            return `https://www.google.com/maps/@${lat},${lng},3a,75y,90t/data=!3m6!1e1`;
+        }
+
+        // Create place item HTML with Google integrations
+        function createPlaceItem(place, index) {
+            const googleMapsLink = generateGoogleMapsLink(place.name, place.coords);
+            const directionsLink = generateDirectionsLink(index);
+            const streetViewLink = generateStreetViewLink(place.coords);
+            
+            return `
+                <div class="place-item">
+                    <div class="place-header">
+                        <div class="place-number">${index + 1}</div>
+                        <div class="place-name">${place.name}</div>
+                    </div>
+                    <div class="place-activities">
+                        <a href="${googleMapsLink}" target="_blank" class="activity-link google-maps">
+                            <i class="fab fa-google"></i> Maps
+                        </a>
+                        ${directionsLink ? `
+                            <a href="${directionsLink}" target="_blank" class="activity-link google-directions">
+                                <i class="fas fa-directions"></i> Route
+                            </a>
+                        ` : ''}
+                        <a href="${streetViewLink}" target="_blank" class="activity-link google-streetview">
+                            <i class="fas fa-street-view"></i> Street View
+                        </a>
+                        <button class="activity-link leaflet-info" onclick="showPlaceInfo(${index})">
+                            <i class="fas fa-info-circle"></i> Info
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update UI
+        function updateUI() {
+            updatePlacesList();
+            updateMap();
+            updateStats();
+        }
+
+        // Update places list
+        function updatePlacesList() {
+            const placesList = document.getElementById('placesList');
+            placesList.innerHTML = places.map((place, index) => createPlaceItem(place, index)).join('');
+        }
+
+        // Update map with Leaflet
+        function updateMap() {
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            // Clear existing route
+            if (routePolyline) {
+                map.removeLayer(routePolyline);
+            }
+
+            // Add markers
+            places.forEach((place, index) => {
+                const marker = L.marker(place.coords)
+                    .addTo(map)
+                    .bindPopup(`
+                        <strong>${place.name}</strong><br>
+                        Stop ${index + 1}<br>
+                        <small>Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</small><br>
+                        <a href="${generateGoogleMapsLink(place.name, place.coords)}" target="_blank">
+                            <i class="fab fa-google"></i> Open in Google Maps
+                        </a>
+                    `)
+                    .bindTooltip(place.name, { sticky: true });
+                markers.push(marker);
+            });
+
+            // Add route line
+            if (showRoute && places.length > 1) {
+                const coords = places.map(place => place.coords);
+                routePolyline = L.polyline(coords, {
+                    color: '#667eea',
+                    weight: 4,
+                    opacity: 0.8,
+                    dashArray: '10, 5'
+                }).addTo(map);
+            }
+        }
+
+        // Show Leaflet route (FREE)
+        function showLeafletRoute() {
+            toggleRoute();
+            centerMap();
+        }
+
+        // Calculate route with Google Directions API (uses free quota)
+        function calculateGoogleRoute() {
+            if (googleApiCallsUsed >= 1000) {
+                alert('⚠️ Google API Limit erreicht (1000/Monat)\nVerwende Leaflet Route oder warte bis nächsten Monat');
+                return;
+            }
+
+            // Simulate Google Directions API call
+            googleApiCallsUsed++;
+            updateApiCallsDisplay();
+            
+            // In real implementation, you would call:
+            // const directionsService = new google.maps.DirectionsService();
+            
+            alert(`🗺️ Google Directions berechnet!\n\nSimuliert: Optimierte Route mit:\n• Echtzeit-Verkehrsdaten\n• Straßensperrungen\n• Beste Routen-Optionen\n\nAPI Calls verwendet: ${googleApiCallsUsed}/1000`);
+            
+            // Update route summary with "Google data"
+            document.getElementById('totalDistance').textContent = '3,142 km';
+            document.getElementById('estimatedTime').textContent = '38.5 hours';
+        }
+
+        // Get Google Directions for current route
+        function getGoogleDirections() {
+            if (places.length < 2) {
+                alert('Mindestens 2 Orte erforderlich für Routenplanung');
+                return;
+            }
+
+            const waypoints = places.map(place => `${place.coords[0]},${place.coords[1]}`).join('/');
+            const googleDirectionsUrl = `https://www.google.com/maps/dir/${waypoints}`;
+            window.open(googleDirectionsUrl, '_blank');
+        }
+
+        // Show place info using free Google services
+        function showPlaceInfo(index) {
+            const place = places[index];
+            
+            // Simulate place details API call (would use free quota)
+            if (googleApiCallsUsed < 1000) {
+                googleApiCallsUsed++;
+                updateApiCallsDisplay();
+            }
+            
+            alert(`📍 ${place.name}\n\nKoordinaten: ${place.coords[0].toFixed(4)}, ${place.coords[1].toFixed(4)}\n\nVerfügbare Services:\n• Google Maps\n• Google Street View\n• Google Directions\n• Leaflet Popup\n\nAPI Calls: ${googleApiCallsUsed}/1000`);
+        }
+
+        // Update API calls display
+        function updateApiCallsDisplay() {
+            document.getElementById('apiCalls').textContent = `${googleApiCallsUsed}/1000`;
+        }
+
+        // Update stats
+        function updateStats() {
+            document.getElementById('totalPlaces').textContent = places.length;
+        }
+
+        // Export complete route with Google links
+        function exportCompleteRoute() {
+            const routeData = {
+                name: 'New Zealand Route - Hybrid Solution',
+                created: new Date().toISOString(),
+                mapProvider: 'Leaflet (OpenStreetMap)',
+                googleServices: 'Directions, Places, Street View',
+                places: places.map((place, index) => ({
+                    ...place,
+                    googleMapsLink: generateGoogleMapsLink(place.name, place.coords),
+                    directionsLink: generateDirectionsLink(index),
+                    streetViewLink: generateStreetViewLink(place.coords)
+                })),
+                apiUsage: {
+                    googleCallsUsed: googleApiCallsUsed,
+                    monthlyLimit: 1000
+                }
+            };
+            
+            const dataStr = JSON.stringify(routeData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'nz-route-hybrid.json';
+            link.click();
+        }
+
+        // Center map
+        function centerMap() {
+            if (places.length === 0) return;
+            
+            const bounds = L.latLngBounds(places.map(place => place.coords));
+            map.fitBounds(bounds, { padding: [20, 20] });
+        }
+
+        // Toggle route visibility
+        function toggleRoute() {
+            showRoute = !showRoute;
+            updateMap();
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            initMap();
+        });
+    </script>
+</body>
+</html>
