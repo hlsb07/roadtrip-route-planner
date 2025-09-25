@@ -1,38 +1,41 @@
-# Dependencies
-node_modules/
-package-lock.json
-
-# Build outputs
-dist/
-build/
-*.exe
-*.dll
-*.pdb
-
-# Development
+# Visual Studio
 .vs/
-.vscode/
 *.user
 *.suo
-*.sln
+*.userosscache
+*.sln.docstates
+
+# Build results  
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+bld/
+
+# .NET
+project.lock.json
+project.fragment.lock.json
+artifacts/
+**/Properties/launchSettings.json
+
+# Node.js
+node_modules/
+npm-debug.log*
 
 # Environment
 .env
 .env.local
-.env.production
-
-# Logs
-*.log
-logs/
 
 # Database
 *.db
 *.sqlite
 
+# Logs
+*.log
+
 # OS
 .DS_Store
 Thumbs.db
-
-# Temporary
-tmp/
-temp/
