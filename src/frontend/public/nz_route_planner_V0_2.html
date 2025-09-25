@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>NZ Route Planner - Enhanced</title>
+    <title>Roadtrip Route Planner - Enhanced</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -371,6 +371,210 @@
         .loading.active {
             display: block;
         }
+        .route-management {
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .route-selector {
+            margin-bottom: 10px;
+        }
+
+        .route-selector label {
+            display: block;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .route-select-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .route-select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
+        }
+
+        .route-select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn-icon {
+            width: 35px;
+            height: 35px;
+            border: none;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .btn-icon:hover {
+            background: #5a67d8;
+            transform: scale(1.05);
+        }
+
+        .route-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2000;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+            position: relative;
+            z-index: 2001;
+        }
+
+        .modal-header {
+            padding: 20px 20px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #2c3e50;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #666;
+            padding: 5px;
+        }
+
+        .btn-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            transition: border-color 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea.form-input {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .modal-footer {
+            padding: 0 20px 20px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        /* Route Info Display */
+        .route-info {
+            padding: 10px 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(102, 126, 234, 0.2);
+        }
+
+        .route-info h4 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+            font-size: 1rem;
+        }
+
+        .route-info p {
+            margin: 0;
+            color: #666;
+            font-size: 0.85rem;
+        }
+
 
         @media (max-width: 768px) {
             .container {
@@ -402,8 +606,31 @@
     <div class="container">
         <div class="sidebar">
             <div class="header">
-                <h1><i class="fas fa-map-marked-alt"></i> NZ Route Planner</h1>
+                <h1><i class="fas fa-map-marked-alt"></i> Roadtrip Route Planner</h1>
                 <p>Smart route planning for your adventure</p>
+            </div>
+
+            <div class="route-management">
+                <div class="route-selector">
+                    <label for="routeSelect">Current Route:</label>
+                    <div class="route-select-group">
+                        <select id="routeSelect" class="route-select">
+                            <option value="">Loading routes...</option>
+                        </select>
+                        <button class="btn-icon" onclick="showCreateRouteModal()" title="Create new route">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="route-actions">
+                    <button class="btn btn-sm" onclick="showRenameRouteModal()" title="Rename route">
+                        <i class="fas fa-edit"></i> Rename
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCurrentRoute()" title="Delete route">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
             </div>
             
             <div class="search-section">
@@ -472,6 +699,32 @@
             • Paste Google Maps links directly
         </div>
     </div>
+    
+    <div id="routeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Create New Route</h3>
+                <button class="btn-close" onclick="closeRouteModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="routeName">Route Name:</label>
+                    <input type="text" id="routeName" class="form-input" placeholder="My Amazing Trip">
+                </div>
+                <div class="form-group">
+                    <label for="routeDescription">Description (optional):</label>
+                    <textarea id="routeDescription" class="form-input" placeholder="Details about this route..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRouteModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveRoute()" id="saveRouteBtn">Create Route</button>
+            </div>
+        </div>
+        <div id="modalOverlay" class="modal-overlay" onclick="closeRouteModal()"></div>
+    </div>    
 
     <input type="file" id="importFile" style="display: none;" accept=".json">
 
@@ -479,6 +732,9 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
         // Global variables
+        let routes = [];
+        let currentRouteId = null;
+        let isEditingRoute = false;
         let map;
         let places = [];
         let markers = [];
@@ -489,7 +745,249 @@
 
         const API_BASE = 'http://localhost:5166/api';
 
-        
+        // ===== ROUTES MANAGEMENT =====
+
+        // Alle Routen laden
+        async function loadRoutes() {
+            try {
+                console.log('Loading routes...');
+                const response = await fetch(`${API_BASE}/routes`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load routes: ${response.status}`);
+                }
+                
+                routes = await response.json();
+                console.log('Routes loaded:', routes);
+                
+                updateRouteSelector();
+                
+                // Erste Route automatisch auswählen
+                if (routes.length > 0 && !currentRouteId) {
+                    currentRouteId = routes[0].id;
+                    await loadCurrentRoute();
+                }
+                
+            } catch (error) {
+                console.error('Failed to load routes:', error);
+                showError('Failed to load routes. Creating default route...');
+                await createDefaultRoute();
+            }
+        }
+
+        // Route Selector aktualisieren
+        function updateRouteSelector() {
+            const select = document.getElementById('routeSelect');
+            select.innerHTML = '';
+            
+            if (routes.length === 0) {
+                select.innerHTML = '<option value="">No routes available</option>';
+                return;
+            }
+            
+            routes.forEach(route => {
+                const option = document.createElement('option');
+                option.value = route.id;
+                option.textContent = `${route.name} (${route.placeCount} places)`;
+                if (route.id === currentRouteId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+            
+            // Event Listener für Route-Wechsel
+            select.onchange = function() {
+                if (this.value) {
+                    currentRouteId = parseInt(this.value);
+                    loadCurrentRoute();
+                }
+            };
+        }
+
+        // Aktuelle Route laden
+        async function loadCurrentRoute() {
+            if (!currentRouteId) return;
+            
+            try {
+                console.log('Loading current route:', currentRouteId);
+                const response = await fetch(`${API_BASE}/routes/${currentRouteId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load route: ${response.status}`);
+                }
+                
+                const route = await response.json();
+                console.log('Current route loaded:', route);
+                
+                // Places aus Route laden
+                places = route.places.map(p => ({
+                    name: p.name,
+                    coords: [p.latitude, p.longitude],
+                    id: p.id
+                }));
+                
+                updateUI();
+                
+            } catch (error) {
+                console.error('Failed to load current route:', error);
+                showError('Failed to load route');
+            }
+        }
+
+        // Neue Route erstellen Modal anzeigen
+        function showCreateRouteModal() {
+            isEditingRoute = false;
+            document.getElementById('modalTitle').textContent = 'Create New Route';
+            document.getElementById('saveRouteBtn').textContent = 'Create Route';
+            document.getElementById('routeName').value = '';
+            document.getElementById('routeDescription').value = '';
+            
+            const modal = document.getElementById('routeModal');
+            modal.classList.add('active');
+            document.getElementById('routeName').focus();
+        }
+
+        // Route umbenennen Modal anzeigen
+        function showRenameRouteModal() {
+            if (!currentRouteId) {
+                showError('No route selected');
+                return;
+            }
+            
+            const currentRoute = routes.find(r => r.id === currentRouteId);
+            if (!currentRoute) return;
+            
+            isEditingRoute = true;
+            document.getElementById('modalTitle').textContent = 'Rename Route';
+            document.getElementById('saveRouteBtn').textContent = 'Save Changes';
+            document.getElementById('routeName').value = currentRoute.name;
+            document.getElementById('routeDescription').value = currentRoute.description || '';
+            
+            const modal = document.getElementById('routeModal');
+            modal.classList.add('active');
+            document.getElementById('routeName').focus();
+        }
+
+        // Modal schließen
+        function closeRouteModal() {
+            const modal = document.getElementById('routeModal');
+            modal.classList.remove('active');
+        }
+
+        // Route speichern (erstellen oder aktualisieren)
+        async function saveRoute() {
+            const name = document.getElementById('routeName').value.trim();
+            const description = document.getElementById('routeDescription').value.trim();
+            
+            if (!name) {
+                showError('Route name is required');
+                return;
+            }
+            
+            try {
+                let response;
+                
+                if (isEditingRoute) {
+                    // Route aktualisieren
+                    response = await fetch(`${API_BASE}/routes/${currentRouteId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, description })
+                    });
+                } else {
+                    // Neue Route erstellen
+                    response = await fetch(`${API_BASE}/routes`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, description })
+                    });
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to save route: ${response.status}`);
+                }
+                
+                if (!isEditingRoute) {
+                    const newRoute = await response.json();
+                    currentRouteId = newRoute.id;
+                }
+                
+                closeRouteModal();
+                await loadRoutes(); // Routen neu laden
+                
+                showSuccess(isEditingRoute ? 'Route updated!' : 'Route created!');
+                
+            } catch (error) {
+                console.error('Failed to save route:', error);
+                showError('Failed to save route');
+            }
+        }
+
+        // Aktuelle Route löschen
+        async function deleteCurrentRoute() {
+            if (!currentRouteId) {
+                showError('No route selected');
+                return;
+            }
+            
+            const currentRoute = routes.find(r => r.id === currentRouteId);
+            if (!currentRoute) return;
+            
+            if (!confirm(`Delete route "${currentRoute.name}"? This cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/routes/${currentRouteId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to delete route: ${response.status}`);
+                }
+                
+                // Route aus lokaler Liste entfernen
+                routes = routes.filter(r => r.id !== currentRouteId);
+                
+                // Nächste verfügbare Route auswählen
+                if (routes.length > 0) {
+                    currentRouteId = routes[0].id;
+                    await loadCurrentRoute();
+                } else {
+                    currentRouteId = null;
+                    places = [];
+                    await createDefaultRoute();
+                }
+                
+                updateRouteSelector();
+                showSuccess('Route deleted!');
+                
+            } catch (error) {
+                console.error('Failed to delete route:', error);
+                showError('Failed to delete route');
+            }
+        }
+
+        // Standard-Route erstellen
+        async function createDefaultRoute() {
+            try {
+                const response = await fetch(`${API_BASE}/routes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        name: 'My Trip Route', 
+                        description: 'Default route for planning' 
+                    })
+                });
+                
+                if (response.ok) {
+                    await loadRoutes();
+                }
+                
+            } catch (error) {
+                console.error('Failed to create default route:', error);
+            }
+        }
 
         // Initialize map
         function initMap() {
@@ -512,8 +1010,6 @@
                 }
             });
 
-            // Load saved route
-            //loadPlacesFromAPI();//loadSavedRoute();
         }
 
         // Switch tabs
@@ -674,59 +1170,186 @@
                 alert('Could not parse Google Maps link. Try copying the coordinates instead.');
             }
         }
+        // ===== PLACES MANAGEMENT (Route-aware) =====
 
+        // Place zur aktuellen Route hinzufügen (überschreibt alte addPlace Funktion)
         async function addPlace(place) {
-            try {
-                // Erst zur API senden
-                const response = await fetch(`${API_BASE}/places`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        name: place.name,
-                        latitude: place.coords[0],
-                        longitude: place.coords[1]
-                    })
-                });
-                
-                if (response.ok) {
-                    const newPlace = await response.json();
-                    console.log('Place added to API:', newPlace);
-                    
-                    // Dann zu lokaler Liste hinzufügen
-                    places.push({
-                        name: newPlace.name,
-                        coords: [newPlace.latitude, newPlace.longitude],
-                        id: newPlace.id
-                    });
-                } else {
-                    throw new Error('API request failed');
-                }
-                
-            } catch (error) {
-                console.error('Failed to add place to API:', error);
-                
-                // Fallback: Nur lokal hinzufügen
-                places.push(place);
+            if (!currentRouteId) {
+                showError('No route selected. Create a route first.');
+                return;
             }
             
-            updateUI();
-            saveRoute();
-        }
-        // Add place to list
-        function addPlace_old(place) {
-            places.push(place);
-            updateUI();
-            saveRoute();
+            try {
+                // 1. Place in Places-Tabelle erstellen (falls noch nicht vorhanden)
+                let placeId = place.id;
+                
+                if (!placeId) {
+                    const placeResponse = await fetch(`${API_BASE}/places`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            name: place.name,
+                            latitude: place.coords[0],
+                            longitude: place.coords[1]
+                        })
+                    });
+                    
+                    if (!placeResponse.ok) {
+                        throw new Error('Failed to create place');
+                    }
+                    
+                    const newPlace = await placeResponse.json();
+                    placeId = newPlace.id;
+                }
+                
+                // 2. Place zur aktuellen Route hinzufügen
+                const routeResponse = await fetch(`${API_BASE}/routes/${currentRouteId}/places`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ placeId: placeId })
+                });
+                
+                if (!routeResponse.ok) {
+                    const errorText = await routeResponse.text();
+                    if (errorText.includes('already in route')) {
+                        showError('This place is already in your route');
+                        return;
+                    }
+                    throw new Error('Failed to add place to route');
+                }
+                
+                // 3. UI aktualisieren
+                await loadCurrentRoute();
+                await loadRoutes(); // Für PlaceCount Update
+                
+                showSuccess(`Added "${place.name}" to route!`);
+                
+            } catch (error) {
+                console.error('Failed to add place:', error);
+                showError('Failed to add place to route');
+            }
         }
 
-        // Remove place
-        function removePlace(index) {
-            places.splice(index, 1);
-            updateUI();
-            saveRoute();
+        // Place aus aktueller Route entfernen (überschreibt alte removePlace)
+        async function removePlace(index) {
+            if (!currentRouteId || !places[index]) return;
+            
+            const place = places[index];
+            
+            if (!confirm(`Remove "${place.name}" from this route?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/routes/${currentRouteId}/places/${place.id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to remove place from route');
+                }
+                
+                await loadCurrentRoute();
+                await loadRoutes(); // Für PlaceCount Update
+                
+                showSuccess(`Removed "${place.name}" from route`);
+                
+            } catch (error) {
+                console.error('Failed to remove place:', error);
+                showError('Failed to remove place');
+            }
         }
+        // ===== DRAG & DROP REORDERING =====
+        // updatePlacesList Funktion erweitern (ersetze die bestehende)
+        function updatePlacesList() {
+            const placesList = document.getElementById('placesList');
+            
+            if (!currentRouteId) {
+                placesList.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #999;">
+                        <i class="fas fa-route" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i><br>
+                        No route selected.<br>
+                        <button class="btn" onclick="showCreateRouteModal()" style="margin-top: 10px;">
+                            <i class="fas fa-plus"></i> Create Your First Route
+                        </button>
+                    </div>`;
+                return;
+            }
+            
+            if (places.length === 0) {
+                placesList.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #999;">
+                        <i class="fas fa-map-marker-alt" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i><br>
+                        No places in this route yet.<br>
+                        Start by searching or clicking the map!
+                    </div>`;
+                return;
+            }
+            
+            placesList.innerHTML = places.map((place, index) => `
+                <div class="place-item" data-index="${index}">
+                    <div class="place-header">
+                        <div class="place-number">${index + 1}</div>
+                        <div class="place-name">${place.name}</div>
+                        <div class="place-actions">
+                            <button class="action-btn delete-btn" onclick="removePlace(${index})" title="Remove from route">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="place-links">
+                        <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}" 
+                        target="_blank" 
+                        class="link-btn google-maps">
+                            <i class="fas fa-map"></i> Maps
+                        </a>
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}" 
+                        target="_blank" 
+                        class="link-btn google-nav">
+                            <i class="fas fa-directions"></i> Navigate
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Sortable für Drag & Drop
+            new Sortable(placesList, {
+                animation: 300,
+                ghostClass: 'dragging',
+                onEnd: async function(evt) {
+                    // Neue Reihenfolge bestimmen
+                    const newOrder = Array.from(placesList.children).map(item => {
+                        const index = parseInt(item.dataset.index);
+                        return places[index].id;
+                    });
+                    
+                    console.log('New order:', newOrder);
+                    
+                    // API Call für Reorder
+                    try {
+                        const response = await fetch(`${API_BASE}/routes/${currentRouteId}/places/reorder`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(newOrder)
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('Failed to reorder places');
+                        }
+                        
+                        // Route neu laden für korrekte Reihenfolge
+                        await loadCurrentRoute();
+                        
+                    } catch (error) {
+                        console.error('Failed to reorder places:', error);
+                        showError('Failed to reorder places');
+                        // UI zurücksetzen
+                        updatePlacesList();
+                    }
+                }
+            });
+        }
+
 
         // Update UI
         function updateUI() {
@@ -853,80 +1476,39 @@
             );
         }
 
-        // Save route to localStorage
-        function saveRoute() {
-                    localStorage.setItem('nzRoute', JSON.stringify(places));
-                }
 
-        async function loadPlacesFromAPI() {
-            try {
-                console.log('Loading places from API...'); // Debug
-                const response = await fetch(`${API_BASE}/places`);
-                
-                if (!response.ok) {
-                    throw new Error(`API Error: ${response.status}`);
-                }
-                
-                const apiPlaces = await response.json();
-                console.log('API Response:', apiPlaces); // Debug
-                
-                // Konvertiere API Format zu deinem Format
-                places = apiPlaces.map(p => ({
-                    name: p.name,
-                    coords: [p.latitude, p.longitude],
-                    id: p.id // Behalte ID für später
-                }));
-                
-                updateUI();
-                if (places.length > 0) {
-                    setTimeout(centerMap, 500);
-                }
-                
-                console.log('Places loaded successfully:', places.length);
-                
-            } catch (error) {
-                console.error('Failed to load places from API:', error);
-                
-                // Fallback: Versuche localStorage
-                loadSavedRoute();
-            }
-        }
-
-        // Load saved route
-        function loadSavedRoute() {
-            const saved = localStorage.getItem('nzRoute');
-            if (saved) {
-                try {
-                    places = JSON.parse(saved);
-                    updateUI();
-                    if (places.length > 0) {
-                        setTimeout(centerMap, 500);
-                    }
-                } catch (e) {
-                    console.error('Failed to load saved route');
-                }
-            }
-        }
-
-        // Export route
-        function exportRoute() {
-            if (places.length === 0) {
-                alert('No places to export');
+        // Export für aktuelle Route
+        async function exportRoute() {
+            if (!currentRouteId) {
+                alert('No route selected');
                 return;
             }
             
-            const routeData = {
-                name: 'NZ Route',
-                created: new Date().toISOString(),
-                places: places
-            };
-            
-            const blob = new Blob([JSON.stringify(routeData, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `nz-route-${new Date().getTime()}.json`;
-            a.click();
+            try {
+                // Aktuelle Route mit Places laden
+                const response = await fetch(`${API_BASE}/routes/${currentRouteId}`);
+                const route = await response.json();
+                
+                const exportData = {
+                    name: route.name,
+                    description: route.description,
+                    created: new Date().toISOString(),
+                    places: route.places.map(p => ({
+                        name: p.name,
+                        coords: [p.latitude, p.longitude]
+                    }))
+                };
+                
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${route.name.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
+                a.click();
+                
+            } catch (error) {
+                alert('Export failed');
+            }
         }
 
         // Import route
@@ -935,26 +1517,49 @@
             input.click();
         }
 
-        // Handle file import
-        document.getElementById('importFile').addEventListener('change', function(e) {
+        // Handle file import - NEUE VERSION
+        document.getElementById('importFile').addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
             
+            if (!currentRouteId) {
+                alert('Please select a route first!');
+                return;
+            }
+            
             const reader = new FileReader();
-            reader.onload = function(event) {
+            reader.onload = async function(event) {
                 try {
                     const data = JSON.parse(event.target.result);
-                    if (data.places && Array.isArray(data.places)) {
-                        places = data.places;
-                        updateUI();
-                        saveRoute();
-                        centerMap();
-                        alert('Route imported successfully!');
+                    
+                    if (!data.places || !Array.isArray(data.places)) {
+                        alert('Invalid file - no places found');
+                        return;
                     }
+                    
+                    console.log('Importing', data.places.length, 'places...');
+                    
+                    // Alle Places zur aktuellen Route hinzufügen
+                    for (const place of data.places) {
+                        if (place.name && place.coords && place.coords.length === 2) {
+                            await addPlace({
+                                name: place.name,
+                                coords: place.coords
+                            });
+                            
+                            // Kurze Pause zwischen Adds
+                            await new Promise(resolve => setTimeout(resolve, 300));
+                        }
+                    }
+                    
+                    alert(`Import completed! Added ${data.places.length} places to your current route.`);
+                    
                 } catch (error) {
-                    alert('Invalid route file');
+                    console.error('Import error:', error);
+                    alert('Invalid file format');
                 }
             };
+            
             reader.readAsText(file);
         });
 
@@ -975,6 +1580,19 @@
                 handleSearch();
             }
         }
+        // ===== UTILITY FUNCTIONS =====
+        // Success/Error Messages
+        function showSuccess(message) {
+            console.log('✅', message);
+            // Optional: Toast notification
+            alert(message); // Temporär, später durch Toast ersetzen
+        }
+        
+        function showError(message) {
+            console.error('❌', message);
+            alert(message); // Temporär, später durch Toast ersetzen
+        }
+        
         async function testAPI() {
             try {
                 const response = await fetch(`${API_BASE}/places`);
@@ -987,10 +1605,23 @@
             }
         }
 
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // ESC schließt Modal
+            if (e.key === 'Escape') {
+                closeRouteModal();
+            }
+            
+            // Enter im Modal speichert
+            if (e.key === 'Enter' && document.getElementById('routeModal').classList.contains('active')) {
+                saveRoute();
+            }
+        });
+
         // Initialize on load
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
             initMap();
-            loadPlacesFromAPI(); // Statt loadSavedRoute()
+            await loadRoutes(); // Lädt Routen und erste Route
         });
     </script>
 </body>

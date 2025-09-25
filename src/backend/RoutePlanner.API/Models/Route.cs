@@ -4,6 +4,8 @@ namespace RoutePlanner.API.Models
     {
         public int Id { get; set; }
         public string Name { get; set; } = "My NZ Route";
+        
+        public string Description { get; set; } = "My Route";
         public List<RoutePlace> Places { get; set; } = new();
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
