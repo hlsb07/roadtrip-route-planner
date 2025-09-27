@@ -1,0 +1,114 @@
+import { CONFIG } from './config.js';
+
+export class MapService {
+    constructor() {
+        this.map = null;
+        this.markers = [];
+        this.routePolyline = null;
+        this.showRoute = true;
+        this.clickMarker = null;
+    }
+
+    init() {
+        this.map = L.map('map').setView(CONFIG.MAP_CENTER, CONFIG.MAP_ZOOM);
+        
+        L.tileLayer(CONFIG.LEAFLET_TILE_URL, {
+            attribution: CONFIG.LEAFLET_ATTRIBUTION,
+            maxZoom: 18
+        }).addTo(this.map);
+
+        return this.map;
+    }
+
+    onMapClick(callback) {
+        this.map.on('click', (e) => {
+            const coords = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
+            callback(coords, e.latlng);
+            
+            // Add temporary marker
+            if (this.clickMarker) {
+                this.map.removeLayer(this.clickMarker);
+            }
+            this.clickMarker = L.marker(e.latlng).addTo(this.map);
+        });
+    }
+
+    clearClickMarker() {
+        if (this.clickMarker) {
+            this.map.removeLayer(this.clickMarker);
+            this.clickMarker = null;
+        }
+    }
+
+    updateMap(places) {
+        // Clear existing markers
+        this.markers.forEach(marker => this.map.removeLayer(marker));
+        this.markers = [];
+        
+        // Clear existing route
+        if (this.routePolyline) {
+            this.map.removeLayer(this.routePolyline);
+        }
+
+        if (places.length === 0) return;
+
+        // Add markers
+        places.forEach((place, index) => {
+            const marker = L.marker(place.coords)
+                .addTo(this.map)
+                .bindPopup(`<strong>${place.name}</strong><br>Stop ${index + 1}`);
+            this.markers.push(marker);
+        });
+
+        // Add route line if enabled
+        if (this.showRoute && places.length > 1) {
+            const coords = places.map(place => place.coords);
+            this.routePolyline = L.polyline(coords, {
+                color: '#667eea',
+                weight: 4,
+                opacity: 0.7,
+                smoothFactor: 1
+            }).addTo(this.map);
+        }
+    }
+
+    centerMap(places) {
+        if (places.length === 0) return;
+        const bounds = L.latLngBounds(places.map(place => place.coords));
+        this.map.fitBounds(bounds, { padding: [50, 50] });
+    }
+
+    toggleRoute() {
+        this.showRoute = !this.showRoute;
+        // Trigger update through callback or event
+        return this.showRoute;
+    }
+
+    getCurrentLocation() {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) {
+                reject(new Error('Geolocation is not supported by your browser'));
+                return;
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    this.map.setView([lat, lng], 13);
+                    
+                    // Add marker for current location
+                    L.marker([lat, lng])
+                        .addTo(this.map)
+                        .bindPopup('Your location')
+                        .openPopup();
+                    
+                    resolve({ lat, lng });
+                },
+                error => {
+                    reject(new Error('Unable to retrieve your location'));
+                }
+            );
+        });
+    }
+}

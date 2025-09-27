@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Roadtrip Route Planner - Enhanced</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="header">
+                <h1><i class="fas fa-map-marked-alt"></i> Roadtrip Route Planner</h1>
+                <p>Smart route planning for your adventure</p>
+            </div>
+
+            <div class="route-management">
+                <div class="route-selector">
+                    <label for="routeSelect">Current Route:</label>
+                    <div class="route-select-group">
+                        <select id="routeSelect" class="route-select">
+                            <option value="">Loading routes...</option>
+                        </select>
+                        <button class="btn-icon" onclick="showCreateRouteModal()" title="Create new route">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="route-actions">
+                    <button class="btn btn-sm" onclick="showRenameRouteModal()" title="Rename route">
+                        <i class="fas fa-edit"></i> Rename
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCurrentRoute()" title="Delete route">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+            
+            <div class="search-section">
+                <div class="search-tabs">
+                    <button class="tab-btn active" onclick="switchTab('search')">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                    <button class="tab-btn" onclick="switchTab('coords')">
+                        <i class="fas fa-map-pin"></i> Coords
+                    </button>
+                    <button class="tab-btn" onclick="switchTab('link')">
+                        <i class="fas fa-link"></i> Link
+                    </button>
+                </div>
+                
+                <div class="search-input-group">
+                    <input type="text" 
+                           id="searchInput" 
+                           class="search-input" 
+                           placeholder="Search for a place...">
+                    <button class="search-btn" onclick="handleSearch()">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <div id="searchResults" class="search-results"></div>
+                <div id="loading" class="loading">
+                    <i class="fas fa-spinner fa-spin"></i> Searching...
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="btn" onclick="exportRoute()">
+                    <i class="fas fa-download"></i> Export
+                </button>
+                <button class="btn" onclick="importRoute()">
+                    <i class="fas fa-upload"></i> Import
+                </button>
+                <button class="btn btn-danger" onclick="clearRoute()">
+                    <i class="fas fa-trash"></i> Clear
+                </button>
+            </div>
+            
+            <div class="places-list" id="placesList"></div>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div class="map-controls">
+            <button class="map-btn" onclick="centerMap()" title="Center map">
+                <i class="fas fa-compress-arrows-alt"></i>
+            </button>
+            <button class="map-btn" onclick="toggleRoute()" title="Toggle route">
+                <i class="fas fa-route"></i>
+            </button>
+            <button class="map-btn" onclick="getCurrentLocation()" title="My location">
+                <i class="fas fa-location-arrow"></i>
+            </button>
+        </div>
+        
+        <div class="info-panel">
+            <strong>Quick Tips:</strong><br>
+            • Click map to get coordinates<br>
+            • Drag places to reorder<br>
+            • Paste Google Maps links directly
+        </div>
+    </div>
+    
+    <div id="routeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Create New Route</h3>
+                <button class="btn-close" onclick="closeRouteModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="routeName">Route Name:</label>
+                    <input type="text" id="routeName" class="form-input" placeholder="My Amazing Trip">
+                </div>
+                <div class="form-group">
+                    <label for="routeDescription">Description (optional):</label>
+                    <textarea id="routeDescription" class="form-input" placeholder="Details about this route..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeRouteModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveRoute()" id="saveRouteBtn">Create Route</button>
+            </div>
+        </div>
+        <div id="modalOverlay" class="modal-overlay" onclick="closeRouteModal()"></div>
+    </div>    
+
+    <input type="file" id="importFile" style="display: none;" accept=".json">
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
