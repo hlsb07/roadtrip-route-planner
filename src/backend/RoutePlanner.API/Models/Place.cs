@@ -1,11 +1,14 @@
+using NetTopologySuite.Geometries;
+
 namespace RoutePlanner.API.Models
 {
     public class Place
     {
         public int Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public double Latitude { get; set; }
-        public double Longitude { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public required string Name { get; set; }
+        public required Point Location { get; set; }
+        
+        public List<RoutePlace> RoutePlaces { get; set; } = new();
     }
+
 }

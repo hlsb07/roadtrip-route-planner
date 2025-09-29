@@ -62,8 +62,8 @@ namespace RoutePlanner.API.Controllers
                     {
                         Id = rp.Place.Id,
                         Name = rp.Place.Name,
-                        Latitude = rp.Place.Latitude,
-                        Longitude = rp.Place.Longitude
+                        Latitude = rp.Place.Location.Y,  // PostGIS: Y = Latitude
+                        Longitude = rp.Place.Location.X  // PostGIS: X = Longitude
                     })
                     .ToList()
             };
@@ -219,6 +219,52 @@ namespace RoutePlanner.API.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // BONUS: PostGIS Feature - Route-Statistiken
+        [HttpGet("{id}/stats")]
+        public async Task<ActionResult<object>> GetRouteStats(int id)
+        {
+            var route = await _context.Routes
+                .Include(r => r.Places)
+                    .ThenInclude(rp => rp.Place)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (route == null)
+                return NotFound();
+
+            if (route.Places.Count < 2)
+            {
+                return Ok(new 
+                { 
+                    routeId = id,
+                    totalDistance = 0.0,
+                    placeCount = route.Places.Count,
+                    message = "Need at least 2 places to calculate distance"
+                });
+            }
+
+            // Gesamtdistanz der Route berechnen (PostGIS)
+            var orderedPlaces = route.Places.OrderBy(rp => rp.OrderIndex).ToList();
+            double totalDistance = 0;
+
+            for (int i = 0; i < orderedPlaces.Count - 1; i++)
+            {
+                var place1 = orderedPlaces[i].Place;
+                var place2 = orderedPlaces[i + 1].Place;
+                
+                var distance = place1.Location.Distance(place2.Location);
+                totalDistance += distance;
+            }
+
+            return Ok(new 
+            { 
+                routeId = id,
+                totalDistanceKm = Math.Round(totalDistance / 1000, 2),
+                placeCount = route.Places.Count,
+                startPlace = orderedPlaces.First().Place.Name,
+                endPlace = orderedPlaces.Last().Place.Name
+            });
         }
     }
 }

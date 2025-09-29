@@ -8,9 +8,12 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// In-Memory Database (für Entwicklung)
+// PostgreSQL Database mit PostGIS
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseInMemoryDatabase("RoutePlannerDb"));
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        x => x.UseNetTopologySuite() // Für PostGIS Support
+    ));
 
 // CORS für Frontend
 builder.Services.AddCors(options =>
@@ -37,11 +40,22 @@ app.UseCors();
 app.UseAuthorization();
 app.MapControllers();
 
-// Database initialisieren
+// Database automatisch migrieren (nur in Development)
+if (app.Environment.IsDevelopment())
+{
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    context.Database.EnsureCreated();
+        try
+        {
+            context.Database.Migrate(); // Führt automatisch alle Migrationen aus
+        }
+        catch (Exception ex)
+        {
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogError(ex, "An error occurred while migrating the database.");
+        }
+    }
 }
 
 app.Run();

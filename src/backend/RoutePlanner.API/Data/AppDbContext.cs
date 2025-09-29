@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RoutePlanner.API.Models;
+using NetTopologySuite.Geometries;
 
 namespace RoutePlanner.API.Data
 {
@@ -13,37 +14,103 @@ namespace RoutePlanner.API.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            base.OnModelCreating(modelBuilder);
+
+            // Place Konfiguration für PostGIS
+            modelBuilder.Entity<Place>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                
+                // GEOMETRY statt geography für einfachere Koordinaten-Zugriffe
+                entity.Property(e => e.Location)
+                      .HasColumnType("geometry (point, 4326)")
+                      .IsRequired();
+                
+                // Räumlicher Index für Performance
+                entity.HasIndex(e => e.Location)
+                      .HasMethod("gist");
+                      
+                // // Ignore für Convenience Properties (werden von Location berechnet)
+                // entity.Ignore(e => e.Latitude);
+                // entity.Ignore(e => e.Longitude);
+            });
+
+            // Route Konfiguration
+            modelBuilder.Entity<Models.Route>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(1000);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+            });
+
             // RoutePlace Konfiguration
-            modelBuilder.Entity<RoutePlace>()
-                .HasKey(rp => rp.Id);
+            modelBuilder.Entity<RoutePlace>(entity =>
+            {
+                entity.HasKey(rp => rp.Id);
 
-            modelBuilder.Entity<RoutePlace>()
-                .HasOne(rp => rp.Route)
-                .WithMany(r => r.Places)  // ⚠️ Wichtig: RoutePlaces statt Places
-                .HasForeignKey(rp => rp.RouteId)
-                .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(rp => rp.Route)
+                      .WithMany(r => r.Places)
+                    .HasForeignKey(rp => rp.RouteId)
+                    .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<RoutePlace>()
-                .HasOne(rp => rp.Place)
-                .WithMany()
-                .HasForeignKey(rp => rp.PlaceId);
+                entity.HasOne(rp => rp.Place)
+                      .WithMany(p => p.RoutePlaces)
+                      .HasForeignKey(rp => rp.PlaceId)
+                      .OnDelete(DeleteBehavior.Restrict); // Verhindert Löschen von Places, die in Routes verwendet werden
 
-            // Index für bessere Performance
-            modelBuilder.Entity<RoutePlace>()
-                .HasIndex(rp => new { rp.RouteId, rp.OrderIndex });
+                // Index für Performance
+                entity.HasIndex(rp => new { rp.RouteId, rp.OrderIndex })
+                      .IsUnique(); // Ein Ort kann nur einmal pro Position in einer Route sein
 
-            // Seed Data erweitern
+                entity.Property(rp => rp.OrderIndex).IsRequired();
+            });
+
+            // Seed Data (wird später per Migration hinzugefügt)
+            SeedData(modelBuilder);
+        }
+
+        private void SeedData(ModelBuilder modelBuilder)
+        {
+            var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+
+            // Seed Places mit PostGIS Points
             modelBuilder.Entity<Place>().HasData(
-                new Place { Id = 1, Name = "Christchurch", Latitude = -43.5321, Longitude = 172.6362 },
-                new Place { Id = 2, Name = "Wellington", Latitude = -41.2865, Longitude = 174.7762 },
-                new Place { Id = 3, Name = "Auckland", Latitude = -36.8485, Longitude = 174.7633 }
+                new 
+                { 
+                    Id = 1, 
+                    Name = "Christchurch",
+                    Location = geometryFactory.CreatePoint(new Coordinate(172.6362, -43.5321))
+                },
+                new 
+                { 
+                    Id = 2, 
+                    Name = "Wellington",
+                    Location = geometryFactory.CreatePoint(new Coordinate(174.7762, -41.2865))
+                },
+                new 
+                { 
+                    Id = 3, 
+                    Name = "Auckland",
+                    Location = geometryFactory.CreatePoint(new Coordinate(174.7633, -36.8485))
+                }
             );
 
-            // Beispiel-Route hinzufügen
+            // Seed Route
             modelBuilder.Entity<Models.Route>().HasData(
-                new Models.Route { Id = 1, Name = "New Zealand Highlights", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
+                new Models.Route 
+                { 
+                    Id = 1, 
+                    Name = "New Zealand Highlights", 
+                    Description = "The best of New Zealand",
+                    CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                }
             );
 
+            // Seed RoutePlaces
             modelBuilder.Entity<RoutePlace>().HasData(
                 new RoutePlace { Id = 1, RouteId = 1, PlaceId = 1, OrderIndex = 0 },
                 new RoutePlace { Id = 2, RouteId = 1, PlaceId = 2, OrderIndex = 1 },
