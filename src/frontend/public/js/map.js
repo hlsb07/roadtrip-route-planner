@@ -58,8 +58,10 @@ export class MapService {
                 .addTo(this.map)
                 .bindPopup(`
                     <div>
-                        <div class="place-number">${index + 1}</div>
-                        <strong>${place.name}</strong><br>
+                        <div class="map-popup-header">
+                            <div class="place-number">${index + 1}</div>
+                            <strong>${place.name}</strong>
+                        </div>
                         <small>Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</small><br>
                         <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}" target="_blank">
                             📍 View in Google Maps
