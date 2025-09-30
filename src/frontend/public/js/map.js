@@ -56,7 +56,16 @@ export class MapService {
         places.forEach((place, index) => {
             const marker = L.marker(place.coords)
                 .addTo(this.map)
-                .bindPopup(`<strong>${place.name}</strong><br>Stop ${index + 1}`);
+                .bindPopup(`
+                    <div>
+                        <div class="place-number">${index + 1}</div>
+                        <strong>${place.name}</strong><br>
+                        <small>Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</small><br>
+                        <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}" target="_blank">
+                            📍 View in Google Maps
+                        </a>
+                    </div>
+                `);
             this.markers.push(marker);
         });
 
