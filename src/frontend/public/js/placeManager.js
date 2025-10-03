@@ -6,6 +6,7 @@ export class PlaceManager {
         this.routeManager = routeManager;
         this.places = [];
         this.onUpdate = onUpdate;
+        this.selectedIndex = null;
     }
 
     async addPlace(place) {
@@ -141,12 +142,12 @@ export class PlaceManager {
         }
 
         placesList.innerHTML = this.places.map((place, index) => `
-            <div class="place-item" data-index="${index}">
+            <div class="place-item ${this.selectedIndex === index ? 'selected' : ''}" data-index="${index}" onclick="window.app?.selectPlace(${index})">
                 <div class="place-header">
                     <div class="place-number">${index + 1}</div>
                     <div class="place-name">${place.name}</div>
                     <div class="place-actions">
-                        <button class="action-btn delete-btn" onclick="placeManager.removePlace(${index})" title="Remove from route">
+                        <button class="action-btn delete-btn" onclick="event.stopPropagation(); placeManager.removePlace(${index})" title="Remove from route">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -154,12 +155,14 @@ export class PlaceManager {
                 <div class="place-links">
                     <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
                     target="_blank"
-                    class="link-btn google-maps">
+                    class="link-btn google-maps"
+                    onclick="event.stopPropagation()">
                         <i class="fas fa-map"></i> Maps
                     </a>
                     <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}"
                     target="_blank"
-                    class="link-btn google-nav">
+                    class="link-btn google-nav"
+                    onclick="event.stopPropagation()">
                         <i class="fas fa-directions"></i> Navigate
                     </a>
                 </div>
@@ -234,12 +237,21 @@ export class PlaceManager {
 
     clearRoute() {
         if (this.places.length === 0) return;
-        
+
         if (confirm('Clear all places from your route?')) {
             // Note: This would need API implementation
             this.places = [];
             return true;
         }
         return false;
+    }
+
+    selectPlace(index) {
+        if (index < 0 || index >= this.places.length) return;
+        this.selectedIndex = index;
+    }
+
+    deselectPlace() {
+        this.selectedIndex = null;
     }
 }

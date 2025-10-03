@@ -7,6 +7,7 @@ export class MapService {
         this.routePolyline = null;
         this.showRoute = true;
         this.clickMarker = null;
+        this.selectedMarkerIndex = null;
     }
 
     init() {
@@ -44,7 +45,7 @@ export class MapService {
         // Clear existing markers
         this.markers.forEach(marker => this.map.removeLayer(marker));
         this.markers = [];
-        
+
         // Clear existing route
         if (this.routePolyline) {
             this.map.removeLayer(this.routePolyline);
@@ -54,7 +55,22 @@ export class MapService {
 
         // Add markers
         places.forEach((place, index) => {
-            const marker = L.marker(place.coords)
+            const isSelected = this.selectedMarkerIndex === index;
+
+            // Create custom icon with size based on selection
+            const iconSize = isSelected ? [35, 50] : [25, 41];
+            const iconAnchor = isSelected ? [17, 50] : [12, 41];
+
+            const customIcon = L.icon({
+                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                iconSize: iconSize,
+                iconAnchor: iconAnchor,
+                popupAnchor: [1, -34],
+                shadowSize: isSelected ? [50, 50] : [41, 41]
+            });
+
+            const marker = L.marker(place.coords, { icon: customIcon })
                 .addTo(this.map)
                 .bindPopup(`
                     <div>
@@ -101,19 +117,19 @@ export class MapService {
                 reject(new Error('Geolocation is not supported by your browser'));
                 return;
             }
-            
+
             navigator.geolocation.getCurrentPosition(
                 position => {
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     this.map.setView([lat, lng], 13);
-                    
+
                     // Add marker for current location
                     L.marker([lat, lng])
                         .addTo(this.map)
                         .bindPopup('Your location')
                         .openPopup();
-                    
+
                     resolve({ lat, lng });
                 },
                 error => {
@@ -121,5 +137,20 @@ export class MapService {
                 }
             );
         });
+    }
+
+    selectPlace(index) {
+        if (index < 0 || index >= this.markers.length) return;
+
+        this.selectedMarkerIndex = index;
+        const marker = this.markers[index];
+
+        // Open popup
+        marker.openPopup();
+        //this.map.setView(marker.getLatLng(), this.map.getZoom() < 13 ? 13 : this.map.getZoom());
+    }
+
+    deselectPlace() {
+        this.selectedMarkerIndex = null;
     }
 }

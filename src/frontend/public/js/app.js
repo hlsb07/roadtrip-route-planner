@@ -243,6 +243,13 @@ class App {
         this.placeManager.updatePlacesList();
         this.mapService.updateMap(this.placeManager.getPlaces());
     }
+
+    selectPlace(index) {
+        this.placeManager.selectPlace(index);
+        this.mapService.selectedMarkerIndex = index;
+        this.updateUI();
+        this.mapService.selectPlace(index);
+    }
 }
 
 // Initialize app when DOM is loaded
