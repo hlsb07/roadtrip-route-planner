@@ -9,9 +9,9 @@ class App {
         this.mapService = new MapService();
         this.routeManager = new RouteManager();
         this.searchManager = new SearchManager();
-        this.placeManager = new PlaceManager(this.routeManager);
-        
-        
+        this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
+
+
         this.bindEventListeners();
         this.setupKeyboardShortcuts();
     }

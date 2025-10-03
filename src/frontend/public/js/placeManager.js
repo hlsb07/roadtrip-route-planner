@@ -2,9 +2,10 @@ import { ApiService } from './api.js';
 import { showSuccess, showError, sleep } from './utils.js';
 
 export class PlaceManager {
-    constructor(routeManager) {
+    constructor(routeManager, onUpdate = null) {
         this.routeManager = routeManager;
         this.places = [];
+        this.onUpdate = onUpdate;
     }
 
     async addPlace(place) {
@@ -116,7 +117,7 @@ export class PlaceManager {
     updatePlacesList(onRemove) {
         const placesList = document.getElementById('placesList');
         const currentRouteId = this.routeManager.getCurrentRouteId();
-        
+
         if (!currentRouteId) {
             placesList.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: #999;">
@@ -128,7 +129,7 @@ export class PlaceManager {
                 </div>`;
             return;
         }
-        
+
         if (this.places.length === 0) {
             placesList.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: #999;">
@@ -138,7 +139,7 @@ export class PlaceManager {
                 </div>`;
             return;
         }
-        
+
         placesList.innerHTML = this.places.map((place, index) => `
             <div class="place-item" data-index="${index}">
                 <div class="place-header">
@@ -151,20 +152,20 @@ export class PlaceManager {
                     </div>
                 </div>
                 <div class="place-links">
-                    <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}" 
-                    target="_blank" 
+                    <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
+                    target="_blank"
                     class="link-btn google-maps">
                         <i class="fas fa-map"></i> Maps
                     </a>
-                    <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}" 
-                    target="_blank" 
+                    <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}"
+                    target="_blank"
                     class="link-btn google-nav">
                         <i class="fas fa-directions"></i> Navigate
                     </a>
                 </div>
             </div>
         `).join('');
-        
+
         // Initialize sortable for drag & drop
         new Sortable(placesList, {
             animation: 300,
@@ -175,12 +176,17 @@ export class PlaceManager {
                     const index = parseInt(item.dataset.index);
                     return this.places[index].id;
                 });
-                
+
                 console.log('New order:', newOrder);
-                
+
                 // API call for reorder
                 const success = await this.reorderPlaces(newOrder);
-                if (!success) {
+                if (success) {
+                    // Update UI on success
+                    if (this.onUpdate) {
+                        this.onUpdate();
+                    }
+                } else {
                     // Reset UI on failure
                     this.updatePlacesList(onRemove);
                 }

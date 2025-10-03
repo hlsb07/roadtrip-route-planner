@@ -153,8 +153,8 @@ namespace RoutePlanner.API.Controllers
             if (route.Places.Any(rp => rp.PlaceId == addDto.PlaceId))
                 return BadRequest("Place already in route");
 
-            // OrderIndex bestimmen
-            var orderIndex = addDto.OrderIndex ?? route.Places.Count;
+            // OrderIndex bestimmen - use max + 1 to avoid conflicts
+            var orderIndex = addDto.OrderIndex ?? (route.Places.Any() ? route.Places.Max(rp => rp.OrderIndex) + 1 : 0);
 
             var routePlace = new RoutePlace
             {
@@ -196,7 +196,7 @@ namespace RoutePlanner.API.Controllers
 
         // PUT: api/routes/{id}/places/reorder - Reihenfolge der Orte ändern
         [HttpPut("{id}/places/reorder")]
-        public async Task<IActionResult> ReorderPlaces(int id, List<int> placeIds)
+        public async Task<IActionResult> ReorderPlaces(int id, [FromBody] List<int> placeIds)
         {
             var route = await _context.Routes
                 .Include(r => r.Places)
@@ -205,7 +205,14 @@ namespace RoutePlanner.API.Controllers
             if (route == null)
                 return NotFound();
 
-            // Neue Reihenfolge setzen
+            // Step 1: Set all OrderIndex to negative values to avoid unique constraint conflicts
+            for (int i = 0; i < route.Places.Count; i++)
+            {
+                route.Places.ElementAt(i).OrderIndex = -(i + 1);
+            }
+            await _context.SaveChangesAsync();
+
+            // Step 2: Set the new order
             for (int i = 0; i < placeIds.Count; i++)
             {
                 var routePlace = route.Places.FirstOrDefault(rp => rp.PlaceId == placeIds[i]);
