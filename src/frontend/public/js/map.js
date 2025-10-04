@@ -74,15 +74,24 @@ export class MapService {
             const marker = L.marker(place.coords, { icon: customIcon })
                 .addTo(this.map)
                 .bindPopup(`
-                    <div>
+                    <div class="map-popup-content">
                         <div class="map-popup-header">
                             <div class="place-number">${index + 1}</div>
                             <strong>${place.name}</strong>
                         </div>
-                        <small>Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</small><br>
-                        <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}" target="_blank">
-                            📍 View in Google Maps
-                        </a>
+                        <div class="map-popup-coords">Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</div>
+                        <div class="map-popup-links">
+                            <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
+                               target="_blank"
+                               class="link-btn google-maps">
+                                <i class="fas fa-map"></i> Google Maps
+                            </a>
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}"
+                               target="_blank"
+                               class="link-btn google-nav">
+                                <i class="fas fa-directions"></i> Navigate
+                            </a>
+                        </div>
                     </div>
                 `)
                 .on('click', () => {

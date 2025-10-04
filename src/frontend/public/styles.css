@@ -248,6 +248,22 @@ body {
     font-size: 1.1em;
 }
 
+.map-popup-content {
+    min-width: 200px;
+}
+
+.map-popup-coords {
+    font-size: 0.75rem;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.map-popup-links {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .place-name {
     flex: 1;
     font-weight: 600;
@@ -582,26 +598,95 @@ textarea.form-input {
     font-size: 0.85rem;
 }
 
+/* Leaflet Popup Customization */
+.leaflet-popup-content-wrapper {
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.leaflet-popup-content {
+    margin: 12px 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+.leaflet-popup-tip {
+    background: white;
+}
+
+.leaflet-popup-close-button {
+    font-size: 24px !important;
+    width: 35px !important;
+    height: 35px !important;
+    padding: 4px !important;
+    color: #666 !important;
+    border-radius: 20%;
+}
+
+.leaflet-popup-close-button:hover {
+    color: #ff6b6b !important;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+/* Override Leaflet's default link styles for our custom buttons */
+.leaflet-container .link-btn,
+.leaflet-popup .link-btn {
+    padding: 5px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.leaflet-container .google-maps,
+.leaflet-popup .google-maps {
+    background: #4285f4;
+    color: white;
+}
+
+.leaflet-container .google-maps:hover,
+.leaflet-popup .google-maps:hover {
+    background: #3367d6;
+    color: white;
+    transform: scale(1.05);
+}
+
+.leaflet-container .google-nav,
+.leaflet-popup .google-nav {
+    background: #34a853;
+    color: white;
+}
+
+.leaflet-container .google-nav:hover,
+.leaflet-popup .google-nav:hover {
+    background: #2d8e47;
+    color: white;
+    transform: scale(1.05);
+}
+
 @media (max-width: 768px) {
     .container {
         flex-direction: column;
     }
-    
+
     .sidebar {
         width: 100%;
         height: 50%;
         order: 2;
     }
-    
+
     #map {
         height: 50%;
         order: 1;
     }
-    
+
     .search-tabs {
         font-size: 0.85rem;
     }
-    
+
     .place-item {
         padding: 12px;
     }
