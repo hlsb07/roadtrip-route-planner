@@ -8,6 +8,7 @@ export class MapService {
         this.showRoute = true;
         this.clickMarker = null;
         this.selectedMarkerIndex = null;
+        this.onMarkerClick = null;
     }
 
     init() {
@@ -83,7 +84,12 @@ export class MapService {
                             📍 View in Google Maps
                         </a>
                     </div>
-                `);
+                `)
+                .on('click', () => {
+                    if (this.onMarkerClick) {
+                        this.onMarkerClick(index);
+                    }
+                });
             this.markers.push(marker);
         });
 
@@ -152,5 +158,9 @@ export class MapService {
 
     deselectPlace() {
         this.selectedMarkerIndex = null;
+    }
+
+    setMarkerClickCallback(callback) {
+        this.onMarkerClick = callback;
     }
 }

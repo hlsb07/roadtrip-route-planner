@@ -20,19 +20,24 @@ class App {
         try {
             // Initialize map
             this.mapService.init();
-            
+
             // Setup map click handler
             this.mapService.onMapClick((coords, latlng) => {
                 this.searchManager.onMapClick(coords, latlng);
             });
-            
+
+            // Setup marker click handler
+            this.mapService.setMarkerClickCallback((index) => {
+                this.selectPlace(index);
+            });
+
             // Load routes and first route
             const places = await this.routeManager.loadRoutes();
             if (places && places.length > 0) {
                 this.placeManager.setPlaces(places);
                 this.updateUI();
             }
-            
+
         } catch (error) {
             console.error('Failed to initialize app:', error);
             showError('Failed to initialize application');

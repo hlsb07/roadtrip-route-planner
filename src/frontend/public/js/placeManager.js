@@ -249,6 +249,14 @@ export class PlaceManager {
     selectPlace(index) {
         if (index < 0 || index >= this.places.length) return;
         this.selectedIndex = index;
+
+        // Scroll to the selected place in the list
+        setTimeout(() => {
+            const selectedElement = document.querySelector(`.place-item[data-index="${index}"]`);
+            if (selectedElement) {
+                selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }, 100);
     }
 
     deselectPlace() {
