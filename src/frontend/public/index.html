@@ -10,8 +10,8 @@
 </head>
 <body>
     <div class="container">
-        <div class="sidebar">
-            <div class="header">
+        <div class="sidebar" id="sidebar">
+            <div class="header" onclick="toggleMobileSidebar()">
                 <h1><i class="fas fa-map-marked-alt"></i> Roadtrip Route Planner</h1>
                 <p>Smart route planning for your adventure</p>
             </div>
@@ -96,6 +96,10 @@
                 <i class="fas fa-location-arrow"></i>
             </button>
         </div>
+
+        <button class="mobile-toggle" id="mobileToggle" onclick="toggleMobileSidebar()">
+            <i class="fas fa-chevron-up"></i>
+        </button>
     </div>
     
     <div id="routeModal" class="modal">
@@ -128,6 +132,49 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <script>
+        // Mobile sidebar toggle functionality
+        window.toggleMobileSidebar = function() {
+            const sidebar = document.getElementById('sidebar');
+            const toggle = document.getElementById('mobileToggle');
+            const icon = toggle?.querySelector('i');
+
+            if (sidebar.classList.contains('expanded')) {
+                sidebar.classList.remove('expanded');
+                toggle?.classList.remove('expanded');
+                if (icon) icon.className = 'fas fa-chevron-up';
+            } else {
+                sidebar.classList.add('expanded');
+                toggle?.classList.add('expanded');
+                if (icon) icon.className = 'fas fa-chevron-down';
+            }
+        };
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const toggle = document.getElementById('mobileToggle');
+
+                if (sidebar.classList.contains('expanded') &&
+                    !sidebar.contains(e.target) &&
+                    e.target !== toggle &&
+                    !toggle?.contains(e.target)) {
+                    window.toggleMobileSidebar();
+                }
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const sidebar = document.getElementById('sidebar');
+            if (window.innerWidth > 768) {
+                sidebar.classList.remove('expanded');
+            }
+        });
+    </script>
+
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
