@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using RoutePlanner.API.Data;
+using RoutePlanner.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// HttpClient for Google Maps API
+builder.Services.AddHttpClient<GoogleMapsService>();
+
+// Google Maps Service
+builder.Services.AddScoped<GoogleMapsService>();
 
 // PostgreSQL Database mit PostGIS
 builder.Services.AddDbContext<AppDbContext>(options =>

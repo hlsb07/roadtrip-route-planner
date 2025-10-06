@@ -11,6 +11,7 @@ namespace RoutePlanner.API.Data
         public DbSet<Place> Places { get; set; }
         public DbSet<Models.Route> Routes { get; set; }
         public DbSet<RoutePlace> RoutePlaces { get; set; }
+        public DbSet<GoogleMapsCache> GoogleMapsCache { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -66,6 +67,32 @@ namespace RoutePlanner.API.Data
                       .IsUnique(); // Ein Ort kann nur einmal pro Position in einer Route sein
 
                 entity.Property(rp => rp.OrderIndex).IsRequired();
+            });
+
+            // GoogleMapsCache Konfiguration
+            modelBuilder.Entity<GoogleMapsCache>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.SearchQuery).HasMaxLength(500);
+                entity.Property(e => e.GooglePlaceId).HasMaxLength(200);
+                entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.FormattedAddress).HasMaxLength(500);
+                entity.Property(e => e.ApiType).HasMaxLength(50).IsRequired();
+
+                // PostGIS Point for location
+                entity.Property(e => e.Location)
+                      .HasColumnType("geometry (point, 4326)")
+                      .IsRequired();
+
+                // Indexes for performance
+                entity.HasIndex(e => e.SearchQuery);
+                entity.HasIndex(e => e.GooglePlaceId);
+                entity.HasIndex(e => e.Name);
+                entity.HasIndex(e => e.Location).HasMethod("gist");
+                entity.HasIndex(e => e.ExpiresAt);
+
+                // Default values
+                entity.Property(e => e.HitCount).HasDefaultValue(0);
             });
 
             // Seed Data (wird später per Migration hinzugefügt)

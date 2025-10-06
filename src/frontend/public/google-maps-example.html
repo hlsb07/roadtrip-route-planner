@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Maps API - Test & Example</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/google-maps-ui.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-top: 0;
+        }
+
+        .demo-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .demo-section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .search-box button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .search-box button:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .results {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .result-item:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .status.success {
+            background: rgba(52, 168, 83, 0.1);
+            color: #34a853;
+        }
+
+        .status.error {
+            background: rgba(234, 67, 53, 0.1);
+            color: #ea4335;
+        }
+
+        .status.info {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        code {
+            background: #f0f0f0;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .instructions h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-map-marked-alt"></i> Google Maps API - Test & Demo</h1>
+
+        <div class="instructions">
+            <h4>⚠️ Setup Required</h4>
+            <p>Before testing, make sure you've:</p>
+            <ol>
+                <li>Added your API key to <code>js/google-maps-config.js</code></li>
+                <li>Enabled APIs in Google Cloud Console</li>
+                <li>Set up billing (free tier: $200/month)</li>
+            </ol>
+            <p>See <strong>GOOGLE_MAPS_SETUP_GUIDE.md</strong> for detailed instructions.</p>
+        </div>
+
+        <div id="status" class="status info">
+            Click "Initialize" to load Google Maps API...
+        </div>
+
+        <div class="demo-section">
+            <h3>1. Initialize Google Maps</h3>
+            <button onclick="initializeGoogleMaps()" class="search-box button">
+                <i class="fas fa-power-off"></i> Initialize Google Maps API
+            </button>
+        </div>
+
+        <div class="demo-section">
+            <h3>2. Search Places (Autocomplete)</h3>
+            <div class="search-box">
+                <input
+                    type="text"
+                    id="searchInput"
+                    placeholder="Search for a place in New Zealand..."
+                    disabled
+                >
+                <button onclick="searchPlaces()" id="searchBtn" disabled>
+                    <i class="fas fa-search"></i> Search
+                </button>
+            </div>
+            <div id="searchResults" class="results">
+                Results will appear here...
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h3>3. Geocode Address</h3>
+            <div class="search-box">
+                <input
+                    type="text"
+                    id="geocodeInput"
+                    placeholder="Enter an address..."
+                    value="Auckland, New Zealand"
+                    disabled
+                >
+                <button onclick="geocodeAddress()" id="geocodeBtn" disabled>
+                    <i class="fas fa-map-pin"></i> Geocode
+                </button>
+            </div>
+            <div id="geocodeResults" class="results">
+                Geocoding results will appear here...
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <h3>4. Cache Statistics</h3>
+            <p>Monitor API usage and cost savings:</p>
+            <button onclick="showGoogleMapsStats()" class="search-box button">
+                <i class="fas fa-chart-bar"></i> View Cache Statistics
+            </button>
+        </div>
+    </div>
+
+    <!-- Test & Stats Buttons -->
+    <button class="google-maps-test-btn" onclick="showGoogleMapsTest()">
+        <i class="fas fa-vial"></i> Test API
+    </button>
+    <button class="google-maps-stats-btn" onclick="showGoogleMapsStats()">
+        <i class="fas fa-chart-bar"></i> Cache Stats
+    </button>
+
+    <!-- Load Google Maps modules -->
+    <script type="module">
+        import { googleMapsService } from './js/google-maps-service.js';
+        import { showTestPanel, showCacheStatsPanel } from './js/google-maps-test.js';
+
+        // Make functions globally accessible
+        window.googleMapsService = googleMapsService;
+        window.showGoogleMapsTest = showTestPanel;
+        window.showGoogleMapsStats = showCacheStatsPanel;
+
+        let isInitialized = false;
+
+        window.initializeGoogleMaps = async function() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status info';
+            statusDiv.textContent = 'Initializing Google Maps API...';
+
+            try {
+                await googleMapsService.init();
+
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = '✅ Google Maps API initialized successfully!<br><small>Cache enabled - API calls will be minimized</small>';
+
+                // Enable inputs
+                document.getElementById('searchInput').disabled = false;
+                document.getElementById('searchBtn').disabled = false;
+                document.getElementById('geocodeInput').disabled = false;
+                document.getElementById('geocodeBtn').disabled = false;
+
+                isInitialized = true;
+
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `❌ Failed to initialize: ${error.message}`;
+                console.error(error);
+            }
+        };
+
+        window.searchPlaces = async function() {
+            if (!isInitialized) {
+                alert('Please initialize Google Maps first!');
+                return;
+            }
+
+            const input = document.getElementById('searchInput').value.trim();
+            if (!input) {
+                alert('Please enter a search query');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
+
+            try {
+                const predictions = await googleMapsService.searchPlaces(input);
+
+                if (predictions.length === 0) {
+                    resultsDiv.innerHTML = 'No results found';
+                    return;
+                }
+
+                resultsDiv.innerHTML = predictions.map(pred => `
+                    <div class="result-item" onclick="selectPlace('${pred.place_id}')">
+                        <strong>${pred.description.split(',')[0]}</strong><br>
+                        <small style="color: #666;">${pred.description}</small>
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<span style="color: #ea4335;">Error: ${error.message}</span>`;
+                console.error(error);
+            }
+        };
+
+        window.selectPlace = async function(placeId) {
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting place details...';
+
+            try {
+                const place = await googleMapsService.getPlaceDetails(placeId);
+
+                resultsDiv.innerHTML = `
+                    <div style="background: rgba(52, 168, 83, 0.1); padding: 15px; border-radius: 8px;">
+                        <h4 style="margin-top: 0; color: #34a853;">✓ Place Details Retrieved</h4>
+                        <p><strong>Name:</strong> ${place.name}</p>
+                        <p><strong>Address:</strong> ${place.address}</p>
+                        <p><strong>Coordinates:</strong> ${place.location.lat.toFixed(6)}, ${place.location.lng.toFixed(6)}</p>
+                        <p><strong>Place ID:</strong> <code>${place.placeId}</code></p>
+                    </div>
+                `;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<span style="color: #ea4335;">Error: ${error.message}</span>`;
+                console.error(error);
+            }
+        };
+
+        window.geocodeAddress = async function() {
+            if (!isInitialized) {
+                alert('Please initialize Google Maps first!');
+                return;
+            }
+
+            const input = document.getElementById('geocodeInput').value.trim();
+            if (!input) {
+                alert('Please enter an address');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('geocodeResults');
+            resultsDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Geocoding...';
+
+            try {
+                const result = await googleMapsService.geocode(input);
+
+                resultsDiv.innerHTML = `
+                    <div style="background: rgba(52, 168, 83, 0.1); padding: 15px; border-radius: 8px;">
+                        <h4 style="margin-top: 0; color: #34a853;">✓ Address Geocoded</h4>
+                        <p><strong>Address:</strong> ${result.address}</p>
+                        <p><strong>Latitude:</strong> ${result.location.lat.toFixed(6)}</p>
+                        <p><strong>Longitude:</strong> ${result.location.lng.toFixed(6)}</p>
+                        <p><strong>Place ID:</strong> <code>${result.placeId}</code></p>
+                    </div>
+                `;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `<span style="color: #ea4335;">Error: ${error.message}</span>`;
+                console.error(error);
+            }
+        };
+
+        // Enable Enter key for search
+        document.getElementById('searchInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') searchPlaces();
+        });
+
+        document.getElementById('geocodeInput')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') geocodeAddress();
+        });
+    </script>
+</body>
+</html>

@@ -11,6 +11,8 @@ class App {
         this.searchManager = new SearchManager();
         this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
 
+        // Set callback for search result selection
+        this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
 
         this.bindEventListeners();
         this.setupKeyboardShortcuts();
@@ -108,13 +110,11 @@ class App {
     // Public methods for global access
     async handleSearch() {
         const result = await this.searchManager.handleSearch();
-        
+
         if (result) {
             if (Array.isArray(result)) {
-                // Search results - display them
-                this.searchManager.displaySearchResults(result, (place) => {
-                    this.addPlace(place);
-                });
+                // Search results - already displayed by SearchManager with callback
+                // No need to do anything here
             } else if (result.coords) {
                 // Direct place from coords or link
                 await this.addPlace(result);

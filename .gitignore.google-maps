@@ -1,0 +1,15 @@
+# Google Maps API - Security
+# Add these lines to your .gitignore file
+
+# Google Maps API configuration (contains API key)
+src/frontend/public/js/google-maps-config.js
+
+# Alternative: Use environment-specific configs
+# src/frontend/public/js/google-maps-config.production.js
+# src/frontend/public/js/google-maps-config.development.js
+
+# Cache exports (optional - can contain cached API data)
+google-maps-cache-*.json
+
+# Note: Create a google-maps-config.example.js with placeholder
+# for other developers to use as a template
