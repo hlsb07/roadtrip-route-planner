@@ -667,36 +667,166 @@ textarea.form-input {
     transform: scale(1.05);
 }
 
-/* Mobile Toggle Button */
-.mobile-toggle {
+/* Mobile Navigation Bar */
+.mobile-nav {
     display: none;
     position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
     z-index: 1500;
+    border-top: 1px solid #e0e0e0;
+}
+
+.mobile-nav-items {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.mobile-nav-item i {
+    font-size: 1.3rem;
+    transition: transform 0.2s;
+}
+
+.mobile-nav-item.active {
+    color: #667eea;
+}
+
+.mobile-nav-item.active i {
+    transform: scale(1.15);
+}
+
+.mobile-nav-item:active {
+    transform: scale(0.95);
+}
+
+/* Mobile Content Panel */
+.mobile-content-panel {
+    display: none;
+    position: fixed;
+    bottom: 65px;
+    left: 0;
+    right: 0;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1400;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-in-out;
+}
+
+.mobile-content-panel.active {
+    max-height: calc(30vh);
+}
+
+.mobile-content-panel.expanded {
+    max-height: calc(vh);
+}
+
+.mobile-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
     background: linear-gradient(135deg, #667eea, #764ba2);
     color: white;
+    position: relative;
+}
+
+.mobile-panel-header::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 2px;
+}
+
+.mobile-panel-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.mobile-panel-expand {
+    background: none;
     border: none;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    font-size: 1.5rem;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    color: white;
+    font-size: 1.2rem;
     cursor: pointer;
-    transition: all 0.3s;
+    padding: 5px;
+    display: none;
 }
 
-.mobile-toggle:active {
-    transform: translateX(-50%) scale(0.95);
-}
-
-.mobile-toggle i {
+.mobile-panel-expand i {
     transition: transform 0.3s;
 }
 
-.mobile-toggle.expanded i {
+.mobile-content-panel.expanded .mobile-panel-expand i {
     transform: rotate(180deg);
+}
+
+.mobile-panel-content {
+    overflow-y: auto;
+    max-height: calc(70vh - 50px);
+    background: #fafafa;
+}
+
+.mobile-content-panel.expanded .mobile-panel-content {
+    max-height: calc(85vh - 50px);
+}
+
+/* Mobile panel content styles */
+.mobile-content-panel .route-management,
+.mobile-content-panel .search-section,
+.mobile-content-panel .controls {
+    background: white;
+    border: none;
+}
+
+.mobile-content-panel .places-list {
+    background: #fafafa;
+    padding: 10px;
+}
+
+.mobile-content-panel .place-item {
+    margin-bottom: 8px;
+}
+
+.mobile-content-panel .search-results {
+    max-height: 200px;
+}
+
+/* Ensure buttons work in mobile panel */
+.mobile-content-panel .btn,
+.mobile-content-panel .tab-btn,
+.mobile-content-panel .search-btn,
+.mobile-content-panel .action-btn {
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 /* Tablet Styles (768px - 1024px) */
@@ -725,137 +855,28 @@ textarea.form-input {
         position: relative;
     }
 
+    /* Hide desktop sidebar on mobile */
     .sidebar {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        width: 100%;
-        height: auto;
-        max-height: 75vh;
-        order: 2;
-        z-index: 1100;
-        border-radius: 20px 20px 0 0;
-        box-shadow: 0 -5px 30px rgba(0,0,0,0.2);
-        transform: translateY(calc(100% - 60px));
-        transition: transform 0.3s ease-in-out;
-    }
-
-    .sidebar.expanded {
-        transform: translateY(0);
-    }
-
-    /* Mobile header with drag handle */
-    .header {
-        padding: 10px 20px;
-        cursor: pointer;
-        position: relative;
-    }
-
-    .header::before {
-        content: '';
-        position: absolute;
-        top: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 40px;
-        height: 4px;
-        background: rgba(255,255,255,0.5);
-        border-radius: 2px;
-    }
-
-    .header h1 {
-        font-size: 1.1rem;
-        margin-top: 10px;
-    }
-
-    .header p {
-        font-size: 0.75rem;
-    }
-
-    /* Hide sections when collapsed */
-    .sidebar:not(.expanded) .route-management,
-    .sidebar:not(.expanded) .search-section,
-    .sidebar:not(.expanded) .controls,
-    .sidebar:not(.expanded) .places-list {
         display: none;
     }
 
     #map {
         height: 100vh;
-        order: 1;
-        flex: 1;
+        width: 100%;
     }
 
-    /* Mobile tabs navigation */
-    .search-tabs {
-        font-size: 0.75rem;
-        gap: 6px;
+    /* Show mobile navigation */
+    .mobile-nav {
+        display: block;
     }
 
-    .tab-btn {
-        padding: 6px 4px;
-        font-size: 0.75rem;
+    .mobile-content-panel {
+        display: block;
     }
 
-    /* Compact controls */
-    .controls {
-        padding: 10px;
-        gap: 6px;
-    }
-
-    .btn {
-        padding: 8px;
-        font-size: 0.8rem;
-    }
-
-    /* Scrollable places list */
-    .places-list {
-        max-height: 35vh;
-        padding: 10px;
-    }
-
-    .place-item {
-        padding: 10px;
-        margin-bottom: 8px;
-    }
-
-    .place-number {
-        width: 24px;
-        height: 24px;
-        font-size: 0.75rem;
-    }
-
-    .place-name {
-        font-size: 0.85rem;
-    }
-
-    /* Route management compact */
-    .route-management {
-        padding: 10px;
-    }
-
-    .route-selector label {
-        font-size: 0.8rem;
-    }
-
-    .route-select {
-        font-size: 0.8rem;
-        padding: 6px 10px;
-    }
-
-    .btn-icon {
-        width: 30px;
-        height: 30px;
-    }
-
-    .route-actions {
-        gap: 6px;
-    }
-
-    .btn-sm {
-        padding: 5px 10px;
-        font-size: 0.75rem;
+    /* Show expand button only for Place List mode */
+    .mobile-content-panel[data-mode="places"] .mobile-panel-expand {
+        display: block;
     }
 
     /* Map controls repositioned */
@@ -869,17 +890,6 @@ textarea.form-input {
         width: 45px;
         height: 45px;
         font-size: 1.1rem;
-    }
-
-    /* Search input */
-    .search-input {
-        font-size: 0.85rem;
-        padding: 10px 40px 10px 12px;
-    }
-
-    .search-results {
-        max-height: 120px;
-        font-size: 0.85rem;
     }
 
     /* Modal adjustments */
@@ -899,38 +909,16 @@ textarea.form-input {
     .modal-footer {
         padding: 0 15px 15px;
     }
-
-    /* Show mobile toggle */
-    .mobile-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Hide toggle when sidebar is expanded */
-    .sidebar.expanded ~ .mobile-toggle {
-        opacity: 0;
-        pointer-events: none;
-    }
 }
 
 /* Small Mobile Styles (max-width: 480px) */
 @media (max-width: 480px) {
-    .sidebar {
-        max-height: 80vh;
-        transform: translateY(calc(100% - 50px));
+    .mobile-content-panel.active {
+        max-height: 75vh;
     }
 
-    .header h1 {
-        font-size: 1rem;
-    }
-
-    .header p {
-        display: none;
-    }
-
-    .places-list {
-        max-height: 30vh;
+    .mobile-content-panel.expanded {
+        max-height: 85vh;
     }
 
     .map-btn {
@@ -944,24 +932,23 @@ textarea.form-input {
         padding: 4px 8px;
     }
 
-    .mobile-toggle {
-        width: 50px;
-        height: 50px;
-        font-size: 1.2rem;
+    .mobile-nav-item {
+        font-size: 0.65rem;
+        padding: 6px;
+    }
+
+    .mobile-nav-item i {
+        font-size: 1.1rem;
     }
 }
 
 /* Landscape Mobile */
 @media (max-width: 768px) and (orientation: landscape) {
-    .sidebar {
-        max-height: 85vh;
+    .mobile-content-panel.active {
+        max-height: 60vh;
     }
 
-    .places-list {
-        max-height: 45vh;
-    }
-
-    .header h1 {
-        font-size: 0.95rem;
+    .mobile-content-panel.expanded {
+        max-height: 75vh;
     }
 }

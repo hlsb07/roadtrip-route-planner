@@ -7,6 +7,7 @@ export class PlaceManager {
         this.places = [];
         this.onUpdate = onUpdate;
         this.selectedIndex = null;
+        this.sortableInstances = {}; // Track Sortable instances
     }
 
     async addPlace(place) {
@@ -117,31 +118,38 @@ export class PlaceManager {
 
     updatePlacesList(onRemove) {
         const placesList = document.getElementById('placesList');
+        const mobilePlacesList = document.querySelector('#mobilePanelContent .places-list');
         const currentRouteId = this.routeManager.getCurrentRouteId();
 
+        const noRouteContent = `
+            <div style="text-align: center; padding: 40px; color: #999;">
+                <i class="fas fa-route" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i><br>
+                No route selected.<br>
+                <button class="btn" onclick="routeManager.showCreateRouteModal()" style="margin-top: 10px;">
+                    <i class="fas fa-plus"></i> Create Your First Route
+                </button>
+            </div>`;
+
+        const noPlacesContent = `
+            <div style="text-align: center; padding: 40px; color: #999;">
+                <i class="fas fa-map-marker-alt" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i><br>
+                No places in this route yet.<br>
+                Start by searching or clicking the map!
+            </div>`;
+
         if (!currentRouteId) {
-            placesList.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #999;">
-                    <i class="fas fa-route" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i><br>
-                    No route selected.<br>
-                    <button class="btn" onclick="routeManager.showCreateRouteModal()" style="margin-top: 10px;">
-                        <i class="fas fa-plus"></i> Create Your First Route
-                    </button>
-                </div>`;
+            placesList.innerHTML = noRouteContent;
+            if (mobilePlacesList) mobilePlacesList.innerHTML = noRouteContent;
             return;
         }
 
         if (this.places.length === 0) {
-            placesList.innerHTML = `
-                <div style="text-align: center; padding: 40px; color: #999;">
-                    <i class="fas fa-map-marker-alt" style="font-size: 2rem; margin-bottom: 10px; opacity: 0.5;"></i><br>
-                    No places in this route yet.<br>
-                    Start by searching or clicking the map!
-                </div>`;
+            placesList.innerHTML = noPlacesContent;
+            if (mobilePlacesList) mobilePlacesList.innerHTML = noPlacesContent;
             return;
         }
 
-        placesList.innerHTML = this.places.map((place, index) => `
+        const placesHTML = this.places.map((place, index) => `
             <div class="place-item ${this.selectedIndex === index ? 'selected' : ''}" data-index="${index}" onclick="window.app?.selectPlace(${index})">
                 <div class="place-header">
                     <div class="place-number">${index + 1}</div>
@@ -169,13 +177,37 @@ export class PlaceManager {
             </div>
         `).join('');
 
-        // Initialize sortable for drag & drop
-        new Sortable(placesList, {
+        placesList.innerHTML = placesHTML;
+        if (mobilePlacesList) mobilePlacesList.innerHTML = placesHTML;
+
+        // Initialize sortable for drag & drop on desktop
+        this.initSortable(placesList);
+
+        // Initialize sortable for mobile if exists
+        if (mobilePlacesList) {
+            this.initSortable(mobilePlacesList);
+        }
+    }
+
+    initSortable(element) {
+        if (!element) return;
+
+        // Get unique key for this element
+        const elementKey = element.id || element.className;
+
+        // Destroy existing Sortable instance if it exists
+        if (this.sortableInstances[elementKey]) {
+            this.sortableInstances[elementKey].destroy();
+            delete this.sortableInstances[elementKey];
+        }
+
+        // Create new Sortable instance
+        this.sortableInstances[elementKey] = new Sortable(element, {
             animation: 300,
             ghostClass: 'dragging',
             onEnd: async (evt) => {
                 // Determine new order
-                const newOrder = Array.from(placesList.children).map(item => {
+                const newOrder = Array.from(element.children).map(item => {
                     const index = parseInt(item.dataset.index);
                     return this.places[index].id;
                 });
@@ -191,7 +223,7 @@ export class PlaceManager {
                     }
                 } else {
                     // Reset UI on failure
-                    this.updatePlacesList(onRemove);
+                    this.updatePlacesList();
                 }
             }
         });

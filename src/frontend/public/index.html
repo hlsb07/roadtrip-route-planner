@@ -11,7 +11,7 @@
 <body>
     <div class="container">
         <div class="sidebar" id="sidebar">
-            <div class="header" onclick="toggleMobileSidebar()">
+            <div class="header">
                 <h1><i class="fas fa-map-marked-alt"></i> Roadtrip Route Planner</h1>
                 <p>Smart route planning for your adventure</p>
             </div>
@@ -97,9 +97,109 @@
             </button>
         </div>
 
-        <button class="mobile-toggle" id="mobileToggle" onclick="toggleMobileSidebar()">
-            <i class="fas fa-chevron-up"></i>
-        </button>
+        <!-- Mobile Navigation -->
+        <div class="mobile-nav" id="mobileNav">
+            <div class="mobile-nav-items">
+                <button class="mobile-nav-item active" data-mode="routes" onclick="switchMobileMode('routes')">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>Routes</span>
+                </button>
+                <button class="mobile-nav-item" data-mode="search" onclick="switchMobileMode('search')">
+                    <i class="fas fa-search"></i>
+                    <span>Add Place</span>
+                </button>
+                <button class="mobile-nav-item" data-mode="places" onclick="switchMobileMode('places')">
+                    <i class="fas fa-list"></i>
+                    <span>Place List</span>
+                </button>
+                <button class="mobile-nav-item" data-mode="controls" onclick="switchMobileMode('controls')">
+                    <i class="fas fa-cog"></i>
+                    <span>Tools</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Content Panel -->
+        <div class="mobile-content-panel active" id="mobilePanel" data-mode="routes">
+            <div class="mobile-panel-header" onclick="handleMobilePanelHeaderClick()">
+                <div class="mobile-panel-title" id="mobilePanelTitle">Route Selection</div>
+                <button class="mobile-panel-expand" onclick="event.stopPropagation(); toggleMobilePanelExpand()">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+            <div class="mobile-panel-content" id="mobilePanelContent">
+                <!-- Routes Section -->
+                <div class="mobile-section" data-section="routes" style="padding: 15px;">
+                    <div class="route-selector">
+                        <label for="mobileRouteSelect">Current Route:</label>
+                        <div class="route-select-group">
+                            <select id="mobileRouteSelect" class="route-select">
+                                <option value="">Loading routes...</option>
+                            </select>
+                            <button class="btn-icon" onclick="showCreateRouteModal()" title="Create new route">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="route-actions" style="margin-top: 10px;">
+                        <button class="btn btn-sm" onclick="showRenameRouteModal()" title="Rename route">
+                            <i class="fas fa-edit"></i> Rename
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCurrentRoute()" title="Delete route">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search Section -->
+                <div class="mobile-section" data-section="search" style="display: none; padding: 15px; background: #f8f9fa;">
+                    <div class="search-tabs" id="mobileSearchTabs" style="margin-bottom: 15px;">
+                        <button class="tab-btn active" onclick="switchTab('search')">
+                            <i class="fas fa-search"></i> Search
+                        </button>
+                        <button class="tab-btn" onclick="switchTab('coords')">
+                            <i class="fas fa-map-pin"></i> Coords
+                        </button>
+                        <button class="tab-btn" onclick="switchTab('link')">
+                            <i class="fas fa-link"></i> Link
+                        </button>
+                    </div>
+                    <div class="search-input-group">
+                        <input type="text"
+                               id="mobileSearchInput"
+                               class="search-input"
+                               placeholder="Search for a place...">
+                        <button class="search-btn" onclick="handleSearch()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div id="mobileSearchResults" class="search-results"></div>
+                    <div id="mobileLoading" class="loading">
+                        <i class="fas fa-spinner fa-spin"></i> Searching...
+                    </div>
+                </div>
+
+                <!-- Places List Section -->
+                <div class="mobile-section places-list" data-section="places" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <!-- Places will be populated by placeManager.updatePlacesList() -->
+                </div>
+
+                <!-- Controls Section -->
+                <div class="mobile-section" data-section="controls" style="display: none; padding: 15px;">
+                    <div class="controls" style="border: none; padding: 0;">
+                        <button class="btn" onclick="exportRoute()">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                        <button class="btn" onclick="importRoute()">
+                            <i class="fas fa-upload"></i> Import
+                        </button>
+                        <button class="btn btn-danger" onclick="clearRoute()">
+                            <i class="fas fa-trash"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <div id="routeModal" class="modal">
@@ -134,43 +234,108 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <script>
-        // Mobile sidebar toggle functionality
-        window.toggleMobileSidebar = function() {
-            const sidebar = document.getElementById('sidebar');
-            const toggle = document.getElementById('mobileToggle');
-            const icon = toggle?.querySelector('i');
+        // Mobile navigation system
+        let currentMobileMode = 'routes';
 
-            if (sidebar.classList.contains('expanded')) {
-                sidebar.classList.remove('expanded');
-                toggle?.classList.remove('expanded');
-                if (icon) icon.className = 'fas fa-chevron-up';
-            } else {
-                sidebar.classList.add('expanded');
-                toggle?.classList.add('expanded');
-                if (icon) icon.className = 'fas fa-chevron-down';
+        window.switchMobileMode = function(mode) {
+            currentMobileMode = mode;
+
+            // Update active nav item
+            document.querySelectorAll('.mobile-nav-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.mode === mode);
+            });
+
+            // Update panel
+            const panel = document.getElementById('mobilePanel');
+            const title = document.getElementById('mobilePanelTitle');
+            const content = document.getElementById('mobilePanelContent');
+
+            panel.dataset.mode = mode;
+            panel.classList.add('active');
+
+            // Set title and show appropriate section
+            const modes = {
+                routes: 'Route Selection',
+                search: 'Add Place',
+                places: 'Place List',
+                controls: 'Tools'
+            };
+
+            title.textContent = modes[mode];
+
+            // Hide all sections
+            content.querySelectorAll('.mobile-section').forEach(section => {
+                section.style.display = 'none';
+            });
+
+            // Show selected section
+            const activeSection = content.querySelector(`[data-section="${mode}"]`);
+            if (activeSection) {
+                activeSection.style.display = 'block';
             }
         };
 
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 768) {
-                const sidebar = document.getElementById('sidebar');
-                const toggle = document.getElementById('mobileToggle');
+        window.handleMobilePanelHeaderClick = function() {
+            const panel = document.getElementById('mobilePanel');
 
-                if (sidebar.classList.contains('expanded') &&
-                    !sidebar.contains(e.target) &&
-                    e.target !== toggle &&
-                    !toggle?.contains(e.target)) {
-                    window.toggleMobileSidebar();
+            // If expanded, just collapse
+            if (panel.classList.contains('expanded')) {
+                panel.classList.remove('expanded');
+                const expandBtn = panel.querySelector('.mobile-panel-expand i');
+                if (expandBtn) {
+                    expandBtn.className = 'fas fa-chevron-up';
                 }
+            } else {
+                // If not expanded, close completely
+                panel.classList.remove('active');
+            }
+        };
+
+        window.closeMobilePanel = function() {
+            const panel = document.getElementById('mobilePanel');
+            panel.classList.remove('active', 'expanded');
+        };
+
+        window.toggleMobilePanelExpand = function() {
+            const panel = document.getElementById('mobilePanel');
+            panel.classList.toggle('expanded');
+
+            // Update icon
+            const expandBtn = panel.querySelector('.mobile-panel-expand i');
+            if (expandBtn) {
+                if (panel.classList.contains('expanded')) {
+                    expandBtn.className = 'fas fa-chevron-down';
+                } else {
+                    expandBtn.className = 'fas fa-chevron-up';
+                }
+            }
+        };
+
+
+        // Initialize mobile mode on load
+        window.addEventListener('load', () => {
+            if (window.innerWidth <= 768) {
+                setTimeout(() => switchMobileMode('routes'), 100);
             }
         });
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            const sidebar = document.getElementById('sidebar');
-            if (window.innerWidth > 768) {
-                sidebar.classList.remove('expanded');
+        // Collapse panel when clicking outside (only if expanded)
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                const panel = document.getElementById('mobilePanel');
+                const nav = document.getElementById('mobileNav');
+
+                // Collapse if panel is expanded and click is outside
+                if (panel.classList.contains('expanded') &&
+                    !panel.contains(e.target) &&
+                    !nav.contains(e.target)) {
+                    panel.classList.remove('expanded');
+                    // Update icon
+                    const expandBtn = panel.querySelector('.mobile-panel-expand i');
+                    if (expandBtn) {
+                        expandBtn.className = 'fas fa-chevron-up';
+                    }
+                }
             }
         });
     </script>

@@ -47,10 +47,20 @@ class App {
     }
 
     bindEventListeners() {
-        // Search input
+        // Search input (desktop)
         const searchInput = document.getElementById('searchInput');
         if (searchInput) {
             searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleSearch();
+                }
+            });
+        }
+
+        // Search input (mobile)
+        const mobileSearchInput = document.getElementById('mobileSearchInput');
+        if (mobileSearchInput) {
+            mobileSearchInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     this.handleSearch();
                 }
@@ -80,7 +90,7 @@ class App {
         }
                     */
         document.addEventListener('change', async (e) => {
-            if (e.target.id === 'routeSelect') {
+            if (e.target.id === 'routeSelect' || e.target.id === 'mobileRouteSelect') {
                 if (e.target.value) {
                     this.routeManager.currentRouteId = parseInt(e.target.value);
                     const places = await this.routeManager.loadCurrentRoute();
@@ -254,6 +264,19 @@ class App {
         this.mapService.selectedMarkerIndex = index;
         this.updateUI();
         this.mapService.selectPlace(index);
+
+        // Collapse mobile panel if it's expanded
+        if (window.innerWidth <= 768) {
+            const panel = document.getElementById('mobilePanel');
+            if (panel && panel.classList.contains('expanded')) {
+                panel.classList.remove('expanded');
+                // Update icon
+                const expandBtn = panel.querySelector('.mobile-panel-expand i');
+                if (expandBtn) {
+                    expandBtn.className = 'fas fa-chevron-up';
+                }
+            }
+        }
     }
 }
 

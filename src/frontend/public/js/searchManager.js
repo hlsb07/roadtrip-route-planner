@@ -13,6 +13,31 @@ export class SearchManager {
         this.onSelectCallback = callback;
     }
 
+    // Helper methods to get current elements (desktop or mobile)
+    getSearchInput() {
+        if (window.innerWidth <= 768) {
+            return document.getElementById('mobileSearchInput') || document.getElementById('searchInput');
+        } else {
+            return document.getElementById('searchInput') || document.getElementById('mobileSearchInput');
+        }
+    }
+
+    getSearchResults() {
+        if (window.innerWidth <= 768) {
+            return document.getElementById('mobileSearchResults') || document.getElementById('searchResults');
+        } else {
+            return document.getElementById('searchResults') || document.getElementById('mobileSearchResults');
+        }
+    }
+
+    getLoadingElement() {
+        if (window.innerWidth <= 768) {
+            return document.getElementById('mobileLoading') || document.getElementById('loading');
+        } else {
+            return document.getElementById('loading') || document.getElementById('mobileLoading');
+        }
+    }
+
     switchTab(tab) {
         this.currentTab = tab;
         const tabs = document.querySelectorAll('.tab-btn');
@@ -22,9 +47,9 @@ export class SearchManager {
         const activeTab = Array.from(tabs).find(t => t.onclick.toString().includes(`'${tab}'`));
         if (activeTab) activeTab.classList.add('active');
 
-        const input = document.getElementById('searchInput');
-        const searchResults = document.getElementById('searchResults');
-        searchResults.classList.remove('active');
+        const input = this.getSearchInput();
+        const searchResults = this.getSearchResults();
+        if (searchResults) searchResults.classList.remove('active');
 
         if (tab === 'search') {
             input.placeholder = 'Search for a place...';
@@ -39,7 +64,8 @@ export class SearchManager {
     }
 
     async handleSearch() {
-        const input = document.getElementById('searchInput').value.trim();
+        const inputElement = this.getSearchInput();
+        const input = inputElement.value.trim();
         if (!input) return;
 
         if (this.currentTab === 'search') {
@@ -52,11 +78,11 @@ export class SearchManager {
     }
 
     async searchPlace(query) {
-        const loading = document.getElementById('loading');
-        const results = document.getElementById('searchResults');
+        const loading = this.getLoadingElement();
+        const results = this.getSearchResults();
 
-        loading.classList.add('active');
-        results.classList.remove('active');
+        if (loading) loading.classList.add('active');
+        if (results) results.classList.remove('active');
 
         try {
             let data;
@@ -98,7 +124,7 @@ export class SearchManager {
                 fromCache = false;
             }
 
-            loading.classList.remove('active');
+            if (loading) loading.classList.remove('active');
 
             if (data && data.length > 0) {
                 this.displaySearchResults(data, fromCache, this.onSelectCallback);
@@ -108,14 +134,16 @@ export class SearchManager {
                 return [];
             }
         } catch (error) {
-            loading.classList.remove('active');
+            if (loading) loading.classList.remove('active');
             showError('Search failed. Please try again.');
             return [];
         }
     }
 
     displaySearchResults(results, fromCache = false, onSelect) {
-        const resultsDiv = document.getElementById('searchResults');
+        const resultsDiv = this.getSearchResults();
+        if (!resultsDiv) return;
+
         resultsDiv.innerHTML = '';
 
         // Show cache indicator
@@ -149,7 +177,8 @@ export class SearchManager {
                 };
                 onSelect(place);
                 resultsDiv.classList.remove('active');
-                document.getElementById('searchInput').value = '';
+                const input = this.getSearchInput();
+                if (input) input.value = '';
             };
             resultsDiv.appendChild(item);
         });
@@ -163,24 +192,26 @@ export class SearchManager {
             showError(validation.error);
             return null;
         }
-        
+
         const place = {
             name: formatPlaceName(validation.lat, validation.lng),
             coords: [validation.lat, validation.lng]
         };
-        
-        document.getElementById('searchInput').value = '';
+
+        const input = this.getSearchInput();
+        if (input) input.value = '';
         return place;
     }
 
     parseGoogleMapsLink(url) {
         const result = parseGoogleMapsLink(url);
-        
+
         if (result.shouldSearch) {
             return this.searchPlace(result.query);
         } else if (result.coords) {
             const place = { name: result.name, coords: result.coords };
-            document.getElementById('searchInput').value = '';
+            const input = this.getSearchInput();
+            if (input) input.value = '';
             return place;
         } else {
             showError('Could not parse Google Maps link. Try copying the coordinates instead.');
@@ -190,7 +221,8 @@ export class SearchManager {
 
     onMapClick(coords, latlng) {
         if (this.currentTab === 'coords') {
-            document.getElementById('searchInput').value = coords;
+            const input = this.getSearchInput();
+            if (input) input.value = coords;
         }
     }
 

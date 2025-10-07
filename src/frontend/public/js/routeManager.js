@@ -31,24 +31,32 @@ export class RouteManager {
     }
 
     updateRouteSelector() {
-        const select = document.getElementById('routeSelect');
-        select.innerHTML = '';
+        const desktopSelect = document.getElementById('routeSelect');
+        const mobileSelect = document.getElementById('mobileRouteSelect');
 
-        if (this.routes.length === 0) {
-            select.innerHTML = '<option value="">No routes available</option>';
-            return;
-        }
+        const updateSelect = (select) => {
+            if (!select) return;
 
-        this.routes.forEach(route => {
-            const option = document.createElement('option');
-            option.value = route.id;
-            option.textContent = `${route.name} (${route.placeCount} places)`;
-            if (route.id === this.currentRouteId) {
-                option.selected = true;
+            select.innerHTML = '';
+
+            if (this.routes.length === 0) {
+                select.innerHTML = '<option value="">No routes available</option>';
+                return;
             }
-            select.appendChild(option);
-        });
 
+            this.routes.forEach(route => {
+                const option = document.createElement('option');
+                option.value = route.id;
+                option.textContent = `${route.name} (${route.placeCount} places)`;
+                if (route.id === this.currentRouteId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        };
+
+        updateSelect(desktopSelect);
+        updateSelect(mobileSelect);
     }
 
     async loadCurrentRoute() {
