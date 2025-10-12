@@ -736,11 +736,11 @@ textarea.form-input {
 }
 
 .mobile-content-panel.active {
-    max-height: calc(30vh);
+    max-height: 30vh;
 }
 
 .mobile-content-panel.expanded {
-    max-height: calc(vh);
+    max-height: 85vh;
 }
 
 .mobile-panel-header {
@@ -791,12 +791,12 @@ textarea.form-input {
 
 .mobile-panel-content {
     overflow-y: auto;
-    max-height: calc(70vh - 50px);
+    max-height: calc(70vh - 40px);
     background: #fafafa;
 }
 
 .mobile-content-panel.expanded .mobile-panel-content {
-    max-height: calc(85vh - 50px);
+    max-height: calc(85vh - 40px);
 }
 
 /* Mobile panel content styles */
@@ -878,6 +878,12 @@ textarea.form-input {
     .mobile-content-panel[data-mode="places"] .mobile-panel-expand {
         display: block;
     }
+    .mobile-content-panel.active {
+        max-height: 40vh;
+    }
+    .mobile-content-panel.expanded {
+        max-height: 85vh;
+    }
 
     /* Map controls repositioned */
     .map-controls {
@@ -914,7 +920,7 @@ textarea.form-input {
 /* Small Mobile Styles (max-width: 480px) */
 @media (max-width: 480px) {
     .mobile-content-panel.active {
-        max-height: 75vh;
+        max-height: 40vh;
     }
 
     .mobile-content-panel.expanded {
