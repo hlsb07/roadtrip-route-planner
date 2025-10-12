@@ -15,6 +15,10 @@ builder.Services.AddHttpClient<GoogleMapsService>();
 // Google Maps Service
 builder.Services.AddScoped<GoogleMapsService>();
 
+// HttpClient and Service for Park4Night Scraper
+builder.Services.AddHttpClient<Park4NightScraperService>();
+builder.Services.AddScoped<Park4NightScraperService>();
+
 // PostgreSQL Database mit PostGIS
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
@@ -43,6 +47,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseStaticFiles(); // Serve static files from wwwroot (for campsite images)
 //app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
