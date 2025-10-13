@@ -71,7 +71,10 @@ namespace RoutePlanner.API.Services
                 campsite.Activities = JsonSerializer.Serialize(ExtractActivities(htmlDoc));
                 campsite.Price = ExtractPrice(htmlDoc);
                 campsite.NumberOfSpots = ExtractNumberOfSpots(htmlDoc);
-                campsite.Description = ExtractDescription(htmlDoc);
+
+                // Extract multi-language descriptions
+                var descriptions = ExtractDescriptions(htmlDoc);
+                campsite.DescriptionsDict = descriptions.Count > 0 ? descriptions : null;
 
                 // Download and save images
                 var imageUrls = ExtractImageUrls(htmlDoc, url);
@@ -328,21 +331,73 @@ namespace RoutePlanner.API.Services
             return null;
         }
 
-        private string? ExtractDescription(HtmlDocument doc)
+        private Dictionary<string, string> ExtractDescriptions(HtmlDocument doc)
         {
+            var descriptions = new Dictionary<string, string>();
+
             try
             {
-                var descNode = doc.DocumentNode.SelectSingleNode("//div[@class='description']") ??
-                              doc.DocumentNode.SelectSingleNode("//div[@class='place-description']") ??
-                              doc.DocumentNode.SelectSingleNode("//*[contains(@class, 'description')]//p");
+                // First, try to find the multi-language description container
+                var descContainer = doc.DocumentNode.SelectSingleNode("//div[@class='place-info-description']") ??
+                                   doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'place-description')]") ??
+                                   doc.DocumentNode.SelectSingleNode("//div[contains(@class, 'description')]");
 
-                return descNode?.InnerText.Trim();
+                if (descContainer != null)
+                {
+                    // Try to find paragraphs with language attributes
+                    var descNodesWithLang = descContainer.SelectNodes(".//p[@lang]");
+
+                    if (descNodesWithLang != null && descNodesWithLang.Count > 0)
+                    {
+                        foreach (var node in descNodesWithLang)
+                        {
+                            var lang = node.GetAttributeValue("lang", null);
+                            var text = node.InnerText.Trim();
+
+                            if (!string.IsNullOrWhiteSpace(lang) && !string.IsNullOrWhiteSpace(text))
+                            {
+                                descriptions[lang] = text;
+                                _logger.LogInformation("Extracted description for language: {Language}", lang);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: If no language-specific paragraphs, extract all text
+                        // and try to detect language from URL or use a default language
+                        var allText = descContainer.InnerText.Trim();
+                        if (!string.IsNullOrWhiteSpace(allText))
+                        {
+                            // Default to English or detect from context
+                            descriptions["en"] = allText;
+                            _logger.LogInformation("Extracted single description (defaulting to 'en')");
+                        }
+                    }
+                }
+
+                // If still no descriptions found, try alternative selectors
+                if (descriptions.Count == 0)
+                {
+                    var descNode = doc.DocumentNode.SelectSingleNode("//div[@class='description']//p") ??
+                                  doc.DocumentNode.SelectSingleNode("//*[contains(@class, 'description')]");
+
+                    if (descNode != null)
+                    {
+                        var text = descNode.InnerText.Trim();
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            descriptions["en"] = text;
+                            _logger.LogInformation("Extracted fallback description");
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error extracting description");
-                return null;
+                _logger.LogWarning(ex, "Error extracting descriptions");
             }
+
+            return descriptions;
         }
 
         private List<string> ExtractImageUrls(HtmlDocument doc, string baseUrl)

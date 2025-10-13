@@ -1,5 +1,7 @@
 using NetTopologySuite.Geometries;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
 
 namespace RoutePlanner.API.Models
 {
@@ -71,7 +73,25 @@ namespace RoutePlanner.API.Models
 
         public int? NumberOfSpots { get; set; }
 
-        public string? Description { get; set; }
+        /// <summary>
+        /// Multi-language descriptions stored as JSONB (e.g., {"en": "Description in English", "de": "Beschreibung auf Deutsch"})
+        /// </summary>
+        [Column(TypeName = "jsonb")]
+        public string? Descriptions { get; set; }
+
+        /// <summary>
+        /// Helper property to work with descriptions as a dictionary
+        /// </summary>
+        [NotMapped]
+        public Dictionary<string, string>? DescriptionsDict
+        {
+            get => string.IsNullOrEmpty(Descriptions)
+                ? null
+                : JsonSerializer.Deserialize<Dictionary<string, string>>(Descriptions);
+            set => Descriptions = value == null
+                ? null
+                : JsonSerializer.Serialize(value);
+        }
 
         /// <summary>
         /// JSON array of image paths (e.g., ["/images/campsites/561613_1.jpg", "/images/campsites/561613_2.jpg"])

@@ -16,7 +16,12 @@ namespace RoutePlanner.API.DTOs
         public List<string>? Activities { get; set; }
         public string? Price { get; set; }
         public int? NumberOfSpots { get; set; }
-        public string? Description { get; set; }
+
+        /// <summary>
+        /// Multi-language descriptions (e.g., {"en": "Description in English", "de": "Beschreibung auf Deutsch"})
+        /// </summary>
+        public Dictionary<string, string>? Descriptions { get; set; }
+
         public List<string>? ImagePaths { get; set; }
         public string SourceUrl { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }

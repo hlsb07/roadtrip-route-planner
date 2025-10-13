@@ -39,3 +39,6 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Uploaded images
+src/backend/RoutePlanner.API/wwwroot/images/campsites/

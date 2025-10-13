@@ -226,7 +226,7 @@ namespace RoutePlanner.API.Controllers
 
             var campsites = await _context.Campsites
                 .Where(c => c.Name.Contains(query) ||
-                           (c.Description != null && c.Description.Contains(query)) ||
+                           (c.Descriptions != null && c.Descriptions.Contains(query)) ||
                            (c.Type != null && c.Type.Contains(query)))
                 .OrderByDescending(c => c.Rating)
                 .Take(50)
@@ -254,7 +254,7 @@ namespace RoutePlanner.API.Controllers
                     : JsonSerializer.Deserialize<List<string>>(campsite.Activities),
                 Price = campsite.Price,
                 NumberOfSpots = campsite.NumberOfSpots,
-                Description = campsite.Description,
+                Descriptions = campsite.DescriptionsDict,
                 ImagePaths = string.IsNullOrEmpty(campsite.ImagePaths)
                     ? null
                     : JsonSerializer.Deserialize<List<string>>(campsite.ImagePaths),

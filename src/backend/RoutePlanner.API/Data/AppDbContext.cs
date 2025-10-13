@@ -115,7 +115,9 @@ namespace RoutePlanner.API.Data
                 entity.Property(e => e.Services).HasColumnType("text");
                 entity.Property(e => e.Activities).HasColumnType("text");
                 entity.Property(e => e.ImagePaths).HasColumnType("text");
-                entity.Property(e => e.Description).HasColumnType("text");
+
+                // JSONB column for multi-language descriptions
+                entity.Property(e => e.Descriptions).HasColumnType("jsonb");
 
                 // Indexes for performance and uniqueness
                 entity.HasIndex(e => e.Park4NightId).IsUnique();
