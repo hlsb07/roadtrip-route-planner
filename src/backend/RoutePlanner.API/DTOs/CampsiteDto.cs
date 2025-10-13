@@ -1,3 +1,5 @@
+using RoutePlanner.API.Models;
+
 namespace RoutePlanner.API.DTOs
 {
     /// <summary>
@@ -13,7 +15,7 @@ namespace RoutePlanner.API.DTOs
         public decimal? Rating { get; set; }
         public string? Type { get; set; }
         public List<string>? Services { get; set; }
-        public List<string>? Activities { get; set; }
+        public List<CampsiteActivity>? Activities { get; set; }
         public string? Price { get; set; }
         public int? NumberOfSpots { get; set; }
 

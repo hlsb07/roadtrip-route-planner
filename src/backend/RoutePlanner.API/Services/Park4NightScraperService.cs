@@ -11,6 +11,7 @@ namespace RoutePlanner.API.Services
         private readonly HttpClient _httpClient;
         private readonly ILogger<Park4NightScraperService> _logger;
         private readonly string _imagesBasePath;
+        private readonly string _activitiesBasePath;
         private readonly GeometryFactory _geometryFactory;
 
         public Park4NightScraperService(
@@ -21,10 +22,12 @@ namespace RoutePlanner.API.Services
             _httpClient = httpClient;
             _logger = logger;
             _imagesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites");
+            _activitiesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "activities");
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-            // Ensure images directory exists
+            // Ensure directories exist
             Directory.CreateDirectory(_imagesBasePath);
+            Directory.CreateDirectory(_activitiesBasePath);
 
             // Configure HttpClient
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
@@ -68,7 +71,11 @@ namespace RoutePlanner.API.Services
                 campsite.Rating = ExtractRating(htmlDoc);
                 campsite.Type = ExtractType(htmlDoc);
                 campsite.Services = JsonSerializer.Serialize(ExtractServices(htmlDoc));
-                campsite.Activities = JsonSerializer.Serialize(ExtractActivities(htmlDoc));
+
+                // Extract activities with SVG icons
+                var activities = await ExtractActivitiesAsync(htmlDoc, url);
+                campsite.ActivitiesList = activities.Count > 0 ? activities : null;
+
                 campsite.Price = ExtractPrice(htmlDoc);
                 campsite.NumberOfSpots = ExtractNumberOfSpots(htmlDoc);
 
@@ -251,33 +258,150 @@ namespace RoutePlanner.API.Services
             return services;
         }
 
-        private List<string> ExtractActivities(HtmlDocument doc)
+        private async Task<List<CampsiteActivity>> ExtractActivitiesAsync(HtmlDocument doc, string baseUrl)
         {
-            var activities = new List<string>();
+            var activities = new List<CampsiteActivity>();
 
             try
             {
-                var activityNodes = doc.DocumentNode.SelectNodes("//ul[@class='activities-list']//li") ??
-                                   doc.DocumentNode.SelectNodes("//*[contains(@class, 'activity')]");
+                // Target the specific list with activities
+                var activityNodes = doc.DocumentNode.SelectNodes("//ul[@class='place-specs-services']//li");
 
                 if (activityNodes != null)
                 {
                     foreach (var node in activityNodes)
                     {
-                        var activity = node.InnerText.Trim();
-                        if (!string.IsNullOrWhiteSpace(activity))
+                        string? activityName = null;
+                        string? svgUrl = null;
+
+                        // Method 1: Try to get alt attribute from img tag
+                        var imgNode = node.SelectSingleNode(".//img");
+                        if (imgNode != null)
                         {
+                            var altText = imgNode.GetAttributeValue("alt", "");
+                            if (!string.IsNullOrWhiteSpace(altText))
+                            {
+                                activityName = altText.Trim();
+                                _logger.LogDebug("Found activity from alt: {Activity}", activityName);
+                            }
+
+                            // Get the image source (could be SVG)
+                            var src = imgNode.GetAttributeValue("src", "");
+                            if (!string.IsNullOrWhiteSpace(src) && src.EndsWith(".svg"))
+                            {
+                                svgUrl = src;
+                            }
+                        }
+
+                        // Method 2: Try to get the SVG element directly
+                        if (string.IsNullOrEmpty(svgUrl))
+                        {
+                            var svgNode = node.SelectSingleNode(".//svg");
+                            if (svgNode != null)
+                            {
+                                var useNode = svgNode.SelectSingleNode(".//use");
+                                if (useNode != null)
+                                {
+                                    // Get the xlink:href attribute (contains the icon reference)
+                                    var xlinkHref = useNode.GetAttributeValue("xlink:href", "")
+                                                    ?? useNode.GetAttributeValue("href", "");
+
+                                    if (!string.IsNullOrWhiteSpace(xlinkHref))
+                                    {
+                                        // Extract the icon name from the reference
+                                        var iconName = xlinkHref.TrimStart('#').Replace("icon-", "");
+
+                                        // If no activity name yet, convert icon name to readable format
+                                        if (string.IsNullOrWhiteSpace(activityName))
+                                        {
+                                            activityName = ConvertIconNameToReadable(iconName);
+                                            _logger.LogDebug("Found activity from SVG: {Activity} (from {XlinkHref})", activityName, xlinkHref);
+                                        }
+
+                                        // Store the SVG reference for later extraction
+                                        svgUrl = xlinkHref;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Method 3: Fallback to text content
+                        if (string.IsNullOrWhiteSpace(activityName))
+                        {
+                            var text = node.InnerText.Trim();
+                            if (!string.IsNullOrWhiteSpace(text))
+                            {
+                                activityName = text;
+                                _logger.LogDebug("Found activity from text: {Activity}", activityName);
+                            }
+                        }
+
+                        // Add the activity if we found a name
+                        if (!string.IsNullOrWhiteSpace(activityName))
+                        {
+                            var activity = new CampsiteActivity
+                            {
+                                Name = activityName
+                            };
+
+                            // Download SVG icon if we found one
+                            if (!string.IsNullOrWhiteSpace(svgUrl))
+                            {
+                                var iconPath = await DownloadActivityIconAsync(svgUrl, activityName, baseUrl);
+                                activity.IconPath = iconPath;
+                            }
+
                             activities.Add(activity);
                         }
                     }
                 }
+
+                _logger.LogInformation("Extracted {Count} activities", activities.Count);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error extracting activities");
             }
 
-            return activities;
+            return activities.Where(a => !string.IsNullOrEmpty(a.Name)).Distinct(new CampsiteActivityComparer()).ToList();
+        }
+
+        // Helper method to convert icon names to readable format
+        private string ConvertIconNameToReadable(string iconName)
+        {
+            // Remove common prefixes and convert to Title Case
+            iconName = iconName.Replace("-", " ").Replace("_", " ").Trim();
+
+            // Capitalize first letter of each word
+            if (!string.IsNullOrWhiteSpace(iconName))
+            {
+                var words = iconName.Split(' ');
+                for (int i = 0; i < words.Length; i++)
+                {
+                    if (words[i].Length > 0)
+                    {
+                        words[i] = char.ToUpper(words[i][0]) + words[i].Substring(1).ToLower();
+                    }
+                }
+                iconName = string.Join(" ", words);
+            }
+
+            return iconName;
+        }
+
+        // Comparer to ensure unique activities by name
+        private class CampsiteActivityComparer : IEqualityComparer<CampsiteActivity>
+        {
+            public bool Equals(CampsiteActivity? x, CampsiteActivity? y)
+            {
+                if (x == null || y == null) return false;
+                return x.Name.Equals(y.Name, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public int GetHashCode(CampsiteActivity obj)
+            {
+                return obj.Name.ToLower().GetHashCode();
+            }
         }
 
         private string? ExtractPrice(HtmlDocument doc)
@@ -401,47 +525,62 @@ namespace RoutePlanner.API.Services
         }
 
         private List<string> ExtractImageUrls(HtmlDocument doc, string baseUrl)
-        {
-            var imageUrls = new List<string>();
+{
+    var imageUrls = new List<string>();
 
-            try
+    try
+    {
+        // Target ONLY the campsite gallery images
+        var galleryLinks = doc.DocumentNode.SelectNodes("//a[contains(@class, 'place-header-gallery-image')]");
+
+            if (galleryLinks != null)
             {
-                // Look for image elements
-                var imgNodes = doc.DocumentNode.SelectNodes("//img[contains(@class, 'place-image')]") ??
-                              doc.DocumentNode.SelectNodes("//div[@class='gallery']//img") ??
-                              doc.DocumentNode.SelectNodes("//img[contains(@src, 'park4night')]");
-
-                if (imgNodes != null)
+                foreach (var link in galleryLinks)
                 {
-                    foreach (var img in imgNodes)
+                    // Get href from the link (full-size image)
+                    var href = link.GetAttributeValue("href", "");
+                    
+                    if (!string.IsNullOrWhiteSpace(href))
                     {
-                        var src = img.GetAttributeValue("src", "") ??
-                                 img.GetAttributeValue("data-src", "");
-
-                        if (!string.IsNullOrWhiteSpace(src))
+                        // Convert relative URLs to absolute
+                        if (href.StartsWith("//"))
+                            href = "https:" + href;
+                        else if (href.StartsWith("/"))
+                            href = new Uri(new Uri(baseUrl), href).ToString();
+                        
+                        imageUrls.Add(href);
+                    }
+                    else
+                    {
+                        // Fallback: try to get src from img inside the link
+                        var img = link.SelectSingleNode(".//img");
+                        if (img != null)
                         {
-                            // Convert relative URLs to absolute
-                            if (src.StartsWith("//"))
-                                src = "https:" + src;
-                            else if (src.StartsWith("/"))
-                                src = new Uri(new Uri(baseUrl), src).ToString();
-
-                            // Skip tiny thumbnails or icons
-                            if (!src.Contains("icon") && !src.Contains("thumb"))
+                            var src = img.GetAttributeValue("src", "");
+                            
+                            if (!string.IsNullOrWhiteSpace(src))
                             {
+                                if (src.StartsWith("//"))
+                                    src = "https:" + src;
+                                else if (src.StartsWith("/"))
+                                    src = new Uri(new Uri(baseUrl), src).ToString();
+                                
                                 imageUrls.Add(src);
                             }
                         }
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Error extracting image URLs");
-            }
-
-            return imageUrls.Distinct().Take(10).ToList(); // Limit to 10 images
+            
+            _logger.LogInformation("Extracted {Count} gallery images", imageUrls.Count);
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error extracting image URLs");
+        }
+
+        return imageUrls.Distinct().ToList();
+    }
 
         private async Task<List<string>> DownloadImagesAsync(List<string> imageUrls, string park4NightId)
         {
@@ -475,6 +614,57 @@ namespace RoutePlanner.API.Services
             }
 
             return savedPaths;
+        }
+
+        private async Task<string?> DownloadActivityIconAsync(string svgUrl, string activityName, string baseUrl)
+        {
+            try
+            {
+                // Sanitize activity name for filename
+                var safeFileName = string.Join("_", activityName.Split(Path.GetInvalidFileNameChars()));
+                safeFileName = safeFileName.ToLower().Replace(" ", "_");
+
+                // If URL is relative, convert to absolute
+                if (svgUrl.StartsWith("//"))
+                {
+                    svgUrl = "https:" + svgUrl;
+                }
+                else if (svgUrl.StartsWith("/"))
+                {
+                    svgUrl = new Uri(new Uri(baseUrl), svgUrl).ToString();
+                }
+                else if (svgUrl.StartsWith("#"))
+                {
+                    // This is a reference to an SVG sprite, we can't download it directly
+                    _logger.LogDebug("Skipping SVG sprite reference: {SvgUrl}", svgUrl);
+                    return null;
+                }
+
+                // Only proceed if it's an SVG file
+                if (!svgUrl.EndsWith(".svg") && !svgUrl.Contains(".svg?"))
+                {
+                    _logger.LogDebug("URL is not an SVG file: {SvgUrl}", svgUrl);
+                    return null;
+                }
+
+                var fileName = $"{safeFileName}.svg";
+                var filePath = Path.Combine(_activitiesBasePath, fileName);
+
+                // Download SVG file
+                var svgContent = await _httpClient.GetStringAsync(svgUrl);
+                await File.WriteAllTextAsync(filePath, svgContent);
+
+                // Return relative path for database
+                var relativePath = $"/images/campsites/activities/{fileName}";
+                _logger.LogInformation("Downloaded activity icon: {Activity} to {Path}", activityName, relativePath);
+
+                return relativePath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error downloading activity icon for {Activity} from {Url}", activityName, svgUrl);
+                return null;
+            }
         }
     }
 }

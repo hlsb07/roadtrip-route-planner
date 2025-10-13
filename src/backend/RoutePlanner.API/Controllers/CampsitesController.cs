@@ -249,9 +249,7 @@ namespace RoutePlanner.API.Controllers
                 Services = string.IsNullOrEmpty(campsite.Services)
                     ? null
                     : JsonSerializer.Deserialize<List<string>>(campsite.Services),
-                Activities = string.IsNullOrEmpty(campsite.Activities)
-                    ? null
-                    : JsonSerializer.Deserialize<List<string>>(campsite.Activities),
+                Activities = campsite.ActivitiesList,
                 Price = campsite.Price,
                 NumberOfSpots = campsite.NumberOfSpots,
                 Descriptions = campsite.DescriptionsDict,

@@ -64,9 +64,23 @@ namespace RoutePlanner.API.Models
         public string? Services { get; set; }
 
         /// <summary>
-        /// JSON array of available activities (e.g., ["Hiking", "Swimming", "Fishing"])
+        /// JSON array of available activities with icons (stored as JSON)
         /// </summary>
         public string? Activities { get; set; }
+
+        /// <summary>
+        /// Helper property to work with activities as a list of objects
+        /// </summary>
+        [NotMapped]
+        public List<CampsiteActivity>? ActivitiesList
+        {
+            get => string.IsNullOrEmpty(Activities)
+                ? null
+                : JsonSerializer.Deserialize<List<CampsiteActivity>>(Activities);
+            set => Activities = value == null
+                ? null
+                : JsonSerializer.Serialize(value);
+        }
 
         [MaxLength(200)]
         public string? Price { get; set; }
