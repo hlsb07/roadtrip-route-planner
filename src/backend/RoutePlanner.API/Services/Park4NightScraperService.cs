@@ -70,7 +70,10 @@ namespace RoutePlanner.API.Services
                 campsite.Location = _geometryFactory.CreatePoint(new Coordinate(lon, lat));
                 campsite.Rating = ExtractRating(htmlDoc);
                 campsite.Type = ExtractType(htmlDoc);
-                campsite.Services = JsonSerializer.Serialize(ExtractServices(htmlDoc));
+
+                // Extract services with SVG icons
+                var services = await ExtractServicesAsync(htmlDoc, url);
+                campsite.ServicesList = services.Count > 0 ? services : null;
 
                 // Extract activities with SVG icons
                 var activities = await ExtractActivitiesAsync(htmlDoc, url);
@@ -227,35 +230,144 @@ namespace RoutePlanner.API.Services
             }
         }
 
-        private List<string> ExtractServices(HtmlDocument doc)
+        private async Task<List<CampsiteService>> ExtractServicesAsync(HtmlDocument doc, string baseUrl)
         {
-            var services = new List<string>();
+            var services = new List<CampsiteService>();
 
             try
             {
-                // Look for service icons or list items
-                var serviceNodes = doc.DocumentNode.SelectNodes("//ul[@class='services-list']//li") ??
-                                  doc.DocumentNode.SelectNodes("//*[contains(@class, 'service')]") ??
-                                  doc.DocumentNode.SelectNodes("//*[contains(@class, 'amenity')]");
+                // Target the specific list with services (same as activities)
+                var serviceNodes = doc.DocumentNode.SelectNodes("//ul[@class='place-specs-services']//li");
 
                 if (serviceNodes != null)
                 {
                     foreach (var node in serviceNodes)
                     {
-                        var service = node.InnerText.Trim();
-                        if (!string.IsNullOrWhiteSpace(service))
+                        string? serviceName = null;
+                        string? svgUrl = null;
+                        string? svgContent = null;
+
+                        // Method 1: Try to get alt attribute from img tag
+                        var imgNode = node.SelectSingleNode(".//img");
+                        if (imgNode != null)
                         {
+                            var altText = imgNode.GetAttributeValue("alt", "");
+                            if (!string.IsNullOrWhiteSpace(altText))
+                            {
+                                serviceName = altText.Trim();
+                                _logger.LogDebug("Found service from alt: {Service}", serviceName);
+                            }
+
+                            // Get the image source (could be SVG or other formats)
+                            var src = imgNode.GetAttributeValue("src", "");
+                            if (!string.IsNullOrWhiteSpace(src))
+                            {
+                                // Check if it's an SVG file
+                                if (src.EndsWith(".svg") || src.Contains(".svg?"))
+                                {
+                                    svgUrl = src;
+                                    _logger.LogDebug("Found SVG URL from img src: {Url}", svgUrl);
+                                }
+                                else
+                                {
+                                    _logger.LogDebug("Image source is not SVG: {Src}", src);
+                                }
+                            }
+                        }
+
+                        // Method 2: Try to get the SVG element directly (inline SVG)
+                        if (string.IsNullOrEmpty(svgContent))
+                        {
+                            var svgNode = node.SelectSingleNode(".//svg");
+                            if (svgNode != null)
+                            {
+                                // Get the outer HTML of the SVG element
+                                svgContent = svgNode.OuterHtml;
+                                _logger.LogDebug("Found inline SVG for service: {Service}", serviceName ?? "Unknown");
+
+                                // Also try to get xlink:href for logging
+                                var useNode = svgNode.SelectSingleNode(".//use");
+                                if (useNode != null)
+                                {
+                                    var xlinkHref = useNode.GetAttributeValue("xlink:href", "")
+                                                    ?? useNode.GetAttributeValue("href", "");
+
+                                    if (!string.IsNullOrWhiteSpace(xlinkHref))
+                                    {
+                                        var iconName = xlinkHref.TrimStart('#').Replace("icon-", "");
+
+                                        // If no service name yet, convert icon name to readable format
+                                        if (string.IsNullOrWhiteSpace(serviceName))
+                                        {
+                                            serviceName = ConvertIconNameToReadable(iconName);
+                                            _logger.LogDebug("Found service from SVG: {Service} (from {XlinkHref})", serviceName, xlinkHref);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Method 3: Fallback to text content
+                        if (string.IsNullOrWhiteSpace(serviceName))
+                        {
+                            var text = node.InnerText.Trim();
+                            if (!string.IsNullOrWhiteSpace(text))
+                            {
+                                serviceName = text;
+                                _logger.LogDebug("Found service from text: {Service}", serviceName);
+                            }
+                        }
+
+                        // Add the service if we found a name
+                        if (!string.IsNullOrWhiteSpace(serviceName))
+                        {
+                            var service = new CampsiteService
+                            {
+                                Name = serviceName
+                            };
+
+                            // Try to save the SVG icon
+                            if (!string.IsNullOrWhiteSpace(svgUrl))
+                            {
+                                // Download from URL
+                                var iconPath = await DownloadActivityIconAsync(svgUrl, serviceName, baseUrl);
+                                service.IconPath = iconPath;
+                            }
+                            else if (!string.IsNullOrWhiteSpace(svgContent))
+                            {
+                                // Save inline SVG content
+                                var iconPath = await SaveInlineSvgAsync(svgContent, serviceName);
+                                service.IconPath = iconPath;
+                            }
+
                             services.Add(service);
                         }
                     }
                 }
+
+                _logger.LogInformation("Extracted {Count} services", services.Count);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error extracting services");
             }
 
-            return services;
+            return services.Where(s => !string.IsNullOrEmpty(s.Name)).Distinct(new CampsiteServiceComparer()).ToList();
+        }
+
+        // Comparer to ensure unique services by name
+        private class CampsiteServiceComparer : IEqualityComparer<CampsiteService>
+        {
+            public bool Equals(CampsiteService? x, CampsiteService? y)
+            {
+                if (x == null || y == null) return false;
+                return x.Name.Equals(y.Name, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public int GetHashCode(CampsiteService obj)
+            {
+                return obj.Name.ToLower().GetHashCode();
+            }
         }
 
         private async Task<List<CampsiteActivity>> ExtractActivitiesAsync(HtmlDocument doc, string baseUrl)
@@ -273,6 +385,7 @@ namespace RoutePlanner.API.Services
                     {
                         string? activityName = null;
                         string? svgUrl = null;
+                        string? svgContent = null;
 
                         // Method 1: Try to get alt attribute from img tag
                         var imgNode = node.SelectSingleNode(".//img");
@@ -285,30 +398,42 @@ namespace RoutePlanner.API.Services
                                 _logger.LogDebug("Found activity from alt: {Activity}", activityName);
                             }
 
-                            // Get the image source (could be SVG)
+                            // Get the image source (could be SVG or other formats)
                             var src = imgNode.GetAttributeValue("src", "");
-                            if (!string.IsNullOrWhiteSpace(src) && src.EndsWith(".svg"))
+                            if (!string.IsNullOrWhiteSpace(src))
                             {
-                                svgUrl = src;
+                                // Check if it's an SVG file
+                                if (src.EndsWith(".svg") || src.Contains(".svg?"))
+                                {
+                                    svgUrl = src;
+                                    _logger.LogDebug("Found SVG URL from img src: {Url}", svgUrl);
+                                }
+                                else
+                                {
+                                    _logger.LogDebug("Image source is not SVG: {Src}", src);
+                                }
                             }
                         }
 
-                        // Method 2: Try to get the SVG element directly
-                        if (string.IsNullOrEmpty(svgUrl))
+                        // Method 2: Try to get the SVG element directly (inline SVG)
+                        if (string.IsNullOrEmpty(svgContent))
                         {
                             var svgNode = node.SelectSingleNode(".//svg");
                             if (svgNode != null)
                             {
+                                // Get the outer HTML of the SVG element
+                                svgContent = svgNode.OuterHtml;
+                                _logger.LogDebug("Found inline SVG for activity: {Activity}", activityName ?? "Unknown");
+
+                                // Also try to get xlink:href for logging
                                 var useNode = svgNode.SelectSingleNode(".//use");
                                 if (useNode != null)
                                 {
-                                    // Get the xlink:href attribute (contains the icon reference)
                                     var xlinkHref = useNode.GetAttributeValue("xlink:href", "")
                                                     ?? useNode.GetAttributeValue("href", "");
 
                                     if (!string.IsNullOrWhiteSpace(xlinkHref))
                                     {
-                                        // Extract the icon name from the reference
                                         var iconName = xlinkHref.TrimStart('#').Replace("icon-", "");
 
                                         // If no activity name yet, convert icon name to readable format
@@ -317,9 +442,6 @@ namespace RoutePlanner.API.Services
                                             activityName = ConvertIconNameToReadable(iconName);
                                             _logger.LogDebug("Found activity from SVG: {Activity} (from {XlinkHref})", activityName, xlinkHref);
                                         }
-
-                                        // Store the SVG reference for later extraction
-                                        svgUrl = xlinkHref;
                                     }
                                 }
                             }
@@ -344,10 +466,17 @@ namespace RoutePlanner.API.Services
                                 Name = activityName
                             };
 
-                            // Download SVG icon if we found one
+                            // Try to save the SVG icon
                             if (!string.IsNullOrWhiteSpace(svgUrl))
                             {
+                                // Download from URL
                                 var iconPath = await DownloadActivityIconAsync(svgUrl, activityName, baseUrl);
+                                activity.IconPath = iconPath;
+                            }
+                            else if (!string.IsNullOrWhiteSpace(svgContent))
+                            {
+                                // Save inline SVG content
+                                var iconPath = await SaveInlineSvgAsync(svgContent, activityName);
                                 activity.IconPath = iconPath;
                             }
 
@@ -663,6 +792,33 @@ namespace RoutePlanner.API.Services
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error downloading activity icon for {Activity} from {Url}", activityName, svgUrl);
+                return null;
+            }
+        }
+
+        private async Task<string?> SaveInlineSvgAsync(string svgContent, string activityName)
+        {
+            try
+            {
+                // Sanitize activity name for filename
+                var safeFileName = string.Join("_", activityName.Split(Path.GetInvalidFileNameChars()));
+                safeFileName = safeFileName.ToLower().Replace(" ", "_");
+
+                var fileName = $"{safeFileName}.svg";
+                var filePath = Path.Combine(_activitiesBasePath, fileName);
+
+                // Save inline SVG content to file
+                await File.WriteAllTextAsync(filePath, svgContent);
+
+                // Return relative path for database
+                var relativePath = $"/images/campsites/activities/{fileName}";
+                _logger.LogInformation("Saved inline SVG icon: {Activity} to {Path}", activityName, relativePath);
+
+                return relativePath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error saving inline SVG icon for {Activity}", activityName);
                 return null;
             }
         }

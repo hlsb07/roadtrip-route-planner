@@ -14,7 +14,7 @@ namespace RoutePlanner.API.DTOs
         public double Longitude { get; set; }
         public decimal? Rating { get; set; }
         public string? Type { get; set; }
-        public List<string>? Services { get; set; }
+        public List<CampsiteService>? Services { get; set; }
         public List<CampsiteActivity>? Activities { get; set; }
         public string? Price { get; set; }
         public int? NumberOfSpots { get; set; }

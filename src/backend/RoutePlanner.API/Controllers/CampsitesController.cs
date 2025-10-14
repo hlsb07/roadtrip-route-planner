@@ -246,9 +246,7 @@ namespace RoutePlanner.API.Controllers
                 Longitude = campsite.Longitude,
                 Rating = campsite.Rating,
                 Type = campsite.Type,
-                Services = string.IsNullOrEmpty(campsite.Services)
-                    ? null
-                    : JsonSerializer.Deserialize<List<string>>(campsite.Services),
+                Services = campsite.ServicesList,
                 Activities = campsite.ActivitiesList,
                 Price = campsite.Price,
                 NumberOfSpots = campsite.NumberOfSpots,

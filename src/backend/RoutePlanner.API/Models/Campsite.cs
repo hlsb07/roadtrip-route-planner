@@ -59,9 +59,23 @@ namespace RoutePlanner.API.Models
         public string? Type { get; set; }
 
         /// <summary>
-        /// JSON array of available services (e.g., ["Water", "Electricity", "WiFi"])
+        /// JSON array of available services with icons (stored as JSON)
         /// </summary>
         public string? Services { get; set; }
+
+        /// <summary>
+        /// Helper property to work with services as a list of objects
+        /// </summary>
+        [NotMapped]
+        public List<CampsiteService>? ServicesList
+        {
+            get => string.IsNullOrEmpty(Services)
+                ? null
+                : JsonSerializer.Deserialize<List<CampsiteService>>(Services);
+            set => Services = value == null
+                ? null
+                : JsonSerializer.Serialize(value);
+        }
 
         /// <summary>
         /// JSON array of available activities with icons (stored as JSON)
