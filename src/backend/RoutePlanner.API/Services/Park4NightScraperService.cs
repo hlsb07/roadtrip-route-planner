@@ -239,8 +239,22 @@ namespace RoutePlanner.API.Services
 
             try
             {
-                // Target the specific list with services (same as activities)
-                var serviceNodes = doc.DocumentNode.SelectNodes("//ul[@class='place-specs-services']//li");
+                // Find the services section by looking for the caption containing "service"
+                var servicesRow = doc.DocumentNode.SelectNodes("//div[@class='row align-items-center py-2']")?
+                    .FirstOrDefault(row =>
+                    {
+                        var caption = row.SelectSingleNode(".//span[contains(@class, 'caption')]");
+                        return caption != null && caption.InnerText.ToLower().Contains("service");
+                    });
+
+                if (servicesRow == null)
+                {
+                    _logger.LogWarning("Services section not found in HTML");
+                    return services;
+                }
+
+                // Get the list items from the services section
+                var serviceNodes = servicesRow.SelectNodes(".//ul[@class='place-specs-services']//li");
 
                 if (serviceNodes != null)
                 {
@@ -379,8 +393,26 @@ namespace RoutePlanner.API.Services
 
             try
             {
-                // Target the specific list with activities
-                var activityNodes = doc.DocumentNode.SelectNodes("//ul[@class='place-specs-services']//li");
+                // Find the activities section by looking for the caption containing "aktivitäten" or "activities"
+                var activitiesRow = doc.DocumentNode.SelectNodes("//div[@class='row align-items-center py-2']")?
+                    .FirstOrDefault(row =>
+                    {
+                        var caption = row.SelectSingleNode(".//span[contains(@class, 'caption')]");
+                        if (caption == null) return false;
+
+                        var text = caption.InnerText.ToLower();
+                        return text.Contains("aktivitäten") || text.Contains("activities") ||
+                               text.Contains("activités") || text.Contains("actividades");
+                    });
+
+                if (activitiesRow == null)
+                {
+                    _logger.LogWarning("Activities section not found in HTML");
+                    return activities;
+                }
+
+                // Get the list items from the activities section
+                var activityNodes = activitiesRow.SelectNodes(".//ul[@class='place-specs-services']//li");
 
                 if (activityNodes != null)
                 {
