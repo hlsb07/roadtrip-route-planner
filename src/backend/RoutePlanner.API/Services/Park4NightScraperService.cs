@@ -12,6 +12,7 @@ namespace RoutePlanner.API.Services
         private readonly ILogger<Park4NightScraperService> _logger;
         private readonly string _imagesBasePath;
         private readonly string _activitiesBasePath;
+        private readonly string _servicesBasePath;
         private readonly GeometryFactory _geometryFactory;
 
         public Park4NightScraperService(
@@ -23,11 +24,13 @@ namespace RoutePlanner.API.Services
             _logger = logger;
             _imagesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites");
             _activitiesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "activities");
+            _servicesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "services");
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
             // Ensure directories exist
             Directory.CreateDirectory(_imagesBasePath);
             Directory.CreateDirectory(_activitiesBasePath);
+            Directory.CreateDirectory(_servicesBasePath);
 
             // Configure HttpClient
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
@@ -330,13 +333,13 @@ namespace RoutePlanner.API.Services
                             if (!string.IsNullOrWhiteSpace(svgUrl))
                             {
                                 // Download from URL
-                                var iconPath = await DownloadActivityIconAsync(svgUrl, serviceName, baseUrl);
+                                var iconPath = await DownloadServiceIconAsync(svgUrl, serviceName, baseUrl);
                                 service.IconPath = iconPath;
                             }
                             else if (!string.IsNullOrWhiteSpace(svgContent))
                             {
                                 // Save inline SVG content
-                                var iconPath = await SaveInlineSvgAsync(svgContent, serviceName);
+                                var iconPath = await SaveInlineSvgAsync(svgContent, serviceName, "services");
                                 service.IconPath = iconPath;
                             }
 
@@ -476,7 +479,7 @@ namespace RoutePlanner.API.Services
                             else if (!string.IsNullOrWhiteSpace(svgContent))
                             {
                                 // Save inline SVG content
-                                var iconPath = await SaveInlineSvgAsync(svgContent, activityName);
+                                var iconPath = await SaveInlineSvgAsync(svgContent, activityName, "activities");
                                 activity.IconPath = iconPath;
                             }
 
@@ -796,29 +799,81 @@ namespace RoutePlanner.API.Services
             }
         }
 
-        private async Task<string?> SaveInlineSvgAsync(string svgContent, string activityName)
+        private async Task<string?> SaveInlineSvgAsync(string svgContent, string itemName, string folderType)
         {
             try
             {
-                // Sanitize activity name for filename
-                var safeFileName = string.Join("_", activityName.Split(Path.GetInvalidFileNameChars()));
+                // Sanitize item name for filename
+                var safeFileName = string.Join("_", itemName.Split(Path.GetInvalidFileNameChars()));
                 safeFileName = safeFileName.ToLower().Replace(" ", "_");
 
                 var fileName = $"{safeFileName}.svg";
-                var filePath = Path.Combine(_activitiesBasePath, fileName);
+                var basePath = folderType == "services" ? _servicesBasePath : _activitiesBasePath;
+                var filePath = Path.Combine(basePath, fileName);
 
                 // Save inline SVG content to file
                 await File.WriteAllTextAsync(filePath, svgContent);
 
                 // Return relative path for database
-                var relativePath = $"/images/campsites/activities/{fileName}";
-                _logger.LogInformation("Saved inline SVG icon: {Activity} to {Path}", activityName, relativePath);
+                var relativePath = $"/images/campsites/{folderType}/{fileName}";
+                _logger.LogInformation("Saved inline SVG icon: {Item} to {Path}", itemName, relativePath);
 
                 return relativePath;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error saving inline SVG icon for {Activity}", activityName);
+                _logger.LogWarning(ex, "Error saving inline SVG icon for {Item}", itemName);
+                return null;
+            }
+        }
+
+        private async Task<string?> DownloadServiceIconAsync(string svgUrl, string serviceName, string baseUrl)
+        {
+            try
+            {
+                // Sanitize service name for filename
+                var safeFileName = string.Join("_", serviceName.Split(Path.GetInvalidFileNameChars()));
+                safeFileName = safeFileName.ToLower().Replace(" ", "_");
+
+                // If URL is relative, convert to absolute
+                if (svgUrl.StartsWith("//"))
+                {
+                    svgUrl = "https:" + svgUrl;
+                }
+                else if (svgUrl.StartsWith("/"))
+                {
+                    svgUrl = new Uri(new Uri(baseUrl), svgUrl).ToString();
+                }
+                else if (svgUrl.StartsWith("#"))
+                {
+                    // This is a reference to an SVG sprite, we can't download it directly
+                    _logger.LogDebug("Skipping SVG sprite reference: {SvgUrl}", svgUrl);
+                    return null;
+                }
+
+                // Only proceed if it's an SVG file
+                if (!svgUrl.EndsWith(".svg") && !svgUrl.Contains(".svg?"))
+                {
+                    _logger.LogDebug("URL is not an SVG file: {SvgUrl}", svgUrl);
+                    return null;
+                }
+
+                var fileName = $"{safeFileName}.svg";
+                var filePath = Path.Combine(_servicesBasePath, fileName);
+
+                // Download SVG file
+                var svgContent = await _httpClient.GetStringAsync(svgUrl);
+                await File.WriteAllTextAsync(filePath, svgContent);
+
+                // Return relative path for database
+                var relativePath = $"/images/campsites/services/{fileName}";
+                _logger.LogInformation("Downloaded service icon: {Service} to {Path}", serviceName, relativePath);
+
+                return relativePath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error downloading service icon for {Service} from {Url}", serviceName, svgUrl);
                 return null;
             }
         }

@@ -44,3 +44,5 @@ Thumbs.db
 src/backend/RoutePlanner.API/wwwroot/images/campsites/
 # Activity icons
 src/backend/RoutePlanner.API/wwwroot/images/campsites/activities/
+# Service icons
+src/backend/RoutePlanner.API/wwwroot/images/campsites/services/
