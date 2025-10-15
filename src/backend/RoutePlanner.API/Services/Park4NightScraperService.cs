@@ -134,8 +134,31 @@ namespace RoutePlanner.API.Services
         {
             try
             {
-                // Look for coordinates in data attributes or meta tags
-                var coordNode = doc.DocumentNode.SelectSingleNode("//meta[@property='place:location:latitude']");
+                // Method 1: Try to extract from place-info-location section
+                var locationList = doc.DocumentNode.SelectSingleNode("//ul[contains(@class, 'place-info-location')]");
+                if (locationList != null)
+                {
+                    var firstLi = locationList.SelectSingleNode(".//li");
+                    if (firstLi != null)
+                    {
+                        var coordSpan = firstLi.SelectSingleNode(".//p/span");
+                        if (coordSpan != null)
+                        {
+                            var coordText = coordSpan.InnerText.Trim();
+                            // Expected format: "-43.4988, 172.7279 (lat, lng)" or "43.4988, 172.7279"
+                            var match = Regex.Match(coordText, @"(-?\d+\.?\d*),\s*(-?\d+\.?\d*)");
+                            if (match.Success)
+                            {
+                                var lat = double.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+                                var lon = double.Parse(match.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+                                _logger.LogInformation("Extracted coordinates from place-info-location: {Lat}, {Lon}", lat, lon);
+                                return (lat, lon);
+                            }
+                        }
+                    }
+                }
+
+                // Method 2: Look for coordinates in meta tags
                 var latNode = doc.DocumentNode.SelectSingleNode("//meta[@property='place:location:latitude']");
                 var lonNode = doc.DocumentNode.SelectSingleNode("//meta[@property='place:location:longitude']");
 
@@ -143,10 +166,11 @@ namespace RoutePlanner.API.Services
                 {
                     var lat = double.Parse(latNode.GetAttributeValue("content", "0"), System.Globalization.CultureInfo.InvariantCulture);
                     var lon = double.Parse(lonNode.GetAttributeValue("content", "0"), System.Globalization.CultureInfo.InvariantCulture);
+                    _logger.LogInformation("Extracted coordinates from meta tags: {Lat}, {Lon}", lat, lon);
                     return (lat, lon);
                 }
 
-                // Try extracting from JavaScript/JSON-LD
+                // Method 3: Try extracting from JavaScript/JSON-LD
                 var scriptNodes = doc.DocumentNode.SelectNodes("//script[@type='application/ld+json']");
                 if (scriptNodes != null)
                 {
@@ -159,6 +183,7 @@ namespace RoutePlanner.API.Services
                             {
                                 var lat = geo.GetProperty("latitude").GetDouble();
                                 var lon = geo.GetProperty("longitude").GetDouble();
+                                _logger.LogInformation("Extracted coordinates from JSON-LD: {Lat}, {Lon}", lat, lon);
                                 return (lat, lon);
                             }
                         }
@@ -166,14 +191,17 @@ namespace RoutePlanner.API.Services
                     }
                 }
 
-                // Fallback: try to find in data-lat and data-lng attributes
+                // Method 4: Fallback - try to find in data-lat and data-lng attributes
                 var mapNode = doc.DocumentNode.SelectSingleNode("//*[@data-lat]");
                 if (mapNode != null)
                 {
                     var lat = double.Parse(mapNode.GetAttributeValue("data-lat", "0"), System.Globalization.CultureInfo.InvariantCulture);
                     var lon = double.Parse(mapNode.GetAttributeValue("data-lng", "0"), System.Globalization.CultureInfo.InvariantCulture);
+                    _logger.LogInformation("Extracted coordinates from data attributes: {Lat}, {Lon}", lat, lon);
                     return (lat, lon);
                 }
+
+                _logger.LogWarning("Could not extract coordinates from any source");
             }
             catch (Exception ex)
             {
@@ -599,6 +627,44 @@ namespace RoutePlanner.API.Services
         {
             try
             {
+                // Method 1: Try to extract from place-info-details definition list
+                var detailsList = doc.DocumentNode.SelectSingleNode("//dl[contains(@class, 'place-info-details')]");
+                if (detailsList != null)
+                {
+                    var dtNodes = detailsList.SelectNodes(".//dt");
+                    if (dtNodes != null)
+                    {
+                        foreach (var dt in dtNodes)
+                        {
+                            var dtText = dt.InnerText.Trim().ToLower();
+                            // Check for multiple language variants
+                            if (dtText.Contains("anzahl der plätze") ||      // German
+                                dtText.Contains("number of places") ||        // English
+                                dtText.Contains("nombre de places") ||        // French
+                                dtText.Contains("número de lugares"))         // Spanish
+                            {
+                                // Get the next sibling <dd> element
+                                var dd = dt.NextSibling;
+                                while (dd != null && dd.Name != "dd")
+                                {
+                                    dd = dd.NextSibling;
+                                }
+
+                                if (dd != null)
+                                {
+                                    var spotsText = Regex.Match(dd.InnerText, @"(\d+)").Value;
+                                    if (int.TryParse(spotsText, out var spots))
+                                    {
+                                        _logger.LogInformation("Extracted number of spots from place-info-details: {Spots}", spots);
+                                        return spots;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Method 2: Fallback to searching for text containing spots/places
                 var spotsNode = doc.DocumentNode.SelectSingleNode("//*[contains(text(), 'spots')]") ??
                                doc.DocumentNode.SelectSingleNode("//*[contains(text(), 'places')]");
 
@@ -607,9 +673,12 @@ namespace RoutePlanner.API.Services
                     var spotsText = Regex.Match(spotsNode.InnerText, @"(\d+)").Value;
                     if (int.TryParse(spotsText, out var spots))
                     {
+                        _logger.LogInformation("Extracted number of spots from text fallback: {Spots}", spots);
                         return spots;
                     }
                 }
+
+                _logger.LogDebug("Could not extract number of spots");
             }
             catch (Exception ex)
             {
