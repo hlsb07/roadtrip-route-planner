@@ -177,7 +177,8 @@ namespace RoutePlanner.API.Controllers
                 return NotFound();
             }
 
-            // Delete associated images
+            // Delete associated campsite images
+            // Note: Service and activity SVG icons are NOT deleted as they are shared across multiple campsites
             try
             {
                 if (!string.IsNullOrEmpty(campsite.ImagePaths))
@@ -191,6 +192,7 @@ namespace RoutePlanner.API.Controllers
                             if (System.IO.File.Exists(fullPath))
                             {
                                 System.IO.File.Delete(fullPath);
+                                _logger.LogDebug("Deleted image: {Path}", imagePath);
                             }
                         }
                     }
