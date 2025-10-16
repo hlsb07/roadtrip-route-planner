@@ -229,7 +229,7 @@ namespace RoutePlanner.API.Controllers
             var campsites = await _context.Campsites
                 .Where(c => c.Name.Contains(query) ||
                            (c.Descriptions != null && c.Descriptions.Contains(query)) ||
-                           (c.Type != null && c.Type.Contains(query)))
+                           (c.Types != null && c.Types.Contains(query)))
                 .OrderByDescending(c => c.Rating)
                 .Take(50)
                 .ToListAsync();
@@ -247,7 +247,7 @@ namespace RoutePlanner.API.Controllers
                 Latitude = campsite.Latitude,
                 Longitude = campsite.Longitude,
                 Rating = campsite.Rating,
-                Type = campsite.Type,
+                Types = campsite.TypesList,
                 Services = campsite.ServicesList,
                 Activities = campsite.ActivitiesList,
                 Price = campsite.Price,

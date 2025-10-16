@@ -55,8 +55,24 @@ namespace RoutePlanner.API.Models
 
         public decimal? Rating { get; set; }
 
-        [MaxLength(200)]
-        public string? Type { get; set; }
+        /// <summary>
+        /// JSON array of campsite types with icons (stored as JSON)
+        /// </summary>
+        public string? Types { get; set; }
+
+        /// <summary>
+        /// Helper property to work with types as a list of objects
+        /// </summary>
+        [NotMapped]
+        public List<CampsiteType>? TypesList
+        {
+            get => string.IsNullOrEmpty(Types)
+                ? null
+                : JsonSerializer.Deserialize<List<CampsiteType>>(Types);
+            set => Types = value == null
+                ? null
+                : JsonSerializer.Serialize(value);
+        }
 
         /// <summary>
         /// JSON array of available services with icons (stored as JSON)

@@ -102,7 +102,6 @@ namespace RoutePlanner.API.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Park4NightId).HasMaxLength(50).IsRequired();
                 entity.Property(e => e.Name).HasMaxLength(300).IsRequired();
-                entity.Property(e => e.Type).HasMaxLength(200);
                 entity.Property(e => e.Price).HasMaxLength(200);
                 entity.Property(e => e.SourceUrl).HasMaxLength(500).IsRequired();
 
@@ -112,6 +111,7 @@ namespace RoutePlanner.API.Data
                       .IsRequired();
 
                 // JSON columns for arrays
+                entity.Property(e => e.Types).HasColumnType("text");
                 entity.Property(e => e.Services).HasColumnType("text");
                 entity.Property(e => e.Activities).HasColumnType("text");
                 entity.Property(e => e.ImagePaths).HasColumnType("text");

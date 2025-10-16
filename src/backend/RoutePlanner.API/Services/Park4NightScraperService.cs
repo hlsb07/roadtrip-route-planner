@@ -13,6 +13,7 @@ namespace RoutePlanner.API.Services
         private readonly string _imagesBasePath;
         private readonly string _activitiesBasePath;
         private readonly string _servicesBasePath;
+        private readonly string _typesBasePath;
         private readonly GeometryFactory _geometryFactory;
 
         public Park4NightScraperService(
@@ -25,12 +26,14 @@ namespace RoutePlanner.API.Services
             _imagesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites");
             _activitiesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "activities");
             _servicesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "services");
+            _typesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "types");
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
             // Ensure directories exist
             Directory.CreateDirectory(_imagesBasePath);
             Directory.CreateDirectory(_activitiesBasePath);
             Directory.CreateDirectory(_servicesBasePath);
+            Directory.CreateDirectory(_typesBasePath);
 
             // Configure HttpClient
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
@@ -72,7 +75,10 @@ namespace RoutePlanner.API.Services
                 var (lat, lon) = ExtractCoordinates(htmlDoc);
                 campsite.Location = _geometryFactory.CreatePoint(new Coordinate(lon, lat));
                 campsite.Rating = ExtractRating(htmlDoc);
-                campsite.Type = ExtractType(htmlDoc);
+
+                // Extract types with SVG icons
+                var types = await ExtractTypeAsync(htmlDoc, url);
+                campsite.TypesList = types.Count > 0 ? types : null;
 
                 // Extract services with SVG icons
                 var services = await ExtractServicesAsync(htmlDoc, url);
@@ -235,29 +241,153 @@ namespace RoutePlanner.API.Services
             return null;
         }
 
-        private string? ExtractType(HtmlDocument doc)
+        private async Task<List<CampsiteType>> ExtractTypeAsync(HtmlDocument doc, string baseUrl)
         {
+            var types = new List<CampsiteType>();
+
             try
             {
-                var typeNode = doc.DocumentNode.SelectSingleNode("//span[@class='place-type']") ??
-                              doc.DocumentNode.SelectSingleNode("//*[contains(@class, 'category')]") ??
-                              doc.DocumentNode.SelectSingleNode("//*[contains(text(), 'Type')]/..//span");
+                // Try to find the type from the place-header-access figure
+                var accessFigure = doc.DocumentNode.SelectSingleNode("//figure[@class='place-header-access']");
 
-                var type = typeNode?.InnerText.Trim();
-
-                // Truncate to database max length (200)
-                if (type?.Length > 200)
+                if (accessFigure != null)
                 {
-                    _logger.LogWarning("Type field truncated from {Length} to 200 characters", type.Length);
-                    return type.Substring(0, 200);
+                    var imgNode = accessFigure.SelectSingleNode(".//img");
+                    if (imgNode != null)
+                    {
+                        string? typeName = null;
+                        string? svgUrl = null;
+                        string? svgContent = null;
+
+                        // Method 1: Try to get alt attribute from img tag
+                        var altText = imgNode.GetAttributeValue("alt", "");
+                        if (!string.IsNullOrWhiteSpace(altText))
+                        {
+                            typeName = altText.Trim();
+                            _logger.LogDebug("Found type from alt: {Type}", typeName);
+                        }
+
+                        // Get the image source (could be SVG or other formats)
+                        var src = imgNode.GetAttributeValue("src", "");
+                        if (!string.IsNullOrWhiteSpace(src))
+                        {
+                            // Check if it's an SVG file
+                            if (src.EndsWith(".svg") || src.Contains(".svg?"))
+                            {
+                                svgUrl = src;
+                                _logger.LogDebug("Found SVG URL from img src: {Url}", svgUrl);
+                            }
+                            else
+                            {
+                                _logger.LogDebug("Image source is not SVG: {Src}", src);
+                            }
+                        }
+
+                        // Add the type if we found a name
+                        if (!string.IsNullOrWhiteSpace(typeName))
+                        {
+                            var campsiteType = new CampsiteType
+                            {
+                                Name = typeName
+                            };
+
+                            // Try to save the SVG icon
+                            if (!string.IsNullOrWhiteSpace(svgUrl))
+                            {
+                                // Download from URL
+                                var iconPath = await DownloadTypeIconAsync(svgUrl, typeName, baseUrl);
+                                campsiteType.IconPath = iconPath;
+                            }
+                            else if (!string.IsNullOrWhiteSpace(svgContent))
+                            {
+                                // Save inline SVG content
+                                var iconPath = await SaveInlineSvgAsync(svgContent, typeName, "types");
+                                campsiteType.IconPath = iconPath;
+                            }
+
+                            types.Add(campsiteType);
+                        }
+                    }
                 }
 
-                return type;
+                // Method 2: Try to get the SVG element directly (inline SVG)
+                if (types.Count == 0)
+                {
+                    var svgNode = doc.DocumentNode.SelectSingleNode("//figure[@class='place-header-access']//svg");
+                    if (svgNode != null)
+                    {
+                        string? typeName = null;
+                        var svgContent = svgNode.OuterHtml;
+                        _logger.LogDebug("Found inline SVG for type");
+
+                        // Try to get xlink:href for logging and name extraction
+                        var useNode = svgNode.SelectSingleNode(".//use");
+                        if (useNode != null)
+                        {
+                            var xlinkHref = useNode.GetAttributeValue("xlink:href", "")
+                                            ?? useNode.GetAttributeValue("href", "");
+
+                            if (!string.IsNullOrWhiteSpace(xlinkHref))
+                            {
+                                var iconName = xlinkHref.TrimStart('#').Replace("icon-", "");
+                                typeName = ConvertIconNameToReadable(iconName);
+                                _logger.LogDebug("Found type from SVG: {Type} (from {XlinkHref})", typeName, xlinkHref);
+                            }
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(typeName))
+                        {
+                            var campsiteType = new CampsiteType
+                            {
+                                Name = typeName
+                            };
+
+                            var iconPath = await SaveInlineSvgAsync(svgContent, typeName, "types");
+                            campsiteType.IconPath = iconPath;
+
+                            types.Add(campsiteType);
+                        }
+                    }
+                }
+
+                // Fallback: Try alternative selectors
+                if (types.Count == 0)
+                {
+                    var typeNode = doc.DocumentNode.SelectSingleNode("//span[@class='place-type']") ??
+                                  doc.DocumentNode.SelectSingleNode("//*[contains(@class, 'category')]") ??
+                                  doc.DocumentNode.SelectSingleNode("//*[contains(text(), 'Type')]/..//span");
+
+                    var fallbackType = typeNode?.InnerText.Trim();
+
+                    if (!string.IsNullOrWhiteSpace(fallbackType))
+                    {
+                        _logger.LogDebug("Extracted type using fallback: {Type}", fallbackType);
+                        types.Add(new CampsiteType { Name = fallbackType });
+                    }
+                }
+
+                _logger.LogInformation("Extracted {Count} types", types.Count);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error extracting type");
-                return null;
+            }
+
+            return types.Where(t => !string.IsNullOrEmpty(t.Name)).Distinct(new CampsiteTypeComparer()).ToList();
+        }
+
+        // Comparer to ensure unique types by name
+        private class CampsiteTypeComparer : IEqualityComparer<CampsiteType>
+        {
+            public bool Equals(CampsiteType? x, CampsiteType? y)
+            {
+                if (x == null || y == null) return false;
+                return x.Name.Equals(y.Name, StringComparison.OrdinalIgnoreCase);
+            }
+
+            public int GetHashCode(CampsiteType obj)
+            {
+                return obj.Name.ToLower().GetHashCode();
             }
         }
 
@@ -600,21 +730,96 @@ namespace RoutePlanner.API.Services
         {
             try
             {
-                var priceNode = doc.DocumentNode.SelectSingleNode("//*[contains(@class, 'price')]") ??
-                               doc.DocumentNode.SelectSingleNode("//*[contains(text(), 'Price')]/..//span") ??
-                               doc.DocumentNode.SelectSingleNode("//*[contains(text(), '€')]") ??
-                               doc.DocumentNode.SelectSingleNode("//*[contains(text(), '$')]");
+                var prices = new List<string>();
 
-                var price = priceNode?.InnerText.Trim();
-
-                // Truncate to database max length (200)
-                if (price?.Length > 200)
+                // Try to extract from place-info-details definition list
+                var detailsList = doc.DocumentNode.SelectSingleNode("//dl[contains(@class, 'place-info-details')]");
+                if (detailsList != null)
                 {
-                    _logger.LogWarning("Price field truncated from {Length} to 200 characters", price.Length);
-                    return price.Substring(0, 200);
+                    var dtNodes = detailsList.SelectNodes(".//dt");
+                    if (dtNodes != null)
+                    {
+                        foreach (var dt in dtNodes)
+                        {
+                            var dtText = dt.InnerText.Trim().ToLower();
+
+                            // Check for service price in multiple languages
+                            bool isServicePrice = dtText.Contains("preis der dienstleistungen") ||   // German
+                                                 dtText.Contains("price of services") ||              // English
+                                                 dtText.Contains("prix des services") ||              // French
+                                                 dtText.Contains("precio de los servicios");         // Spanish
+
+                            // Check for parking cost in multiple languages
+                            bool isParkingCost = dtText.Contains("parkgebühren") ||                  // German
+                                                dtText.Contains("parking cost") ||                   // English
+                                                dtText.Contains("frais de parking") ||               // French
+                                                dtText.Contains("coste de aparcamiento");            // Spanish
+
+                            if (isServicePrice || isParkingCost)
+                            {
+                                // Get the next sibling <dd> element
+                                var dd = dt.NextSibling;
+                                while (dd != null && dd.Name != "dd")
+                                {
+                                    dd = dd.NextSibling;
+                                }
+
+                                if (dd != null)
+                                {
+                                    var priceValue = dd.InnerText.Trim();
+                                    if (!string.IsNullOrWhiteSpace(priceValue))
+                                    {
+                                        // Add label for clarity
+                                        string label = isServicePrice ? "Services" : "Parking";
+                                        prices.Add($"{label}: {priceValue}");
+                                        _logger.LogDebug("Extracted {Label} price: {Price}", label, priceValue);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
-                return price;
+                // If we found prices, combine them
+                if (prices.Count > 0)
+                {
+                    var combinedPrice = string.Join(", ", prices);
+
+                    // Truncate to database max length (200)
+                    if (combinedPrice.Length > 200)
+                    {
+                        _logger.LogWarning("Price field truncated from {Length} to 200 characters", combinedPrice.Length);
+                        combinedPrice = combinedPrice.Substring(0, 200);
+                    }
+
+                    _logger.LogInformation("Extracted price: {Price}", combinedPrice);
+                    return combinedPrice;
+                }
+
+                // Fallback: Try to find any price-related node
+                var priceNode = doc.DocumentNode.SelectSingleNode("//*[contains(@class, 'price')]") ??
+                               doc.DocumentNode.SelectSingleNode("//*[contains(text(), 'Price')]/..//span");
+
+                if (priceNode != null)
+                {
+                    var price = priceNode.InnerText.Trim();
+
+                    if (!string.IsNullOrWhiteSpace(price))
+                    {
+                        // Truncate to database max length (200)
+                        if (price.Length > 200)
+                        {
+                            _logger.LogWarning("Price field truncated from {Length} to 200 characters", price.Length);
+                            price = price.Substring(0, 200);
+                        }
+
+                        _logger.LogInformation("Extracted price from fallback: {Price}", price);
+                        return price;
+                    }
+                }
+
+                _logger.LogDebug("Could not extract price");
+                return null;
             }
             catch (Exception ex)
             {
@@ -975,6 +1180,57 @@ namespace RoutePlanner.API.Services
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error downloading service icon for {Service} from {Url}", serviceName, svgUrl);
+                return null;
+            }
+        }
+
+        private async Task<string?> DownloadTypeIconAsync(string svgUrl, string typeName, string baseUrl)
+        {
+            try
+            {
+                // Sanitize type name for filename
+                var safeFileName = string.Join("_", typeName.Split(Path.GetInvalidFileNameChars()));
+                safeFileName = safeFileName.ToLower().Replace(" ", "_");
+
+                // If URL is relative, convert to absolute
+                if (svgUrl.StartsWith("//"))
+                {
+                    svgUrl = "https:" + svgUrl;
+                }
+                else if (svgUrl.StartsWith("/"))
+                {
+                    svgUrl = new Uri(new Uri(baseUrl), svgUrl).ToString();
+                }
+                else if (svgUrl.StartsWith("#"))
+                {
+                    // This is a reference to an SVG sprite, we can't download it directly
+                    _logger.LogDebug("Skipping SVG sprite reference: {SvgUrl}", svgUrl);
+                    return null;
+                }
+
+                // Only proceed if it's an SVG file
+                if (!svgUrl.EndsWith(".svg") && !svgUrl.Contains(".svg?"))
+                {
+                    _logger.LogDebug("URL is not an SVG file: {SvgUrl}", svgUrl);
+                    return null;
+                }
+
+                var fileName = $"{safeFileName}.svg";
+                var filePath = Path.Combine(_typesBasePath, fileName);
+
+                // Download SVG file
+                var svgContent = await _httpClient.GetStringAsync(svgUrl);
+                await File.WriteAllTextAsync(filePath, svgContent);
+
+                // Return relative path for database
+                var relativePath = $"/images/campsites/types/{fileName}";
+                _logger.LogInformation("Downloaded type icon: {Type} to {Path}", typeName, relativePath);
+
+                return relativePath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Error downloading type icon for {Type} from {Url}", typeName, svgUrl);
                 return null;
             }
         }
