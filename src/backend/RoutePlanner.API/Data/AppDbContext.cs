@@ -12,6 +12,7 @@ namespace RoutePlanner.API.Data
         public DbSet<Models.Route> Routes { get; set; }
         public DbSet<RoutePlace> RoutePlaces { get; set; }
         public DbSet<GoogleMapsCache> GoogleMapsCache { get; set; }
+        public DbSet<Campsite> Campsites { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -93,6 +94,42 @@ namespace RoutePlanner.API.Data
 
                 // Default values
                 entity.Property(e => e.HitCount).HasDefaultValue(0);
+            });
+
+            // Campsite Konfiguration
+            modelBuilder.Entity<Campsite>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Park4NightId).HasMaxLength(50).IsRequired();
+                entity.Property(e => e.Name).HasMaxLength(300).IsRequired();
+                entity.Property(e => e.Price).HasMaxLength(200);
+                entity.Property(e => e.SourceUrl).HasMaxLength(500).IsRequired();
+
+                // PostGIS Point for location
+                entity.Property(e => e.Location)
+                      .HasColumnType("geometry (point, 4326)")
+                      .IsRequired();
+
+                // JSON columns for arrays
+                entity.Property(e => e.Types).HasColumnType("text");
+                entity.Property(e => e.Services).HasColumnType("text");
+                entity.Property(e => e.Activities).HasColumnType("text");
+                entity.Property(e => e.ImagePaths).HasColumnType("text");
+
+                // JSONB column for multi-language descriptions
+                entity.Property(e => e.Descriptions).HasColumnType("jsonb");
+
+                // Indexes for performance and uniqueness
+                entity.HasIndex(e => e.Park4NightId).IsUnique();
+                entity.HasIndex(e => e.SourceUrl).IsUnique();
+                entity.HasIndex(e => e.Name);
+                entity.HasIndex(e => e.Location).HasMethod("gist");
+                entity.HasIndex(e => e.Rating);
+                entity.HasIndex(e => e.CreatedAt);
+
+                // Default values
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+                entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
             // Seed Data (wird später per Migration hinzugefügt)
