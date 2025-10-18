@@ -16,6 +16,32 @@
                 <p>Smart route planning for your adventure</p>
             </div>
 
+            <!-- Desktop Navigation -->
+            <div class="desktop-nav">
+                <div class="desktop-nav-items">
+                    <button class="desktop-nav-item active" data-mode="routes" onclick="switchDesktopMode('routes')">
+                        <i class="fas fa-map-marked-alt"></i>
+                        <span>Routes</span>
+                    </button>
+                    <button class="desktop-nav-item" data-mode="search" onclick="switchDesktopMode('search')">
+                        <i class="fas fa-search"></i>
+                        <span>Add Place</span>
+                    </button>
+                    <button class="desktop-nav-item" data-mode="places" onclick="switchDesktopMode('places')">
+                        <i class="fas fa-list"></i>
+                        <span>Place List</span>
+                    </button>
+                    <button class="desktop-nav-item" data-mode="campsites" onclick="switchDesktopMode('campsites')">
+                        <i class="fas fa-campground"></i>
+                        <span>Campsites</span>
+                    </button>
+                    <button class="desktop-nav-item" data-mode="controls" onclick="switchDesktopMode('controls')">
+                        <i class="fas fa-cog"></i>
+                        <span>Tools</span>
+                    </button>
+                </div>
+            </div>
+
             <div class="route-management">
                 <div class="route-selector">
                     <label for="routeSelect">Current Route:</label>
@@ -81,8 +107,10 @@
             </div>
             
             <div class="places-list" id="placesList"></div>
+
+            <div class="campsites-list" id="campsitesList"></div>
         </div>
-        
+
         <div id="map"></div>
         
         <div class="map-controls">
@@ -111,6 +139,10 @@
                 <button class="mobile-nav-item" data-mode="places" onclick="switchMobileMode('places')">
                     <i class="fas fa-list"></i>
                     <span>Place List</span>
+                </button>
+                <button class="mobile-nav-item" data-mode="campsites" onclick="switchMobileMode('campsites')">
+                    <i class="fas fa-campground"></i>
+                    <span>Campsites</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="controls" onclick="switchMobileMode('controls')">
                     <i class="fas fa-cog"></i>
@@ -184,6 +216,11 @@
                     <!-- Places will be populated by placeManager.updatePlacesList() -->
                 </div>
 
+                <!-- Campsites List Section -->
+                <div class="mobile-section campsites-list" data-section="campsites" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <!-- Campsites will be populated here -->
+                </div>
+
                 <!-- Controls Section -->
                 <div class="mobile-section" data-section="controls" style="display: none; padding: 15px;">
                     <div class="controls" style="border: none; padding: 0;">
@@ -234,6 +271,52 @@
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <script>
+        // Desktop navigation system
+        let currentDesktopMode = 'routes';
+
+        window.switchDesktopMode = function(mode) {
+            currentDesktopMode = mode;
+
+            // Update active nav item
+            document.querySelectorAll('.desktop-nav-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.mode === mode);
+            });
+
+            // Show/hide sections based on mode
+            const routeMgmt = document.querySelector('.route-management');
+            const searchSection = document.querySelector('.search-section');
+            const controls = document.querySelector('.controls');
+            const placesList = document.querySelector('.places-list');
+            const campsitesList = document.querySelector('.campsites-list');
+
+            // Hide all sections first
+            if (routeMgmt) routeMgmt.style.display = 'none';
+            if (searchSection) searchSection.style.display = 'none';
+            if (controls) controls.style.display = 'none';
+            if (placesList) placesList.style.display = 'none';
+            if (campsitesList) campsitesList.style.display = 'none';
+
+            // Show the selected section
+            switch(mode) {
+                case 'routes':
+                    if (routeMgmt) routeMgmt.style.display = 'block';
+                    if (placesList) placesList.style.display = 'block';
+                    break;
+                case 'search':
+                    if (searchSection) searchSection.style.display = 'block';
+                    break;
+                case 'places':
+                    if (placesList) placesList.style.display = 'block';
+                    break;
+                case 'campsites':
+                    if (campsitesList) campsitesList.style.display = 'block';
+                    break;
+                case 'controls':
+                    if (controls) controls.style.display = 'flex';
+                    break;
+            }
+        };
+
         // Mobile navigation system
         let currentMobileMode = 'routes';
 
@@ -258,6 +341,7 @@
                 routes: 'Route Selection',
                 search: 'Add Place',
                 places: 'Place List',
+                campsites: 'Campsites',
                 controls: 'Tools'
             };
 
@@ -312,10 +396,12 @@
         };
 
 
-        // Initialize mobile mode on load
+        // Initialize desktop/mobile mode on load
         window.addEventListener('load', () => {
             if (window.innerWidth <= 768) {
                 setTimeout(() => switchMobileMode('routes'), 100);
+            } else {
+                setTimeout(() => switchDesktopMode('routes'), 100);
             }
         });
 
