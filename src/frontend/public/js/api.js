@@ -106,4 +106,38 @@ export class ApiService {
         }
         return await response.json();
     }
+
+    // Campsite API methods
+    static async getAllCampsites() {
+        const response = await fetch(`${CONFIG.API_BASE}/campsites/all`);
+        if (!response.ok) {
+            throw new Error(`Failed to load campsites: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async getCampsite(campsiteId) {
+        const response = await fetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load campsite: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async searchCampsites(query) {
+        const response = await fetch(`${CONFIG.API_BASE}/campsites/search?query=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            throw new Error(`Failed to search campsites: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async deleteCampsite(campsiteId) {
+        const response = await fetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to delete campsite: ${response.status}`);
+        }
+    }
 }

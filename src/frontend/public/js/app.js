@@ -2,6 +2,7 @@ import { MapService } from './map.js';
 import { RouteManager } from './routeManager.js';
 import { SearchManager } from './searchManager.js';
 import { PlaceManager } from './placeManager.js';
+import { CampsiteManager } from './campsiteManager.js';
 import { showError } from './utils.js';
 
 class App {
@@ -10,6 +11,7 @@ class App {
         this.routeManager = new RouteManager();
         this.searchManager = new SearchManager();
         this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
+        this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
 
         // Set callback for search result selection
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
@@ -33,12 +35,21 @@ class App {
                 this.selectPlace(index);
             });
 
+            // Setup campsite marker click handler
+            this.mapService.setCampsiteMarkerClickCallback((index) => {
+                this.selectCampsite(index);
+            });
+
             // Load routes and first route
             const places = await this.routeManager.loadRoutes();
             if (places && places.length > 0) {
                 this.placeManager.setPlaces(places);
                 this.updateUI();
             }
+
+            // Load campsites
+            await this.campsiteManager.loadCampsites();
+            this.updateCampsiteUI();
 
         } catch (error) {
             console.error('Failed to initialize app:', error);
@@ -278,6 +289,31 @@ class App {
             }
         }
     }
+
+    selectCampsite(index) {
+        this.campsiteManager.selectCampsite(index);
+        this.mapService.selectedCampsiteIndex = index;
+        this.updateCampsiteUI();
+        this.mapService.selectCampsite(index);
+
+        // Collapse mobile panel if it's expanded
+        if (window.innerWidth <= 768) {
+            const panel = document.getElementById('mobilePanel');
+            if (panel && panel.classList.contains('expanded')) {
+                panel.classList.remove('expanded');
+                // Update icon
+                const expandBtn = panel.querySelector('.mobile-panel-expand i');
+                if (expandBtn) {
+                    expandBtn.className = 'fas fa-chevron-up';
+                }
+            }
+        }
+    }
+
+    updateCampsiteUI() {
+        this.campsiteManager.updateCampsitesList();
+        this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
+    }
 }
 
 // Initialize app when DOM is loaded
@@ -304,6 +340,7 @@ window.clearRoute = () => window.app?.clearRoute();
 // Global access for managers
 window.placeManager = null; // Will be set by app
 window.routeManager = null; // Will be set by app
+window.campsiteManager = null; // Will be set by app
 
 // Set global references after app initialization
 window.addEventListener('load', () => {
@@ -311,6 +348,7 @@ window.addEventListener('load', () => {
         if (window.app) {
             window.placeManager = window.app.placeManager;
             window.routeManager = window.app.routeManager;
+            window.campsiteManager = window.app.campsiteManager;
         }
     }, 100);
 });

@@ -1037,3 +1037,16 @@ textarea.form-input {
         max-height: 75vh;
     }
 }
+
+/* Campsite Marker Icons */
+.campsite-marker-icon {
+    border-radius: 50%;
+    background: white;
+    padding: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* Ensure SVG icons display correctly */
+.campsite-marker-icon img {
+    display: block;
+}

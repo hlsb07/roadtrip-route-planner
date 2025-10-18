@@ -4,11 +4,14 @@ export class MapService {
     constructor() {
         this.map = null;
         this.markers = [];
+        this.campsiteMarkers = [];
         this.routePolyline = null;
         this.showRoute = true;
         this.clickMarker = null;
         this.selectedMarkerIndex = null;
+        this.selectedCampsiteIndex = null;
         this.onMarkerClick = null;
+        this.onCampsiteMarkerClick = null;
     }
 
     init() {
@@ -171,5 +174,126 @@ export class MapService {
 
     setMarkerClickCallback(callback) {
         this.onMarkerClick = callback;
+    }
+
+    updateCampsiteMarkers(campsites) {
+        // Clear existing campsite markers
+        this.campsiteMarkers.forEach(marker => this.map.removeLayer(marker));
+        this.campsiteMarkers = [];
+
+        if (!campsites || campsites.length === 0) return;
+
+        // Add campsite markers
+        campsites.forEach((campsite, index) => {
+            if (!campsite.latitude || !campsite.longitude) return;
+
+            const isSelected = this.selectedCampsiteIndex === index;
+
+            // Get the first type icon if available
+            const firstType = campsite.types && campsite.types.length > 0 ? campsite.types[0] : null;
+            const iconUrl = firstType && firstType.iconPath
+                ? `${CONFIG.API_BASE.replace('/api', '')}${firstType.iconPath}`
+                : 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+
+            // Create custom icon
+            const iconSize = isSelected ? [35, 35] : [28, 28];
+            const iconAnchor = isSelected ? [17, 35] : [14, 28];
+
+            const customIcon = L.icon({
+                iconUrl: iconUrl,
+                iconSize: iconSize,
+                iconAnchor: iconAnchor,
+                popupAnchor: [0, -28],
+                className: 'campsite-marker-icon'
+            });
+
+            // Build types list for popup
+            const typesList = campsite.types && campsite.types.length > 0
+                ? campsite.types.map(t => t.name).join(', ')
+                : 'No type specified';
+
+            // Build services list
+            const servicesList = campsite.services && campsite.services.length > 0
+                ? `<div style="margin-top: 8px; font-size: 0.85rem;">
+                       <strong>Services:</strong> ${campsite.services.map(s => s.name).join(', ')}
+                   </div>`
+                : '';
+
+            // Build activities list
+            const activitiesList = campsite.activities && campsite.activities.length > 0
+                ? `<div style="margin-top: 5px; font-size: 0.85rem;">
+                       <strong>Activities:</strong> ${campsite.activities.map(a => a.name).join(', ')}
+                   </div>`
+                : '';
+
+            // Rating display
+            const ratingDisplay = campsite.rating
+                ? `<div style="color: #f39c12; margin-top: 5px;"><i class="fas fa-star"></i> ${campsite.rating.toFixed(1)}/5</div>`
+                : '';
+
+            // Price display
+            const priceDisplay = campsite.price
+                ? `<div style="margin-top: 5px;"><strong>Price:</strong> ${campsite.price}</div>`
+                : '';
+
+            const marker = L.marker([campsite.latitude, campsite.longitude], { icon: customIcon })
+                .addTo(this.map)
+                .bindPopup(`
+                    <div class="map-popup-content">
+                        <div class="map-popup-header">
+                            <i class="fas fa-campground" style="color: #2A9D8F;"></i>
+                            <strong style="margin-left: 5px;">${campsite.name || 'Unnamed Campsite'}</strong>
+                        </div>
+                        <div style="font-size: 0.85rem; margin-top: 8px;">
+                            <div><strong>Type:</strong> ${typesList}</div>
+                            ${ratingDisplay}
+                            ${priceDisplay}
+                            ${servicesList}
+                            ${activitiesList}
+                        </div>
+                        <div class="map-popup-coords">Lat: ${campsite.latitude.toFixed(4)}, Lng: ${campsite.longitude.toFixed(4)}</div>
+                        <div class="map-popup-links">
+                            <a href="https://www.google.com/maps/search/?api=1&query=${campsite.latitude},${campsite.longitude}"
+                               target="_blank"
+                               class="link-btn google-maps">
+                                <i class="fas fa-map"></i> Google Maps
+                            </a>
+                            ${campsite.sourceUrl ? `
+                                <a href="${campsite.sourceUrl}"
+                                   target="_blank"
+                                   class="link-btn"
+                                   style="background: #3EBBA5; color: white;">
+                                    <i class="fas fa-external-link-alt"></i> Park4Night
+                                </a>
+                            ` : ''}
+                        </div>
+                    </div>
+                `)
+                .on('click', () => {
+                    if (this.onCampsiteMarkerClick) {
+                        this.onCampsiteMarkerClick(index);
+                    }
+                });
+
+            this.campsiteMarkers.push(marker);
+        });
+    }
+
+    selectCampsite(index) {
+        if (index < 0 || index >= this.campsiteMarkers.length) return;
+
+        this.selectedCampsiteIndex = index;
+        const marker = this.campsiteMarkers[index];
+
+        // Open popup and center map
+        marker.openPopup();
+    }
+
+    deselectCampsite() {
+        this.selectedCampsiteIndex = null;
+    }
+
+    setCampsiteMarkerClickCallback(callback) {
+        this.onCampsiteMarkerClick = callback;
     }
 }
