@@ -214,17 +214,66 @@ export class MapService {
                 ? campsite.types.map(t => t.name).join(', ')
                 : 'No type specified';
 
-            // Build services list
+            // Build services list with icons (icon only, no text)
             const servicesList = campsite.services && campsite.services.length > 0
-                ? `<div style="margin-top: 8px; font-size: 0.85rem;">
-                       <strong>Services:</strong> ${campsite.services.map(s => s.name).join(', ')}
+                ? `<div class="popup-services">
+                       <div class="popup-section-title"><i class="fas fa-wrench"></i> Services</div>
+                       <div class="popup-icons-row">
+                           ${campsite.services.map(s => `
+                               <div class="popup-icon-item" title="${s.name}">
+                                   ${s.iconPath
+                                       ? `<img src="${s.iconPath}" alt="${s.name}" class="popup-icon">`
+                                       : `<i class="fas fa-check-circle"></i>`
+                                   }
+                               </div>
+                           `).join('')}
+                       </div>
                    </div>`
                 : '';
 
-            // Build activities list
+            // Build activities list with icons (icon only, no text)
             const activitiesList = campsite.activities && campsite.activities.length > 0
-                ? `<div style="margin-top: 5px; font-size: 0.85rem;">
-                       <strong>Activities:</strong> ${campsite.activities.map(a => a.name).join(', ')}
+                ? `<div class="popup-activities">
+                       <div class="popup-section-title"><i class="fas fa-hiking"></i> Activities</div>
+                       <div class="popup-icons-row">
+                           ${campsite.activities.map(a => `
+                               <div class="popup-icon-item" title="${a.name}">
+                                   ${a.iconPath
+                                       ? `<img src="${a.iconPath}" alt="${a.name}" class="popup-icon">`
+                                       : `<i class="fas fa-hiking"></i>`
+                                   }
+                               </div>
+                           `).join('')}
+                       </div>
+                   </div>`
+                : '';
+
+            // Build image carousel
+            const imageGallery = campsite.imagePaths && campsite.imagePaths.length > 0
+                ? `<div class="popup-image-carousel">
+                       <div class="carousel-container" id="carousel-${index}">
+                           ${campsite.imagePaths.map((imgPath, idx) => `
+                               <img src="${imgPath}"
+                                    alt="Campsite photo ${idx + 1}"
+                                    class="carousel-image ${idx === 0 ? 'active' : ''}"
+                                    data-index="${idx}">
+                           `).join('')}
+                       </div>
+                       ${campsite.imagePaths.length > 1
+                           ? `<button class="carousel-btn prev" onclick="event.stopPropagation(); navigateCarousel('carousel-${index}', -1)">
+                                  <i class="fas fa-chevron-left"></i>
+                              </button>
+                              <button class="carousel-btn next" onclick="event.stopPropagation(); navigateCarousel('carousel-${index}', 1)">
+                                  <i class="fas fa-chevron-right"></i>
+                              </button>
+                              <div class="carousel-indicators">
+                                  ${campsite.imagePaths.map((_, idx) => `
+                                      <span class="indicator ${idx === 0 ? 'active' : ''}"
+                                            onclick="event.stopPropagation(); goToSlide('carousel-${index}', ${idx})"></span>
+                                  `).join('')}
+                              </div>`
+                           : ''
+                       }
                    </div>`
                 : '';
 
@@ -241,18 +290,19 @@ export class MapService {
             const marker = L.marker([campsite.latitude, campsite.longitude], { icon: customIcon })
                 .addTo(this.map)
                 .bindPopup(`
-                    <div class="map-popup-content">
+                    <div class="map-popup-content campsite-popup">
+                        ${imageGallery}
                         <div class="map-popup-header">
                             <i class="fas fa-campground" style="color: #2A9D8F;"></i>
                             <strong style="margin-left: 5px;">${campsite.name || 'Unnamed Campsite'}</strong>
                         </div>
-                        <div style="font-size: 0.85rem; margin-top: 8px;">
+                        <div class="popup-info">
                             <div><strong>Type:</strong> ${typesList}</div>
                             ${ratingDisplay}
                             ${priceDisplay}
-                            ${servicesList}
-                            ${activitiesList}
                         </div>
+                        ${servicesList}
+                        ${activitiesList}
                         <div class="map-popup-coords">Lat: ${campsite.latitude.toFixed(4)}, Lng: ${campsite.longitude.toFixed(4)}</div>
                         <div class="map-popup-links">
                             <a href="https://www.google.com/maps/search/?api=1&query=${campsite.latitude},${campsite.longitude}"
@@ -270,7 +320,10 @@ export class MapService {
                             ` : ''}
                         </div>
                     </div>
-                `)
+                `, {
+                    maxWidth: 350,
+                    className: 'campsite-popup-container'
+                })
                 .on('click', () => {
                     if (this.onCampsiteMarkerClick) {
                         this.onCampsiteMarkerClick(index);
@@ -299,3 +352,49 @@ export class MapService {
         this.onCampsiteMarkerClick = callback;
     }
 }
+
+// Carousel navigation functions
+window.navigateCarousel = function(carouselId, direction) {
+    const container = document.getElementById(carouselId);
+    if (!container) return;
+
+    const images = container.querySelectorAll('.carousel-image');
+    const indicators = container.parentElement.querySelectorAll('.indicator');
+
+    let currentIndex = 0;
+    images.forEach((img, idx) => {
+        if (img.classList.contains('active')) {
+            currentIndex = idx;
+        }
+    });
+
+    // Calculate new index
+    let newIndex = currentIndex + direction;
+    if (newIndex < 0) newIndex = images.length - 1;
+    if (newIndex >= images.length) newIndex = 0;
+
+    // Update active states
+    images[currentIndex].classList.remove('active');
+    images[newIndex].classList.add('active');
+
+    if (indicators.length > 0) {
+        indicators[currentIndex].classList.remove('active');
+        indicators[newIndex].classList.add('active');
+    }
+};
+
+window.goToSlide = function(carouselId, index) {
+    const container = document.getElementById(carouselId);
+    if (!container) return;
+
+    const images = container.querySelectorAll('.carousel-image');
+    const indicators = container.parentElement.querySelectorAll('.indicator');
+
+    // Remove all active states
+    images.forEach(img => img.classList.remove('active'));
+    indicators.forEach(ind => ind.classList.remove('active'));
+
+    // Set new active state
+    if (images[index]) images[index].classList.add('active');
+    if (indicators[index]) indicators[index].classList.add('active');
+};
