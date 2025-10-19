@@ -23,10 +23,16 @@ namespace RoutePlanner.API.Services
         {
             _httpClient = httpClient;
             _logger = logger;
-            _imagesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites");
-            _activitiesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "activities");
-            _servicesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "services");
-            _typesBasePath = Path.Combine(env.WebRootPath ?? "wwwroot", "images", "campsites", "types");
+
+            // Use shared directory instead of wwwroot
+            // Navigate from ContentRootPath (backend folder) to shared folder
+            var projectRoot = Path.GetFullPath(Path.Combine(env.ContentRootPath, "..", "..", "shared"));
+            var sharedImagesPath = Path.Combine(projectRoot, "images", "campsites");
+
+            _imagesBasePath = sharedImagesPath;
+            _activitiesBasePath = Path.Combine(sharedImagesPath, "activities");
+            _servicesBasePath = Path.Combine(sharedImagesPath, "services");
+            _typesBasePath = Path.Combine(sharedImagesPath, "types");
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
             // Ensure directories exist
@@ -34,6 +40,8 @@ namespace RoutePlanner.API.Services
             Directory.CreateDirectory(_activitiesBasePath);
             Directory.CreateDirectory(_servicesBasePath);
             Directory.CreateDirectory(_typesBasePath);
+
+            _logger.LogInformation("Using shared images directory: {Path}", _imagesBasePath);
 
             // Configure HttpClient
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");

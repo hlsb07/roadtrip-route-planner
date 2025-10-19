@@ -191,8 +191,10 @@ export class MapService {
 
             // Get the first type icon if available
             const firstType = campsite.types && campsite.types.length > 0 ? campsite.types[0] : null;
+            // iconPath already contains "/images/campsites/types/..." from backend
+            // Nginx serves these directly from shared directory at /images/
             const iconUrl = firstType && firstType.iconPath
-                ? `${CONFIG.API_BASE.replace('/api', '')}${firstType.iconPath}`
+                ? firstType.iconPath  // e.g., "/images/campsites/types/camping.svg"
                 : 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
 
             // Create custom icon

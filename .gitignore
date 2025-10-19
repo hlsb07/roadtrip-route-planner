@@ -40,9 +40,9 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Uploaded images
+# Shared images directory (served by Nginx)
+# Contains scraped campsite images, icons, etc.
+src/shared/
+
+# Old image paths (deprecated - now using shared directory)
 src/backend/RoutePlanner.API/wwwroot/images/campsites/
-# Activity icons
-src/backend/RoutePlanner.API/wwwroot/images/campsites/activities/
-# Service icons
-src/backend/RoutePlanner.API/wwwroot/images/campsites/services/
