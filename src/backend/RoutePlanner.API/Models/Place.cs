@@ -7,8 +7,10 @@ namespace RoutePlanner.API.Models
         public int Id { get; set; }
         public required string Name { get; set; }
         public required Point Location { get; set; }
-        
+
         public List<RoutePlace> RoutePlaces { get; set; } = new();
+        public List<PlaceCategory> PlaceCategories { get; set; } = new();
+        public List<PlaceCountry> PlaceCountries { get; set; } = new();
     }
 
 }
