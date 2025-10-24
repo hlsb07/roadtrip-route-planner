@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using RoutePlanner.API.Data;
 namespace RoutePlanner.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251024192144_AddCategorySystem")]
+    partial class AddCategorySystem
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -199,122 +202,6 @@ namespace RoutePlanner.API.Migrations
                         });
                 });
 
-            modelBuilder.Entity("RoutePlanner.API.Models.Country", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Code")
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Icon")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code");
-
-                    b.HasIndex("Name");
-
-                    b.ToTable("Countries");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Code = "NZ",
-                            Description = "Island country in the southwestern Pacific Ocean",
-                            Icon = "🇳🇿",
-                            Name = "New Zealand"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Code = "AU",
-                            Description = "Country and continent in Oceania",
-                            Icon = "🇦🇺",
-                            Name = "Australia"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Code = "US",
-                            Description = "Federal republic in North America",
-                            Icon = "🇺🇸",
-                            Name = "United States"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Code = "DE",
-                            Description = "Federal republic in Central Europe",
-                            Icon = "🇩🇪",
-                            Name = "Germany"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Code = "FR",
-                            Description = "Republic in Western Europe",
-                            Icon = "🇫🇷",
-                            Name = "France"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Code = "IT",
-                            Description = "Republic in Southern Europe",
-                            Icon = "🇮🇹",
-                            Name = "Italy"
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Code = "ES",
-                            Description = "Kingdom in Southwestern Europe",
-                            Icon = "🇪🇸",
-                            Name = "Spain"
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Code = "GB",
-                            Description = "Island nation in Northwestern Europe",
-                            Icon = "🇬🇧",
-                            Name = "United Kingdom"
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Code = "CA",
-                            Description = "Country in North America",
-                            Icon = "🇨🇦",
-                            Name = "Canada"
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Code = "JP",
-                            Description = "Island nation in East Asia",
-                            Icon = "🇯🇵",
-                            Name = "Japan"
-                        });
-                });
-
             modelBuilder.Entity("RoutePlanner.API.Models.GoogleMapsCache", b =>
                 {
                     b.Property<int>("Id")
@@ -449,23 +336,6 @@ namespace RoutePlanner.API.Migrations
                     b.ToTable("PlaceCategories");
                 });
 
-            modelBuilder.Entity("RoutePlanner.API.Models.PlaceCountry", b =>
-                {
-                    b.Property<int>("PlaceId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("CountryId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("PlaceId", "CountryId");
-
-                    b.HasIndex("CountryId");
-
-                    b.HasIndex("PlaceId");
-
-                    b.ToTable("PlaceCountries");
-                });
-
             modelBuilder.Entity("RoutePlanner.API.Models.Route", b =>
                 {
                     b.Property<int>("Id")
@@ -573,25 +443,6 @@ namespace RoutePlanner.API.Migrations
                     b.Navigation("Place");
                 });
 
-            modelBuilder.Entity("RoutePlanner.API.Models.PlaceCountry", b =>
-                {
-                    b.HasOne("RoutePlanner.API.Models.Country", "Country")
-                        .WithMany("PlaceCountries")
-                        .HasForeignKey("CountryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("RoutePlanner.API.Models.Place", "Place")
-                        .WithMany("PlaceCountries")
-                        .HasForeignKey("PlaceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Country");
-
-                    b.Navigation("Place");
-                });
-
             modelBuilder.Entity("RoutePlanner.API.Models.RoutePlace", b =>
                 {
                     b.HasOne("RoutePlanner.API.Models.Place", "Place")
@@ -616,16 +467,9 @@ namespace RoutePlanner.API.Migrations
                     b.Navigation("PlaceCategories");
                 });
 
-            modelBuilder.Entity("RoutePlanner.API.Models.Country", b =>
-                {
-                    b.Navigation("PlaceCountries");
-                });
-
             modelBuilder.Entity("RoutePlanner.API.Models.Place", b =>
                 {
                     b.Navigation("PlaceCategories");
-
-                    b.Navigation("PlaceCountries");
 
                     b.Navigation("RoutePlaces");
                 });

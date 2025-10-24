@@ -25,12 +25,31 @@ namespace RoutePlanner.API.Controllers
         public async Task<ActionResult<List<PlaceDto>>> GetPlaces()
         {
             var places = await _context.Places
+                .Include(p => p.PlaceCategories)
+                .ThenInclude(pc => pc.Category)
+                .Include(p => p.PlaceCountries)
+                .ThenInclude(pc => pc.Country)
                 .Select(p => new PlaceDto
                 {
                     Id = p.Id,
                     Name = p.Name,
                     Latitude = p.Location.Y,
-                    Longitude = p.Location.X
+                    Longitude = p.Location.X,
+                    Categories = p.PlaceCategories.Select(pc => new CategoryDto
+                    {
+                        Id = pc.Category.Id,
+                        Name = pc.Category.Name,
+                        Icon = pc.Category.Icon,
+                        Description = pc.Category.Description
+                    }).ToList(),
+                    Countries = p.PlaceCountries.Select(pc => new CountryDto
+                    {
+                        Id = pc.Country.Id,
+                        Name = pc.Country.Name,
+                        Code = pc.Country.Code,
+                        Icon = pc.Country.Icon,
+                        Description = pc.Country.Description
+                    }).ToList()
                 })
                 .ToListAsync();
 
@@ -41,7 +60,12 @@ namespace RoutePlanner.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<PlaceDto>> GetPlace(int id)
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _context.Places
+                .Include(p => p.PlaceCategories)
+                .ThenInclude(pc => pc.Category)
+                .Include(p => p.PlaceCountries)
+                .ThenInclude(pc => pc.Country)
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (place == null)
                 return NotFound();
@@ -51,7 +75,22 @@ namespace RoutePlanner.API.Controllers
                 Id = place.Id,
                 Name = place.Name,
                 Latitude = place.Location.Y,
-                Longitude = place.Location.X
+                Longitude = place.Location.X,
+                Categories = place.PlaceCategories.Select(pc => new CategoryDto
+                {
+                    Id = pc.Category.Id,
+                    Name = pc.Category.Name,
+                    Icon = pc.Category.Icon,
+                    Description = pc.Category.Description
+                }).ToList(),
+                Countries = place.PlaceCountries.Select(pc => new CountryDto
+                {
+                    Id = pc.Country.Id,
+                    Name = pc.Country.Name,
+                    Code = pc.Country.Code,
+                    Icon = pc.Country.Icon,
+                    Description = pc.Country.Description
+                }).ToList()
             };
 
             return Ok(placeDto);
@@ -143,8 +182,8 @@ namespace RoutePlanner.API.Controllers
         // GET: api/places/nearby
         [HttpGet("nearby")]
         public async Task<ActionResult<List<PlaceDto>>> GetNearbyPlaces(
-            [FromQuery] double latitude, 
-            [FromQuery] double longitude, 
+            [FromQuery] double latitude,
+            [FromQuery] double longitude,
             [FromQuery] double radiusKm = 50)
         {
             try
@@ -153,6 +192,10 @@ namespace RoutePlanner.API.Controllers
                 var radiusMeters = radiusKm * 1000;
 
                 var nearbyPlaces = await _context.Places
+                    .Include(p => p.PlaceCategories)
+                    .ThenInclude(pc => pc.Category)
+                    .Include(p => p.PlaceCountries)
+                    .ThenInclude(pc => pc.Country)
                     .Where(p => p.Location.IsWithinDistance(searchPoint, radiusMeters))
                     .OrderBy(p => p.Location.Distance(searchPoint))
                     .Select(p => new PlaceDto
@@ -160,7 +203,22 @@ namespace RoutePlanner.API.Controllers
                         Id = p.Id,
                         Name = p.Name,
                         Latitude = p.Location.Y,
-                        Longitude = p.Location.X
+                        Longitude = p.Location.X,
+                        Categories = p.PlaceCategories.Select(pc => new CategoryDto
+                        {
+                            Id = pc.Category.Id,
+                            Name = pc.Category.Name,
+                            Icon = pc.Category.Icon,
+                            Description = pc.Category.Description
+                        }).ToList(),
+                        Countries = p.PlaceCountries.Select(pc => new CountryDto
+                        {
+                            Id = pc.Country.Id,
+                            Name = pc.Country.Name,
+                            Code = pc.Country.Code,
+                            Icon = pc.Country.Icon,
+                            Description = pc.Country.Description
+                        }).ToList()
                     })
                     .ToListAsync();
 
@@ -184,7 +242,7 @@ namespace RoutePlanner.API.Controllers
                 .Where(rp => rp.PlaceId == id)
                 .Include(rp => rp.Route)
                 .Where(rp => rp.Route != null)
-                .Select(rp => new 
+                .Select(rp => new
                 {
                     RouteId = rp.RouteId,
                     RouteName = rp.Route!.Name,
@@ -192,13 +250,154 @@ namespace RoutePlanner.API.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(new 
+            return Ok(new
             {
                 PlaceId = id,
                 PlaceName = place.Name,
                 UsedInRoutes = usage.Count,
                 Routes = usage
             });
+        }
+
+        // POST: api/places/{id}/categories
+        [HttpPost("{id}/categories")]
+        public async Task<IActionResult> AssignCategoryToPlace(int id, AssignCategoryDto assignDto)
+        {
+            var place = await _context.Places.FindAsync(id);
+            if (place == null)
+                return NotFound(new { message = "Place not found" });
+
+            var category = await _context.Categories.FindAsync(assignDto.CategoryId);
+            if (category == null)
+                return NotFound(new { message = "Category not found" });
+
+            // Check if the relationship already exists
+            var exists = await _context.PlaceCategories
+                .AnyAsync(pc => pc.PlaceId == id && pc.CategoryId == assignDto.CategoryId);
+
+            if (exists)
+                return BadRequest(new { message = "Place is already assigned to this category" });
+
+            var placeCategory = new PlaceCategory
+            {
+                PlaceId = id,
+                CategoryId = assignDto.CategoryId
+            };
+
+            _context.PlaceCategories.Add(placeCategory);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Category assigned to place successfully" });
+        }
+
+        // DELETE: api/places/{id}/categories/{categoryId}
+        [HttpDelete("{id}/categories/{categoryId}")]
+        public async Task<IActionResult> RemoveCategoryFromPlace(int id, int categoryId)
+        {
+            var placeCategory = await _context.PlaceCategories
+                .FirstOrDefaultAsync(pc => pc.PlaceId == id && pc.CategoryId == categoryId);
+
+            if (placeCategory == null)
+                return NotFound(new { message = "Category assignment not found" });
+
+            _context.PlaceCategories.Remove(placeCategory);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Category removed from place successfully" });
+        }
+
+        // GET: api/places/{id}/categories
+        [HttpGet("{id}/categories")]
+        public async Task<ActionResult<List<CategoryDto>>> GetPlaceCategories(int id)
+        {
+            var place = await _context.Places.FindAsync(id);
+            if (place == null)
+                return NotFound();
+
+            var categories = await _context.PlaceCategories
+                .Where(pc => pc.PlaceId == id)
+                .Include(pc => pc.Category)
+                .Select(pc => new CategoryDto
+                {
+                    Id = pc.Category.Id,
+                    Name = pc.Category.Name,
+                    Icon = pc.Category.Icon,
+                    Description = pc.Category.Description
+                })
+                .ToListAsync();
+
+            return Ok(categories);
+        }
+
+        // POST: api/places/{id}/countries
+        [HttpPost("{id}/countries")]
+        public async Task<IActionResult> AssignCountryToPlace(int id, AssignCountryDto assignDto)
+        {
+            var place = await _context.Places.FindAsync(id);
+            if (place == null)
+                return NotFound(new { message = "Place not found" });
+
+            var country = await _context.Countries.FindAsync(assignDto.CountryId);
+            if (country == null)
+                return NotFound(new { message = "Country not found" });
+
+            // Check if the relationship already exists
+            var exists = await _context.PlaceCountries
+                .AnyAsync(pc => pc.PlaceId == id && pc.CountryId == assignDto.CountryId);
+
+            if (exists)
+                return BadRequest(new { message = "Place is already assigned to this country" });
+
+            var placeCountry = new PlaceCountry
+            {
+                PlaceId = id,
+                CountryId = assignDto.CountryId
+            };
+
+            _context.PlaceCountries.Add(placeCountry);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Country assigned to place successfully" });
+        }
+
+        // DELETE: api/places/{id}/countries/{countryId}
+        [HttpDelete("{id}/countries/{countryId}")]
+        public async Task<IActionResult> RemoveCountryFromPlace(int id, int countryId)
+        {
+            var placeCountry = await _context.PlaceCountries
+                .FirstOrDefaultAsync(pc => pc.PlaceId == id && pc.CountryId == countryId);
+
+            if (placeCountry == null)
+                return NotFound(new { message = "Country assignment not found" });
+
+            _context.PlaceCountries.Remove(placeCountry);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Country removed from place successfully" });
+        }
+
+        // GET: api/places/{id}/countries
+        [HttpGet("{id}/countries")]
+        public async Task<ActionResult<List<CountryDto>>> GetPlaceCountries(int id)
+        {
+            var place = await _context.Places.FindAsync(id);
+            if (place == null)
+                return NotFound();
+
+            var countries = await _context.PlaceCountries
+                .Where(pc => pc.PlaceId == id)
+                .Include(pc => pc.Country)
+                .Select(pc => new CountryDto
+                {
+                    Id = pc.Country.Id,
+                    Name = pc.Country.Name,
+                    Code = pc.Country.Code,
+                    Icon = pc.Country.Icon,
+                    Description = pc.Country.Description
+                })
+                .ToListAsync();
+
+            return Ok(countries);
         }
     }
 }
