@@ -103,12 +103,15 @@ export class ApiService {
     }
 
     static async reorderPlaces(routeId, placeIds) {
+        console.log('Reordering places:', { routeId, placeIds });
         const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places/reorder`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(placeIds)
         });
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Reorder failed:', response.status, errorText);
             throw new Error('Failed to reorder places');
         }
     }

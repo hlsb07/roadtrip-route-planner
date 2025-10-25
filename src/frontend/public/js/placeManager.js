@@ -233,14 +233,31 @@ export class PlaceManager {
             return;
         }
 
+        // Add sorting mode banner if active
+        const sortingBanner = this.sortingEnabled ? `
+            <div class="sorting-mode-banner">
+                <div class="sorting-banner-content">
+                    <i class="fas fa-grip-vertical"></i>
+                    <span>Sorting Mode Active - Drag items to reorder</span>
+                </div>
+                <button class="btn-done" onclick="placeManager.disableSorting()">
+                    <i class="fas fa-check"></i> Done
+                </button>
+            </div>
+        ` : '';
+
         const placesHTML = this.places.map((place, index) => {
             const isSelected = this.selectedIndex === index;
             return `
-            <div class="place-item ${isSelected ? 'selected' : ''} ${this.sortingEnabled ? 'sorting-mode' : ''}" data-index="${index}" onclick="placeManager.togglePlaceSelection(${index})">
+            <div class="place-item ${isSelected ? 'selected' : ''} ${this.sortingEnabled ? 'sorting-mode' : ''}"
+                 data-index="${index}"
+                 data-place-id="${place.id}"
+                 onclick="${this.sortingEnabled ? (isSelected ? 'placeManager.disableSorting()' : '') : 'placeManager.togglePlaceSelection(' + index + ')'}">
                 <div class="place-header">
+                    ${this.sortingEnabled ? '<div class="sort-handle"><i class="fas fa-grip-vertical"></i></div>' : ''}
                     <div class="place-number">${index + 1}</div>
                     <div class="place-name">${place.name}</div>
-                    ${isSelected ? `
+                    ${isSelected && !this.sortingEnabled ? `
                     <div class="place-actions">
                         <button class="action-btn rename-btn"
                                 onclick="event.stopPropagation(); placeManager.showRenamePlaceModal(${index})"
@@ -263,7 +280,9 @@ export class PlaceManager {
                         </button>
                     </div>
                     ` : ''}
+                    ${this.sortingEnabled && isSelected ? '<div class="sorting-hint-selected">Tap here to exit</div>' : ''}
                 </div>
+                ${!this.sortingEnabled ? `
                 <div class="place-links">
                     <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
                     target="_blank"
@@ -278,11 +297,12 @@ export class PlaceManager {
                         <i class="fas fa-directions"></i> Navigate
                     </a>
                 </div>
+                ` : ''}
             </div>
         `}).join('');
 
-        placesList.innerHTML = placesHTML;
-        if (mobilePlacesList) mobilePlacesList.innerHTML = placesHTML;
+        placesList.innerHTML = sortingBanner + placesHTML;
+        if (mobilePlacesList) mobilePlacesList.innerHTML = sortingBanner + placesHTML;
 
         // Initialize sortable for drag & drop (disabled by default)
         this.initSortable(placesList);
@@ -310,25 +330,43 @@ export class PlaceManager {
             animation: 300,
             ghostClass: 'dragging',
             disabled: !this.sortingEnabled, // Only enabled when sorting mode is active
-            handle: '.place-item', // Only allow dragging from the item itself
+            handle: '.place-item', // Allow dragging the entire item when sorting is enabled
+            scrollSensitivity: 100, // Better scroll detection
+            scrollSpeed: 10, // Scroll speed while dragging
+            touchStartThreshold: 5, // Pixels of movement before starting drag
+            onStart: (evt) => {
+                // Add visual feedback when dragging starts
+                evt.item.style.opacity = '0.7';
+            },
             onEnd: async (evt) => {
-                // Determine new order
-                const newOrder = Array.from(element.children).map(item => {
-                    const index = parseInt(item.dataset.index);
-                    return this.places[index].id;
-                });
+                // Remove visual feedback
+                evt.item.style.opacity = '1';
+
+                // Determine new order - filter out banner and only get place items
+                const newOrder = Array.from(element.children)
+                    .filter(item => item.classList.contains('place-item'))
+                    .map(item => {
+                        const placeId = parseInt(item.dataset.placeId);
+                        return placeId;
+                    })
+                    .filter(id => !isNaN(id)); // Remove any NaN values
 
                 console.log('New order:', newOrder);
+
+                if (newOrder.length === 0) {
+                    console.error('No valid place IDs found');
+                    return;
+                }
 
                 // API call for reorder
                 const success = await this.reorderPlaces(newOrder);
                 if (success) {
-                    // Disable sorting mode after successful reorder
-                    this.disableSorting();
+                    // Keep sorting mode enabled - user can continue reordering
+                    // or exit manually by clicking selected item / done button
 
-                    // Update UI on success
+                    // Update UI AND MAP on success - important for seeing new order
                     if (this.onUpdate) {
-                        this.onUpdate();
+                        this.onUpdate(); // This will update both list and map
                     }
                 } else {
                     // Reset UI on failure
@@ -340,7 +378,10 @@ export class PlaceManager {
 
     togglePlaceSelection(index) {
         if (this.sortingEnabled) {
-            // Don't allow selection changes while sorting
+            // If in sorting mode, clicking the selected item exits sorting mode
+            if (this.selectedIndex === index) {
+                this.disableSorting();
+            }
             return;
         }
 
