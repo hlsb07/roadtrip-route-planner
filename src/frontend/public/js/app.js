@@ -3,6 +3,7 @@ import { RouteManager } from './routeManager.js';
 import { SearchManager } from './searchManager.js';
 import { PlaceManager } from './placeManager.js';
 import { CampsiteManager } from './campsiteManager.js';
+import { FilterManager } from './filterManager.js';
 import { showError } from './utils.js';
 
 class App {
@@ -12,9 +13,15 @@ class App {
         this.searchManager = new SearchManager();
         this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
+        this.filterManager = new FilterManager();
 
         // Set callback for search result selection
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
+
+        // Set callback for filter changes
+        this.filterManager.onFilterChange((filteredPlaces) => {
+            this.updateMapWithFilteredPlaces(filteredPlaces);
+        });
 
         this.bindEventListeners();
         this.setupKeyboardShortcuts();
@@ -50,6 +57,9 @@ class App {
             // Load campsites
             await this.campsiteManager.loadCampsites();
             this.updateCampsiteUI();
+
+            // Initialize filters
+            await this.filterManager.init();
 
         } catch (error) {
             console.error('Failed to initialize app:', error);
@@ -314,6 +324,11 @@ class App {
         this.campsiteManager.updateCampsitesList();
         this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
     }
+
+    updateMapWithFilteredPlaces(filteredPlaces) {
+        // Update map markers with filtered places
+        this.mapService.updateFilteredPlaces(filteredPlaces);
+    }
 }
 
 // Initialize app when DOM is loaded
@@ -341,6 +356,7 @@ window.clearRoute = () => window.app?.clearRoute();
 window.placeManager = null; // Will be set by app
 window.routeManager = null; // Will be set by app
 window.campsiteManager = null; // Will be set by app
+window.filterManager = null; // Will be set by app
 
 // Set global references after app initialization
 window.addEventListener('load', () => {
@@ -349,6 +365,7 @@ window.addEventListener('load', () => {
             window.placeManager = window.app.placeManager;
             window.routeManager = window.app.routeManager;
             window.campsiteManager = window.app.campsiteManager;
+            window.filterManager = window.app.filterManager;
         }
     }, 100);
 });

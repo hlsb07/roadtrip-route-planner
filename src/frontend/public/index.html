@@ -23,6 +23,10 @@
                         <i class="fas fa-map-marked-alt"></i>
                         <span>Routes</span>
                     </button>
+                    <button class="desktop-nav-item" data-mode="filters" onclick="switchDesktopMode('filters')">
+                        <i class="fas fa-filter"></i>
+                        <span>Filters</span>
+                    </button>
                     <button class="desktop-nav-item" data-mode="search" onclick="switchDesktopMode('search')">
                         <i class="fas fa-search"></i>
                         <span>Add Place</span>
@@ -109,6 +113,8 @@
             <div class="places-list" id="placesList"></div>
 
             <div class="campsites-list" id="campsitesList"></div>
+
+            <div class="filters-container" id="desktopFilters"></div>
         </div>
 
         <div id="map"></div>
@@ -132,6 +138,10 @@
                     <i class="fas fa-map-marked-alt"></i>
                     <span>Routes</span>
                 </button>
+                <button class="mobile-nav-item" data-mode="filters" onclick="switchMobileMode('filters')">
+                    <i class="fas fa-filter"></i>
+                    <span>Filters</span>
+                </button>
                 <button class="mobile-nav-item" data-mode="search" onclick="switchMobileMode('search')">
                     <i class="fas fa-search"></i>
                     <span>Add Place</span>
@@ -143,10 +153,6 @@
                 <button class="mobile-nav-item" data-mode="campsites" onclick="switchMobileMode('campsites')">
                     <i class="fas fa-campground"></i>
                     <span>Campsites</span>
-                </button>
-                <button class="mobile-nav-item" data-mode="controls" onclick="switchMobileMode('controls')">
-                    <i class="fas fa-cog"></i>
-                    <span>Tools</span>
                 </button>
             </div>
         </div>
@@ -214,6 +220,11 @@
                 <!-- Places List Section -->
                 <div class="mobile-section places-list" data-section="places" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
                     <!-- Places will be populated by placeManager.updatePlacesList() -->
+                </div>
+
+                <!-- Filters Section -->
+                <div class="mobile-section filters-container" data-section="filters" id="mobileFilters" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <!-- Filters will be populated here -->
                 </div>
 
                 <!-- Campsites List Section -->
@@ -296,11 +307,18 @@
             if (placesList) placesList.style.display = 'none';
             if (campsitesList) campsitesList.style.display = 'none';
 
+            // Get filters container
+            const filtersContainer = document.getElementById('desktopFilters');
+            if (filtersContainer) filtersContainer.style.display = 'none';
+
             // Show the selected section
             switch(mode) {
                 case 'routes':
                     if (routeMgmt) routeMgmt.style.display = 'block';
                     if (placesList) placesList.style.display = 'block';
+                    break;
+                case 'filters':
+                    if (filtersContainer) filtersContainer.style.display = 'block';
                     break;
                 case 'search':
                     if (searchSection) searchSection.style.display = 'block';
@@ -339,6 +357,7 @@
             // Set title and show appropriate section
             const modes = {
                 routes: 'Route Selection',
+                filters: 'Filters',
                 search: 'Add Place',
                 places: 'Place List',
                 campsites: 'Campsites',

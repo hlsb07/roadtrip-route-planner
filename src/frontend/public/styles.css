@@ -1252,3 +1252,430 @@ textarea.form-input {
 .campsite-popup .map-popup-links {
     padding: 8px 12px 12px;
 }
+
+/* ============================================
+   FILTER SECTION STYLES
+   ============================================ */
+
+.filters-container {
+    display: none;
+    overflow-y: auto;
+    padding: 15px;
+    background: #fafafa;
+    flex: 1;
+}
+
+.filter-section {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.filter-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-header h3 i {
+    color: #2A9D8F;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: #2A9D8F;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: all 0.3s;
+    font-size: 0.9rem;
+}
+
+.btn-text:hover {
+    background: rgba(42, 157, 143, 0.1);
+    color: #258075;
+}
+
+.filter-group {
+    margin-bottom: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all 0.3s;
+}
+
+.filter-group.collapsed .filter-options {
+    display: none;
+}
+
+.filter-group.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.filter-group-header {
+    background: linear-gradient(135deg, #2A9D8F 0%, #3EBBA5 100%);
+    color: white;
+    padding: 12px 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: all 0.3s;
+}
+
+.filter-group-header:hover {
+    background: linear-gradient(135deg, #258075 0%, #35a894 100%);
+}
+
+.filter-group-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-icon {
+    transition: transform 0.3s;
+    font-size: 0.9rem;
+}
+
+.filter-options {
+    padding: 10px;
+    background: #fafafa;
+    max-height: 350px;
+    overflow-y: auto;
+}
+
+/* Custom scrollbar for filter options */
+.filter-options::-webkit-scrollbar {
+    width: 6px;
+}
+
+.filter-options::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.filter-options::-webkit-scrollbar-thumb {
+    background: #2A9D8F;
+    border-radius: 3px;
+}
+
+.filter-options::-webkit-scrollbar-thumb:hover {
+    background: #258075;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    user-select: none;
+}
+
+.filter-option:hover {
+    background: #f0f9f8;
+    border-color: #2A9D8F;
+    transform: translateX(3px);
+}
+
+.filter-option:has(.filter-checkbox:checked) {
+    background: linear-gradient(135deg, rgba(42, 157, 143, 0.1) 0%, rgba(62, 187, 165, 0.1) 100%);
+    border-color: #2A9D8F;
+    box-shadow: 0 2px 6px rgba(42, 157, 143, 0.2);
+}
+
+.filter-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: #2A9D8F;
+    flex-shrink: 0;
+}
+
+.filter-icon {
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(42, 157, 143, 0.1);
+    border-radius: 6px;
+}
+
+.filter-name {
+    flex: 1;
+    color: #2c3e50;
+    font-weight: 500;
+    font-size: 0.95rem;
+}
+
+.filter-count {
+    background: #2A9D8F;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.active-filters-summary {
+    margin-top: 15px;
+    padding: 12px 15px;
+    background: linear-gradient(135deg, rgba(42, 157, 143, 0.15) 0%, rgba(62, 187, 165, 0.15) 100%);
+    border-left: 4px solid #2A9D8F;
+    border-radius: 8px;
+    color: #2c3e50;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.active-filters-summary i {
+    color: #2A9D8F;
+    font-size: 1rem;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .filters-container {
+        padding: 0;
+        background: #fafafa;
+    }
+
+    .filter-section {
+        box-shadow: none;
+        border-radius: 0;
+        padding: 12px;
+    }
+
+    .filter-header {
+        margin-bottom: 15px;
+    }
+
+    .filter-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .filter-group {
+        margin-bottom: 15px;
+    }
+
+    .filter-group-header {
+        padding: 10px 12px;
+    }
+
+    .filter-group-header h4 {
+        font-size: 0.95rem;
+    }
+
+    .filter-options {
+        max-height: 280px;
+        padding: 8px;
+    }
+
+    .filter-option {
+        padding: 12px 10px;
+        margin-bottom: 6px;
+        /* Larger touch targets for mobile */
+        min-height: 48px;
+    }
+
+    .filter-checkbox {
+        width: 22px;
+        height: 22px;
+    }
+
+    .filter-icon {
+        font-size: 1.4rem;
+        width: 32px;
+        height: 32px;
+    }
+
+    .filter-name {
+        font-size: 0.95rem;
+    }
+
+    .filter-count {
+        font-size: 0.85rem;
+        padding: 3px 9px;
+    }
+
+    .active-filters-summary {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+    }
+
+    /* Improve touch feedback */
+    .filter-option:active {
+        transform: scale(0.98);
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .filter-header h3 {
+        font-size: 1.15rem;
+    }
+
+    .filter-option {
+        padding: 11px;
+    }
+}
+
+/* Large screens */
+@media (min-width: 1440px) {
+    .filters-container {
+        padding: 20px;
+    }
+
+    .filter-section {
+        padding: 20px;
+    }
+
+    .filter-header h3 {
+        font-size: 1.3rem;
+    }
+
+    .filter-options {
+        max-height: 400px;
+    }
+}
+
+/* ============================================
+   CUSTOM MAP MARKERS (with Category Icons)
+   ============================================ */
+
+.custom-marker-container {
+    background: transparent;
+    border: none;
+}
+
+.custom-marker {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #2A9D8F 0%, #3EBBA5 100%);
+    border: 3px solid white;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.custom-marker.selected {
+    width: 44px;
+    height: 44px;
+    border-width: 4px;
+    box-shadow: 0 5px 15px rgba(42, 157, 143, 0.5);
+}
+
+.custom-marker .marker-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    font-size: 1.3rem;
+    line-height: 1;
+}
+
+.custom-marker.selected .marker-icon {
+    font-size: 1.6rem;
+}
+
+.custom-marker:hover {
+    transform: rotate(-45deg) scale(1.1);
+    box-shadow: 0 5px 15px rgba(42, 157, 143, 0.4);
+}
+
+/* Category and Country Badges in Popups */
+.map-popup-categories,
+.map-popup-countries {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+}
+
+.category-badge,
+.country-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.category-badge {
+    background: linear-gradient(135deg, rgba(42, 157, 143, 0.15) 0%, rgba(62, 187, 165, 0.15) 100%);
+    color: #2A9D8F;
+    border: 1px solid rgba(42, 157, 143, 0.3);
+}
+
+.country-badge {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    color: #667eea;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+/* Responsive adjustments for badges */
+@media (max-width: 768px) {
+    .category-badge,
+    .country-badge {
+        font-size: 0.7rem;
+        padding: 3px 8px;
+    }
+
+    .custom-marker {
+        width: 32px;
+        height: 32px;
+    }
+
+    .custom-marker.selected {
+        width: 38px;
+        height: 38px;
+    }
+
+    .custom-marker .marker-icon {
+        font-size: 1.1rem;
+    }
+
+    .custom-marker.selected .marker-icon {
+        font-size: 1.4rem;
+    }
+}

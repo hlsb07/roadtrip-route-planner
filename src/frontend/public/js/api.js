@@ -140,4 +140,47 @@ export class ApiService {
             throw new Error(`Failed to delete campsite: ${response.status}`);
         }
     }
+
+    // Category API methods
+    static async getAllCategories() {
+        const response = await fetch(`${CONFIG.API_BASE}/categories`);
+        if (!response.ok) {
+            throw new Error(`Failed to load categories: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async getPlacesByCategory(categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}/places`);
+        if (!response.ok) {
+            throw new Error(`Failed to load places for category: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    // Country API methods
+    static async getAllCountries() {
+        const response = await fetch(`${CONFIG.API_BASE}/countries`);
+        if (!response.ok) {
+            throw new Error(`Failed to load countries: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async getPlacesByCountry(countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}/places`);
+        if (!response.ok) {
+            throw new Error(`Failed to load places for country: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    // Get all places (for filtering)
+    static async getAllPlaces() {
+        const response = await fetch(`${CONFIG.API_BASE}/places`);
+        if (!response.ok) {
+            throw new Error(`Failed to load places: ${response.status}`);
+        }
+        return await response.json();
+    }
 }

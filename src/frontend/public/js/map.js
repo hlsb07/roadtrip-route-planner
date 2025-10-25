@@ -351,6 +351,109 @@ export class MapService {
     setCampsiteMarkerClickCallback(callback) {
         this.onCampsiteMarkerClick = callback;
     }
+
+    /**
+     * Update map with filtered places (for category/country filtering)
+     * This creates separate markers for all places with visual indicators
+     */
+    updateFilteredPlaces(filteredPlaces) {
+        // Clear existing markers but keep campsites
+        this.markers.forEach(marker => this.map.removeLayer(marker));
+        this.markers = [];
+
+        // Clear existing route
+        if (this.routePolyline) {
+            this.map.removeLayer(this.routePolyline);
+        }
+
+        if (filteredPlaces.length === 0) return;
+
+        // Add markers for filtered places
+        filteredPlaces.forEach((place, index) => {
+            const isSelected = this.selectedMarkerIndex === index;
+
+            // Get category icon if available
+            const categoryIcon = place.categories && place.categories.length > 0
+                ? place.categories[0].icon
+                : null;
+
+            // Create custom marker with category icon
+            const iconSize = isSelected ? [35, 50] : [25, 41];
+            const iconAnchor = isSelected ? [17, 50] : [12, 41];
+
+            let marker;
+
+            // If there's a category icon, create a custom divIcon with emoji
+            if (categoryIcon) {
+                const divIcon = L.divIcon({
+                    html: `<div class="custom-marker ${isSelected ? 'selected' : ''}">
+                            <div class="marker-icon">${categoryIcon}</div>
+                           </div>`,
+                    className: 'custom-marker-container',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                });
+
+                marker = L.marker([place.latitude, place.longitude], { icon: divIcon });
+            } else {
+                // Use default Leaflet marker
+                const customIcon = L.icon({
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconSize: iconSize,
+                    iconAnchor: iconAnchor,
+                    popupAnchor: [1, -34],
+                    shadowSize: isSelected ? [50, 50] : [41, 41]
+                });
+
+                marker = L.marker([place.latitude, place.longitude], { icon: customIcon });
+            }
+
+            // Create popup content
+            const categories = place.categories && place.categories.length > 0
+                ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+                : '';
+
+            const countries = place.countries && place.countries.length > 0
+                ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+                : '';
+
+            marker.addTo(this.map)
+                .bindPopup(`
+                    <div class="map-popup-content">
+                        <div class="map-popup-header">
+                            <strong>${place.name}</strong>
+                        </div>
+                        ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                        ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
+                        <div class="map-popup-coords">Lat: ${place.latitude.toFixed(4)}, Lng: ${place.longitude.toFixed(4)}</div>
+                        <div class="map-popup-links">
+                            <a href="https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}"
+                               target="_blank"
+                               class="link-btn google-maps">
+                                <i class="fas fa-map"></i> Google Maps
+                            </a>
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}"
+                               target="_blank"
+                               class="link-btn google-nav">
+                                <i class="fas fa-directions"></i> Navigate
+                            </a>
+                        </div>
+                    </div>
+                `);
+
+            this.markers.push(marker);
+        });
+
+        // Center map to show all filtered places
+        if (filteredPlaces.length > 0) {
+            const bounds = L.latLngBounds(
+                filteredPlaces.map(place => [place.latitude, place.longitude])
+            );
+            this.map.fitBounds(bounds, { padding: [50, 50] });
+        }
+    }
 }
 
 // Carousel navigation functions
