@@ -51,6 +51,7 @@ echo.
 echo Services:
 echo   Frontend:  http://localhost
 echo   Backend:   http://localhost:5166 (direct)
+echo   Swagger:   http://localhost:5166/swagger (direct)
 echo   API:       http://localhost/api (via Nginx)
 echo   Images:    http://localhost/images (via Nginx)
 echo.
