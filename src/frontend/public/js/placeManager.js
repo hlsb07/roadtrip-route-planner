@@ -8,6 +8,8 @@ export class PlaceManager {
         this.onUpdate = onUpdate;
         this.selectedIndex = null;
         this.sortableInstances = {}; // Track Sortable instances
+        this.sortingEnabled = false; // Track if sorting mode is active
+        this.sortHoldTimer = null; // Timer for press-and-hold
     }
 
     async addPlace(place) {
@@ -50,26 +52,108 @@ export class PlaceManager {
     async removePlace(index) {
         const currentRouteId = this.routeManager.getCurrentRouteId();
         if (!currentRouteId || !this.places[index]) return false;
-        
+
         const place = this.places[index];
-        
+
         if (!confirm(`Remove "${place.name}" from this route?`)) {
             return false;
         }
-        
+
         try {
             await ApiService.removePlaceFromRoute(currentRouteId, place.id);
-            
+
             this.places = await this.routeManager.loadCurrentRoute();
             await this.routeManager.loadRoutes(); // For place count update
-            
+
+            // Clear selection if removed place was selected
+            if (this.selectedIndex === index) {
+                this.selectedIndex = null;
+            } else if (this.selectedIndex > index) {
+                this.selectedIndex--;
+            }
+
             showSuccess(`Removed "${place.name}" from route`);
             return true;
-            
+
         } catch (error) {
             console.error('Failed to remove place:', error);
             showError('Failed to remove place');
             return false;
+        }
+    }
+
+    async renamePlace(index, newName) {
+        if (!this.places[index]) return false;
+
+        const place = this.places[index];
+
+        try {
+            await ApiService.updatePlace(place.id, newName);
+
+            this.places = await this.routeManager.loadCurrentRoute();
+            await this.routeManager.loadRoutes(); // For place count update
+
+            showSuccess(`Renamed to "${newName}"`);
+            return true;
+
+        } catch (error) {
+            console.error('Failed to rename place:', error);
+            showError('Failed to rename place');
+            return false;
+        }
+    }
+
+    showRenamePlaceModal(index) {
+        if (!this.places[index]) return;
+
+        const place = this.places[index];
+        const modal = document.getElementById('renamePlaceModal');
+        const nameInput = document.getElementById('placeName');
+        const coordsDisplay = document.getElementById('placeCoords');
+
+        if (!modal || !nameInput || !coordsDisplay) return;
+
+        // Set current values
+        nameInput.value = place.name;
+        coordsDisplay.textContent = `${place.coords[0].toFixed(6)}, ${place.coords[1].toFixed(6)}`;
+
+        // Store the index for saving
+        modal.dataset.placeIndex = index;
+
+        // Show modal
+        modal.classList.add('active');
+        nameInput.focus();
+        nameInput.select();
+    }
+
+    closePlaceModal() {
+        const modal = document.getElementById('renamePlaceModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    async savePlaceRename() {
+        const modal = document.getElementById('renamePlaceModal');
+        const nameInput = document.getElementById('placeName');
+
+        if (!modal || !nameInput) return;
+
+        const index = parseInt(modal.dataset.placeIndex);
+        const newName = nameInput.value.trim();
+
+        if (!newName) {
+            showError('Please enter a name');
+            return;
+        }
+
+        const success = await this.renamePlace(index, newName);
+
+        if (success) {
+            this.closePlaceModal();
+            if (this.onUpdate) {
+                this.onUpdate();
+            }
         }
     }
 
@@ -149,16 +233,36 @@ export class PlaceManager {
             return;
         }
 
-        const placesHTML = this.places.map((place, index) => `
-            <div class="place-item ${this.selectedIndex === index ? 'selected' : ''}" data-index="${index}" onclick="window.app?.selectPlace(${index})">
+        const placesHTML = this.places.map((place, index) => {
+            const isSelected = this.selectedIndex === index;
+            return `
+            <div class="place-item ${isSelected ? 'selected' : ''} ${this.sortingEnabled ? 'sorting-mode' : ''}" data-index="${index}" onclick="placeManager.togglePlaceSelection(${index})">
                 <div class="place-header">
                     <div class="place-number">${index + 1}</div>
                     <div class="place-name">${place.name}</div>
+                    ${isSelected ? `
                     <div class="place-actions">
-                        <button class="action-btn delete-btn" onclick="event.stopPropagation(); placeManager.removePlace(${index})" title="Remove from route">
-                            <i class="fas fa-times"></i>
+                        <button class="action-btn rename-btn"
+                                onclick="event.stopPropagation(); placeManager.showRenamePlaceModal(${index})"
+                                title="Rename place">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn sort-btn"
+                                onmousedown="event.stopPropagation(); placeManager.startSortHold(event, ${index})"
+                                onmouseup="event.stopPropagation(); placeManager.endSortHold()"
+                                onmouseleave="event.stopPropagation(); placeManager.endSortHold()"
+                                ontouchstart="event.stopPropagation(); placeManager.startSortHold(event, ${index})"
+                                ontouchend="event.stopPropagation(); placeManager.endSortHold()"
+                                title="Press and hold to enable sorting">
+                            <i class="fas fa-grip-vertical"></i>
+                        </button>
+                        <button class="action-btn delete-btn"
+                                onclick="event.stopPropagation(); placeManager.removePlace(${index})"
+                                title="Remove from route">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
+                    ` : ''}
                 </div>
                 <div class="place-links">
                     <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
@@ -175,12 +279,12 @@ export class PlaceManager {
                     </a>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
 
         placesList.innerHTML = placesHTML;
         if (mobilePlacesList) mobilePlacesList.innerHTML = placesHTML;
 
-        // Initialize sortable for drag & drop on desktop
+        // Initialize sortable for drag & drop (disabled by default)
         this.initSortable(placesList);
 
         // Initialize sortable for mobile if exists
@@ -201,10 +305,12 @@ export class PlaceManager {
             delete this.sortableInstances[elementKey];
         }
 
-        // Create new Sortable instance
+        // Create new Sortable instance (disabled by default)
         this.sortableInstances[elementKey] = new Sortable(element, {
             animation: 300,
             ghostClass: 'dragging',
+            disabled: !this.sortingEnabled, // Only enabled when sorting mode is active
+            handle: '.place-item', // Only allow dragging from the item itself
             onEnd: async (evt) => {
                 // Determine new order
                 const newOrder = Array.from(element.children).map(item => {
@@ -217,6 +323,9 @@ export class PlaceManager {
                 // API call for reorder
                 const success = await this.reorderPlaces(newOrder);
                 if (success) {
+                    // Disable sorting mode after successful reorder
+                    this.disableSorting();
+
                     // Update UI on success
                     if (this.onUpdate) {
                         this.onUpdate();
@@ -227,6 +336,93 @@ export class PlaceManager {
                 }
             }
         });
+    }
+
+    togglePlaceSelection(index) {
+        if (this.sortingEnabled) {
+            // Don't allow selection changes while sorting
+            return;
+        }
+
+        if (this.selectedIndex === index) {
+            // Deselect if clicking the same item
+            this.selectedIndex = null;
+        } else {
+            // Select the new item
+            this.selectedIndex = index;
+        }
+
+        this.updatePlacesList();
+
+        // Update map selection
+        if (window.app && this.selectedIndex !== null) {
+            window.app.selectPlace(this.selectedIndex);
+        }
+    }
+
+    startSortHold(event, index) {
+        event.preventDefault();
+
+        // Clear any existing timer
+        if (this.sortHoldTimer) {
+            clearTimeout(this.sortHoldTimer);
+        }
+
+        // Visual feedback - add pressing class
+        const btn = event.currentTarget;
+        btn.classList.add('pressing');
+
+        // Start timer for 500ms hold
+        this.sortHoldTimer = setTimeout(() => {
+            this.enableSorting();
+            btn.classList.remove('pressing');
+
+            // Haptic feedback on mobile
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }, 500);
+    }
+
+    endSortHold() {
+        // Clear timer if released early
+        if (this.sortHoldTimer) {
+            clearTimeout(this.sortHoldTimer);
+            this.sortHoldTimer = null;
+        }
+
+        // Remove pressing class
+        document.querySelectorAll('.sort-btn.pressing').forEach(btn => {
+            btn.classList.remove('pressing');
+        });
+    }
+
+    enableSorting() {
+        this.sortingEnabled = true;
+
+        // Enable all sortable instances
+        Object.values(this.sortableInstances).forEach(instance => {
+            if (instance) {
+                instance.option('disabled', false);
+            }
+        });
+
+        // Update UI to show sorting mode (visual feedback via styling)
+        this.updatePlacesList();
+    }
+
+    disableSorting() {
+        this.sortingEnabled = false;
+
+        // Disable all sortable instances
+        Object.values(this.sortableInstances).forEach(instance => {
+            if (instance) {
+                instance.option('disabled', true);
+            }
+        });
+
+        // Update UI
+        this.updatePlacesList();
     }
 
     getPlaces() {

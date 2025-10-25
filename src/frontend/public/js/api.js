@@ -62,6 +62,22 @@ export class ApiService {
         return await response.json();
     }
 
+    static async updatePlace(placeId, name, latitude = null, longitude = null) {
+        const body = {};
+        if (name !== null && name !== undefined) body.name = name;
+        if (latitude !== null) body.latitude = latitude;
+        if (longitude !== null) body.longitude = longitude;
+
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update place');
+        }
+    }
+
     static async addPlaceToRoute(routeId, placeId) {
         const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places`, {
             method: 'POST',

@@ -135,6 +135,11 @@ class App {
                     this.updateRoutesList();
                 });
             }
+
+            // Enter in place rename modal saves
+            if (e.key === 'Enter' && document.getElementById('renamePlaceModal').classList.contains('active')) {
+                this.placeManager.savePlaceRename();
+            }
         });
     }
 
@@ -351,6 +356,8 @@ window.getCurrentLocation = () => window.app?.getCurrentLocation();
 window.exportRoute = () => window.app?.exportRoute();
 window.importRoute = () => window.app?.importRoute();
 window.clearRoute = () => window.app?.clearRoute();
+window.closePlaceModal = () => window.app?.placeManager?.closePlaceModal();
+window.savePlaceRename = () => window.app?.placeManager?.savePlaceRename();
 
 // Global access for managers
 window.placeManager = null; // Will be set by app

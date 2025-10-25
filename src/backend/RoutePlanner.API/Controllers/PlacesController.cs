@@ -127,6 +127,41 @@ namespace RoutePlanner.API.Controllers
             }
         }
 
+        // PUT: api/places/{id}
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdatePlace(int id, UpdatePlaceDto updateDto)
+        {
+            var place = await _context.Places.FindAsync(id);
+
+            if (place == null)
+                return NotFound();
+
+            // Update name if provided
+            if (!string.IsNullOrWhiteSpace(updateDto.Name))
+            {
+                place.Name = updateDto.Name;
+            }
+
+            // Update location if provided
+            if (updateDto.Latitude.HasValue && updateDto.Longitude.HasValue)
+            {
+                place.Location = _geometryFactory.CreatePoint(
+                    new Coordinate(updateDto.Longitude.Value, updateDto.Latitude.Value));
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!await _context.Places.AnyAsync(p => p.Id == id))
+                    return NotFound();
+                throw;
+            }
+        }
+
         // DELETE: api/places/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePlace(int id)

@@ -17,6 +17,13 @@ namespace RoutePlanner.API.DTOs
         public double Longitude { get; set; }
     }
 
+    public class UpdatePlaceDto
+    {
+        public string? Name { get; set; }
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+    }
+
     public class RouteDto
     {
         public int Id { get; set; }
