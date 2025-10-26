@@ -1684,7 +1684,6 @@ textarea.form-input {
    ============================================ */
 
 .place-item {
-    cursor: pointer;
     transition: all 0.3s ease;
 }
 
@@ -1695,7 +1694,6 @@ textarea.form-input {
 }
 
 .place-item.sorting-mode {
-    cursor: move;
     background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(255, 152, 0, 0.1) 100%);
     border: 2px dashed #ff9800;
 }
@@ -1738,14 +1736,14 @@ textarea.form-input {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
     transition: all 0.3s;
     font-size: 0.9rem;
 }
 
 .action-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);    
+    cursor: pointer;
 }
 
 .action-btn:active {
@@ -1773,18 +1771,6 @@ textarea.form-input {
     background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
     color: white;
     border-color: #ff9800;
-}
-
-.sort-btn.pressing {
-    animation: pulse-sort 0.5s ease-in-out;
-    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-    color: white;
-    transform: scale(0.95);
-}
-
-@keyframes pulse-sort {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.1); }
 }
 
 .delete-btn {
@@ -1913,13 +1899,7 @@ textarea.form-input {
     border-radius: 6px;
 }
 
-.place-item.sorting-mode {
-    cursor: grab;
-}
 
-.place-item.sorting-mode:active {
-    cursor: grabbing;
-}
 
 /* Mobile sorting mode */
 @media (max-width: 768px) {

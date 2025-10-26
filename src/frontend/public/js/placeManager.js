@@ -9,7 +9,6 @@ export class PlaceManager {
         this.selectedIndex = null;
         this.sortableInstances = {}; // Track Sortable instances
         this.sortingEnabled = false; // Track if sorting mode is active
-        this.sortHoldTimer = null; // Timer for press-and-hold
     }
 
     async addPlace(place) {
@@ -252,11 +251,11 @@ export class PlaceManager {
             <div class="place-item ${isSelected ? 'selected' : ''} ${this.sortingEnabled ? 'sorting-mode' : ''}"
                  data-index="${index}"
                  data-place-id="${place.id}"
-                 onclick="${this.sortingEnabled ? (isSelected ? 'placeManager.disableSorting()' : '') : 'placeManager.togglePlaceSelection(' + index + ')'}">
+                 onclick="placeManager.togglePlaceSelection(${index})">
                 <div class="place-header">
-                    ${this.sortingEnabled ? '<div class="sort-handle"><i class="fas fa-grip-vertical"></i></div>' : ''}
                     <div class="place-number">${index + 1}</div>
                     <div class="place-name">${place.name}</div>
+                    ${this.sortingEnabled ? '<div class="sort-handle"><i class="fas fa-grip-vertical"></i></div>' : ''}
                     ${isSelected && !this.sortingEnabled ? `
                     <div class="place-actions">
                         <button class="action-btn rename-btn"
@@ -265,12 +264,8 @@ export class PlaceManager {
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="action-btn sort-btn"
-                                onmousedown="event.stopPropagation(); placeManager.startSortHold(event, ${index})"
-                                onmouseup="event.stopPropagation(); placeManager.endSortHold()"
-                                onmouseleave="event.stopPropagation(); placeManager.endSortHold()"
-                                ontouchstart="event.stopPropagation(); placeManager.startSortHold(event, ${index})"
-                                ontouchend="event.stopPropagation(); placeManager.endSortHold()"
-                                title="Press and hold to enable sorting">
+                                onclick="event.stopPropagation(); placeManager.enableSorting()"
+                                title="Enable sorting mode">
                             <i class="fas fa-grip-vertical"></i>
                         </button>
                         <button class="action-btn delete-btn"
@@ -280,7 +275,6 @@ export class PlaceManager {
                         </button>
                     </div>
                     ` : ''}
-                    ${this.sortingEnabled && isSelected ? '<div class="sorting-hint-selected">Tap here to exit</div>' : ''}
                 </div>
                 ${!this.sortingEnabled ? `
                 <div class="place-links">
@@ -330,9 +324,9 @@ export class PlaceManager {
             animation: 300,
             ghostClass: 'dragging',
             disabled: !this.sortingEnabled, // Only enabled when sorting mode is active
-            handle: '.place-item', // Allow dragging the entire item when sorting is enabled
+            handle: '.sort-handle', // Allow dragging the entire item when sorting is enabled
             scrollSensitivity: 100, // Better scroll detection
-            scrollSpeed: 10, // Scroll speed while dragging
+            scrollSpeed: 5, // Scroll speed while dragging
             touchStartThreshold: 5, // Pixels of movement before starting drag
             onStart: (evt) => {
                 // Add visual feedback when dragging starts
@@ -378,13 +372,18 @@ export class PlaceManager {
 
     togglePlaceSelection(index) {
         if (this.sortingEnabled) {
-            // If in sorting mode, clicking the selected item exits sorting mode
-            if (this.selectedIndex === index) {
-                this.disableSorting();
+            // In sorting mode: only allow changing selection, not exiting
+            this.selectedIndex = index;
+            this.updatePlacesList();
+
+            // Update map selection
+            if (window.app) {
+                window.app.selectPlace(index);
             }
             return;
         }
 
+        // Normal mode (not sorting):
         if (this.selectedIndex === index) {
             // Deselect if clicking the same item
             this.selectedIndex = null;
@@ -399,43 +398,6 @@ export class PlaceManager {
         if (window.app && this.selectedIndex !== null) {
             window.app.selectPlace(this.selectedIndex);
         }
-    }
-
-    startSortHold(event, index) {
-        event.preventDefault();
-
-        // Clear any existing timer
-        if (this.sortHoldTimer) {
-            clearTimeout(this.sortHoldTimer);
-        }
-
-        // Visual feedback - add pressing class
-        const btn = event.currentTarget;
-        btn.classList.add('pressing');
-
-        // Start timer for 500ms hold
-        this.sortHoldTimer = setTimeout(() => {
-            this.enableSorting();
-            btn.classList.remove('pressing');
-
-            // Haptic feedback on mobile
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-        }, 500);
-    }
-
-    endSortHold() {
-        // Clear timer if released early
-        if (this.sortHoldTimer) {
-            clearTimeout(this.sortHoldTimer);
-            this.sortHoldTimer = null;
-        }
-
-        // Remove pressing class
-        document.querySelectorAll('.sort-btn.pressing').forEach(btn => {
-            btn.classList.remove('pressing');
-        });
     }
 
     enableSorting() {
