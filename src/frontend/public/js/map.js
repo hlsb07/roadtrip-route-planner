@@ -12,6 +12,9 @@ export class MapService {
         this.selectedCampsiteIndex = null;
         this.onMarkerClick = null;
         this.onCampsiteMarkerClick = null;
+        this.coordinateSelectionMode = false;
+        this.coordinateSelectionCallback = null;
+        this.coordinatePreviewMarker = null;
     }
 
     init() {
@@ -27,15 +30,68 @@ export class MapService {
 
     onMapClick(callback) {
         this.map.on('click', (e) => {
+            // Check if we're in coordinate selection mode
+            if (this.coordinateSelectionMode && this.coordinateSelectionCallback) {
+                // Update coordinate preview marker
+                if (this.coordinatePreviewMarker) {
+                    this.map.removeLayer(this.coordinatePreviewMarker);
+                }
+
+                // Create a special preview marker
+                const previewIcon = L.divIcon({
+                    html: '<div class="coordinate-preview-marker"><i class="fas fa-map-marker-alt"></i></div>',
+                    className: 'coordinate-preview-icon',
+                    iconSize: [30, 42],
+                    iconAnchor: [15, 42]
+                });
+
+                this.coordinatePreviewMarker = L.marker(e.latlng, { icon: previewIcon })
+                    .addTo(this.map)
+                    .bindPopup(`
+                        <div class="coord-preview-popup">
+                            <strong>New Location</strong><br>
+                            Lat: ${e.latlng.lat.toFixed(6)}<br>
+                            Lng: ${e.latlng.lng.toFixed(6)}
+                        </div>
+                    `)
+                    .openPopup();
+
+                // Call the callback with coordinates
+                this.coordinateSelectionCallback(e.latlng.lat, e.latlng.lng);
+                return;
+            }
+
+            // Normal map click behavior
             const coords = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
             callback(coords, e.latlng);
-            
+
             // Add temporary marker
             if (this.clickMarker) {
                 this.map.removeLayer(this.clickMarker);
             }
             this.clickMarker = L.marker(e.latlng).addTo(this.map);
         });
+    }
+
+    setCoordinateSelectionMode(enabled, callback = null) {
+        this.coordinateSelectionMode = enabled;
+        this.coordinateSelectionCallback = callback;
+
+        // Change cursor style
+        const mapContainer = document.getElementById('map');
+        if (mapContainer) {
+            if (enabled) {
+                mapContainer.classList.add('coordinate-selection-active');
+            } else {
+                mapContainer.classList.remove('coordinate-selection-active');
+            }
+        }
+
+        // Clear preview marker if disabling
+        if (!enabled && this.coordinatePreviewMarker) {
+            this.map.removeLayer(this.coordinatePreviewMarker);
+            this.coordinatePreviewMarker = null;
+        }
     }
 
     clearClickMarker() {

@@ -2025,3 +2025,461 @@ textarea.form-input {
         padding: 3px 8px;
     }
 }
+
+/* ============================================
+   EDIT PLACE MODAL
+   ============================================ */
+
+.modal-large {
+    max-width: 650px;
+    width: 95%;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.form-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 8px;
+}
+
+.form-group label i {
+    color: #2A9D8F;
+    font-size: 1rem;
+}
+
+.form-input[type="number"] {
+    font-family: 'Courier New', monospace;
+}
+
+/* Multi-Select Container */
+.multi-select-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.multi-select-container::-webkit-scrollbar {
+    width: 8px;
+}
+
+.multi-select-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.multi-select-container::-webkit-scrollbar-thumb {
+    background: #2A9D8F;
+    border-radius: 4px;
+}
+
+.multi-select-container::-webkit-scrollbar-thumb:hover {
+    background: #258075;
+}
+
+/* Checkbox Items */
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    user-select: none;
+}
+
+.checkbox-item:hover {
+    background: #f0f9f8;
+    border-color: #2A9D8F;
+    transform: translateX(2px);
+}
+
+.checkbox-item:has(input:checked) {
+    background: linear-gradient(135deg, rgba(42, 157, 143, 0.15) 0%, rgba(62, 187, 165, 0.15) 100%);
+    border-color: #2A9D8F;
+    box-shadow: 0 2px 6px rgba(42, 157, 143, 0.2);
+}
+
+.checkbox-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #2A9D8F;
+    flex-shrink: 0;
+}
+
+.checkbox-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.checkbox-label {
+    flex: 1;
+    font-size: 0.9rem;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .modal-large {
+        max-width: 100%;
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .multi-select-container {
+        grid-template-columns: 1fr;
+        max-height: 180px;
+        gap: 6px;
+        padding: 8px;
+    }
+
+    .checkbox-item {
+        padding: 12px 10px;
+        min-height: 48px; /* Touch-friendly */
+    }
+
+    .checkbox-item input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+    }
+
+    .checkbox-icon {
+        font-size: 1.3rem;
+        width: 28px;
+        height: 28px;
+    }
+
+    .checkbox-label {
+        font-size: 0.95rem;
+    }
+
+    /* Make modal scrollable on mobile */
+    .modal-content.modal-large {
+        max-height: 100vh;
+        overflow-y: auto;
+    }
+
+    .modal-body {
+        max-height: calc(100vh - 180px);
+        overflow-y: auto;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .modal-large {
+        max-width: 600px;
+    }
+
+    .multi-select-container {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
+/* ==================== Coordinate Selection Styles ==================== */
+
+/* Readonly coordinate inputs */
+.coords-input {
+    font-family: 'Courier New', Consolas, monospace;
+    background: #f8f9fa !important;
+    cursor: not-allowed;
+    color: #495057;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Change Location Button */
+.btn-change-location {
+    width: 100%;
+    padding: 12px 16px;
+    margin-top: 12px;
+    background: linear-gradient(135deg, #2196F3 0%, #1976d2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+.btn-change-location:hover {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
+.btn-change-location:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(33, 150, 243, 0.3);
+}
+
+.btn-change-location i {
+    font-size: 1.1rem;
+}
+
+/* Hide entire modal during location change to avoid flex display conflict */
+.modal.location-change-mode {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Hide sidebar during location change for better map focus */
+#sidebar.location-change-hidden {
+    display: none !important;
+}
+
+/* Location Change Banner on Map */
+.location-change-banner {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 24px;
+    background: linear-gradient(135deg, #2196F3 0%, #1976d2 100%);
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.5);
+    animation: bannerSlideDown 0.4s ease-out;
+    min-width: 300px;
+    max-width: 90%;
+}
+
+@keyframes bannerSlideDown {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.location-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.location-banner-content i {
+    font-size: 1.4rem;
+    animation: markerPulse 2s infinite;
+}
+
+.btn-location-done {
+    padding: 8px 20px;
+    background: rgba(255, 255, 255, 0.95);
+    color: #2196F3;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-location-done:hover {
+    background: white;
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-location-done:active {
+    transform: scale(0.98);
+}
+
+.btn-location-done i {
+    font-size: 1rem;
+}
+
+/* Coordinate update animation */
+@keyframes coordsUpdate {
+    0% {
+        background: #fff3cd;
+        transform: scale(1);
+    }
+    50% {
+        background: #d4edda;
+        transform: scale(1.02);
+    }
+    100% {
+        background: #f8f9fa;
+        transform: scale(1);
+    }
+}
+
+.coords-updated {
+    animation: coordsUpdate 0.6s ease-out;
+    border-color: #28a745 !important;
+}
+
+/* Map coordinate selection mode */
+.coordinate-selection-active {
+    cursor: crosshair !important;
+}
+
+.coordinate-selection-active * {
+    cursor: crosshair !important;
+}
+
+/* Coordinate preview marker */
+.coordinate-preview-icon {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.coordinate-preview-marker {
+    position: relative;
+    width: 30px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: markerBounce 0.5s ease-out, markerPulse 2s infinite;
+}
+
+.coordinate-preview-marker i {
+    font-size: 32px;
+    color: #2196F3;
+    filter: drop-shadow(0 2px 4px rgba(33, 150, 243, 0.4));
+}
+
+/* Marker bounce animation */
+@keyframes markerBounce {
+    0% {
+        transform: translateY(-20px) scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        transform: translateY(-5px) scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+/* Marker pulse animation */
+@keyframes markerPulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* Coordinate preview popup */
+.coord-preview-popup {
+    font-family: 'Courier New', Consolas, monospace;
+    text-align: center;
+    padding: 8px;
+}
+
+.coord-preview-popup strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #2196F3;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.coord-preview-popup br + text {
+    color: #495057;
+    font-size: 0.85rem;
+}
+
+/* Mobile coordinate selection adjustments */
+@media (max-width: 768px) {
+    .btn-change-location {
+        padding: 14px 18px;
+        font-size: 1.05rem;
+        min-height: 48px; /* Touch-friendly */
+    }
+
+    .location-change-banner {
+        top: 10px;
+        flex-direction: column;
+        gap: 12px;
+        padding: 14px 18px;
+        min-width: 280px;
+    }
+
+    .location-banner-content {
+        font-size: 0.95rem;
+        gap: 10px;
+    }
+
+    .location-banner-content i {
+        font-size: 1.3rem;
+    }
+
+    .btn-location-done {
+        width: 100%;
+        justify-content: center;
+        padding: 12px 16px;
+        min-height: 44px; /* Touch-friendly */
+    }
+
+    .coordinate-preview-marker {
+        width: 36px;
+        height: 48px;
+    }
+
+    .coordinate-preview-marker i {
+        font-size: 38px;
+    }
+
+    .coords-input {
+        font-size: 0.95rem;
+    }
+}

@@ -202,4 +202,64 @@ export class ApiService {
         }
         return await response.json();
     }
+
+    // Place Category Management
+    static async assignCategoryToPlace(placeId, categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ categoryId })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to assign category');
+        }
+    }
+
+    static async removeCategoryFromPlace(placeId, categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories/${categoryId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to remove category');
+        }
+    }
+
+    static async getPlaceCategories(placeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories`);
+        if (!response.ok) {
+            throw new Error('Failed to get place categories');
+        }
+        return await response.json();
+    }
+
+    // Place Country Management
+    static async assignCountryToPlace(placeId, countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ countryId })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to assign country');
+        }
+    }
+
+    static async removeCountryFromPlace(placeId, countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries/${countryId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to remove country');
+        }
+    }
+
+    static async getPlaceCountries(placeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries`);
+        if (!response.ok) {
+            throw new Error('Failed to get place countries');
+        }
+        return await response.json();
+    }
 }

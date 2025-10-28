@@ -136,9 +136,9 @@ class App {
                 });
             }
 
-            // Enter in place rename modal saves
-            if (e.key === 'Enter' && document.getElementById('renamePlaceModal').classList.contains('active')) {
-                this.placeManager.savePlaceRename();
+            // Enter in place edit modal saves
+            if (e.key === 'Enter' && document.getElementById('editPlaceModal').classList.contains('active')) {
+                this.placeManager.savePlaceEdit();
             }
         });
     }
@@ -283,6 +283,10 @@ class App {
     updateUI() {
         this.placeManager.updatePlacesList();
         this.mapService.updateMap(this.placeManager.getPlaces());
+        // Re-center map to show all places in the current route
+        if (this.placeManager.getPlaces().length > 0) {
+            this.mapService.centerMap(this.placeManager.getPlaces());
+        }
     }
 
     selectPlace(index) {
@@ -357,7 +361,7 @@ window.exportRoute = () => window.app?.exportRoute();
 window.importRoute = () => window.app?.importRoute();
 window.clearRoute = () => window.app?.clearRoute();
 window.closePlaceModal = () => window.app?.placeManager?.closePlaceModal();
-window.savePlaceRename = () => window.app?.placeManager?.savePlaceRename();
+window.savePlaceEdit = () => window.app?.placeManager?.savePlaceEdit();
 
 // Global access for managers
 window.placeManager = null; // Will be set by app

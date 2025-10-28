@@ -276,27 +276,57 @@
         <div id="modalOverlay" class="modal-overlay" onclick="closeRouteModal()"></div>
     </div>
 
-    <div id="renamePlaceModal" class="modal">
-        <div class="modal-content">
+    <div id="editPlaceModal" class="modal">
+        <div class="modal-content modal-large">
             <div class="modal-header">
-                <h3>Rename Place</h3>
+                <h3><i class="fas fa-edit"></i> Edit Place</h3>
                 <button class="btn-close" onclick="closePlaceModal()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
+                <!-- Place Name -->
                 <div class="form-group">
-                    <label for="placeName">Place Name:</label>
-                    <input type="text" id="placeName" class="form-input" placeholder="Enter new name">
+                    <label for="placeName"><i class="fas fa-map-marker-alt"></i> Place Name:</label>
+                    <input type="text" id="placeName" class="form-input" placeholder="Enter place name">
                 </div>
+
+                <!-- Coordinates -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="placeLatitude"><i class="fas fa-globe"></i> Latitude:</label>
+                        <input type="text" id="placeLatitude" class="form-input coords-input" placeholder="e.g., 51.5074" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="placeLongitude"><i class="fas fa-globe"></i> Longitude:</label>
+                        <input type="text" id="placeLongitude" class="form-input coords-input" placeholder="e.g., -0.1278" readonly>
+                    </div>
+                </div>
+                <button type="button" class="btn-change-location" onclick="placeManager.startLocationChange()">
+                    <i class="fas fa-map-marker-alt"></i> Change Location on Map
+                </button>
+
+                <!-- Categories -->
                 <div class="form-group">
-                    <label>Coordinates:</label>
-                    <div class="coords-display" id="placeCoords">--, --</div>
+                    <label><i class="fas fa-tag"></i> Categories:</label>
+                    <div id="categoriesContainer" class="multi-select-container">
+                        <!-- Categories will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Countries -->
+                <div class="form-group">
+                    <label><i class="fas fa-flag"></i> Countries:</label>
+                    <div id="countriesContainer" class="multi-select-container">
+                        <!-- Countries will be loaded here -->
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closePlaceModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="savePlaceRename()" id="savePlaceBtn">Save</button>
+                <button class="btn btn-primary" onclick="savePlaceEdit()" id="savePlaceBtn">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
             </div>
         </div>
         <div class="modal-overlay" onclick="closePlaceModal()"></div>

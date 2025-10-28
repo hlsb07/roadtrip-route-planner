@@ -102,22 +102,28 @@ export class PlaceManager {
         }
     }
 
-    showRenamePlaceModal(index) {
+    async showRenamePlaceModal(index) {
         if (!this.places[index]) return;
 
         const place = this.places[index];
-        const modal = document.getElementById('renamePlaceModal');
+        const modal = document.getElementById('editPlaceModal');
         const nameInput = document.getElementById('placeName');
-        const coordsDisplay = document.getElementById('placeCoords');
+        const latInput = document.getElementById('placeLatitude');
+        const lngInput = document.getElementById('placeLongitude');
 
-        if (!modal || !nameInput || !coordsDisplay) return;
+        if (!modal || !nameInput || !latInput || !lngInput) return;
 
         // Set current values
         nameInput.value = place.name;
-        coordsDisplay.textContent = `${place.coords[0].toFixed(6)}, ${place.coords[1].toFixed(6)}`;
+        latInput.value = place.coords[0];
+        lngInput.value = place.coords[1];
 
-        // Store the index for saving
+        // Store the index and placeId for saving
         modal.dataset.placeIndex = index;
+        modal.dataset.placeId = place.id;
+
+        // Load categories and countries
+        await this.loadCategoriesAndCountries(place.id);
 
         // Show modal
         modal.classList.add('active');
@@ -125,34 +131,268 @@ export class PlaceManager {
         nameInput.select();
     }
 
-    closePlaceModal() {
-        const modal = document.getElementById('renamePlaceModal');
+    startLocationChange() {
+        // Hide the modal completely by adding class to the modal itself
+        const modal = document.getElementById('editPlaceModal');
         if (modal) {
-            modal.classList.remove('active');
+            modal.classList.add('location-change-mode');
+        }
+
+        // Hide sidebar for better map focus
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.add('location-change-hidden');
+
+        // Enable map coordinate selection
+        this.enableMapCoordinateSelection();
+
+        // Show instruction banner on map
+        this.showLocationChangeInstructions();
+    }
+
+    showLocationChangeInstructions() {
+        // Remove existing banner if any
+        const existingBanner = document.getElementById('locationChangeBanner');
+        if (existingBanner) {
+            existingBanner.remove();
+        }
+
+        // Create instruction banner
+        const banner = document.createElement('div');
+        banner.id = 'locationChangeBanner';
+        banner.className = 'location-change-banner';
+        banner.innerHTML = `
+            <div class="location-banner-content">
+                <i class="fas fa-map-marker-alt"></i>
+                <span>Click on the map to select new location</span>
+            </div>
+            <button class="btn-location-done" onclick="placeManager.finishLocationChange()">
+                <i class="fas fa-check"></i> Done
+            </button>
+        `;
+
+        // Add to map container
+        const mapContainer = document.getElementById('map');
+        if (mapContainer) {
+            mapContainer.appendChild(banner);
         }
     }
 
-    async savePlaceRename() {
-        const modal = document.getElementById('renamePlaceModal');
-        const nameInput = document.getElementById('placeName');
+    finishLocationChange() {
+        // Remove instruction banner
+        const banner = document.getElementById('locationChangeBanner');
+        if (banner) {
+            banner.remove();
+        }
 
-        if (!modal || !nameInput) return;
+        // Show modal again by removing the class from modal itself
+        const modal = document.getElementById('editPlaceModal');
+        if (modal) {
+            modal.classList.remove('location-change-mode');
+        }
+
+        // Show sidebar again
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('location-change-hidden');
+
+        // Disable coordinate selection mode
+        this.disableMapCoordinateSelection();
+    }
+
+    enableMapCoordinateSelection() {
+        // Set flag that we're in coordinate selection mode
+        if (window.app && window.app.mapService) {
+            window.app.mapService.setCoordinateSelectionMode(true, (lat, lng) => {
+                // Update coordinate inputs when map is clicked
+                const latInput = document.getElementById('placeLatitude');
+                const lngInput = document.getElementById('placeLongitude');
+
+                if (latInput && lngInput) {
+                    latInput.value = lat.toFixed(6);
+                    lngInput.value = lng.toFixed(6);
+
+                    // Visual feedback
+                    latInput.classList.add('coords-updated');
+                    lngInput.classList.add('coords-updated');
+
+                    setTimeout(() => {
+                        latInput.classList.remove('coords-updated');
+                        lngInput.classList.remove('coords-updated');
+                    }, 1000);
+                }
+            });
+        }
+    }
+
+    disableMapCoordinateSelection() {
+        if (window.app && window.app.mapService) {
+            window.app.mapService.setCoordinateSelectionMode(false);
+        }
+    }
+
+    async loadCategoriesAndCountries(placeId) {
+        try {
+            // Fetch all categories and countries
+            const [allCategories, allCountries, placeCategories, placeCountries] = await Promise.all([
+                ApiService.getAllCategories(),
+                ApiService.getAllCountries(),
+                ApiService.getPlaceCategories(placeId),
+                ApiService.getPlaceCountries(placeId)
+            ]);
+
+            // Get selected IDs
+            const selectedCategoryIds = placeCategories.map(c => c.id);
+            const selectedCountryIds = placeCountries.map(c => c.id);
+
+            // Render categories
+            const categoriesContainer = document.getElementById('categoriesContainer');
+            if (categoriesContainer) {
+                categoriesContainer.innerHTML = allCategories.map(cat => `
+                    <label class="checkbox-item">
+                        <input
+                            type="checkbox"
+                            class="category-checkbox"
+                            data-id="${cat.id}"
+                            ${selectedCategoryIds.includes(cat.id) ? 'checked' : ''}
+                        >
+                        <span class="checkbox-icon">${cat.icon || '📍'}</span>
+                        <span class="checkbox-label">${cat.name}</span>
+                    </label>
+                `).join('');
+            }
+
+            // Render countries
+            const countriesContainer = document.getElementById('countriesContainer');
+            if (countriesContainer) {
+                countriesContainer.innerHTML = allCountries.map(country => `
+                    <label class="checkbox-item">
+                        <input
+                            type="checkbox"
+                            class="country-checkbox"
+                            data-id="${country.id}"
+                            ${selectedCountryIds.includes(country.id) ? 'checked' : ''}
+                        >
+                        <span class="checkbox-icon">${country.icon || '🌍'}</span>
+                        <span class="checkbox-label">${country.name}</span>
+                    </label>
+                `).join('');
+            }
+
+        } catch (error) {
+            console.error('Failed to load categories and countries:', error);
+            showError('Failed to load categories and countries');
+        }
+    }
+
+    closePlaceModal() {
+        const modal = document.getElementById('editPlaceModal');
+        if (modal) {
+            modal.classList.remove('active');
+            // Remove location change mode if active
+            modal.classList.remove('location-change-mode');
+        }
+
+        // Show sidebar again if it was hidden
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) sidebar.classList.remove('location-change-hidden');
+
+        // Remove location change banner if exists
+        const banner = document.getElementById('locationChangeBanner');
+        if (banner) {
+            banner.remove();
+        }
+
+        // Disable map coordinate selection
+        this.disableMapCoordinateSelection();
+    }
+
+    async savePlaceEdit() {
+        const modal = document.getElementById('editPlaceModal');
+        const nameInput = document.getElementById('placeName');
+        const latInput = document.getElementById('placeLatitude');
+        const lngInput = document.getElementById('placeLongitude');
+
+        if (!modal || !nameInput || !latInput || !lngInput) return;
 
         const index = parseInt(modal.dataset.placeIndex);
+        const placeId = parseInt(modal.dataset.placeId);
         const newName = nameInput.value.trim();
+        const newLat = parseFloat(latInput.value);
+        const newLng = parseFloat(lngInput.value);
 
+        // Validation
         if (!newName) {
             showError('Please enter a name');
             return;
         }
 
-        const success = await this.renamePlace(index, newName);
+        if (isNaN(newLat) || newLat < -90 || newLat > 90) {
+            showError('Latitude must be between -90 and 90');
+            return;
+        }
 
-        if (success) {
+        if (isNaN(newLng) || newLng < -180 || newLng > 180) {
+            showError('Longitude must be between -180 and 180');
+            return;
+        }
+
+        try {
+            // Update place name and coordinates
+            await ApiService.updatePlace(placeId, newName, newLat, newLng);
+
+            // Get selected categories and countries
+            const selectedCategories = Array.from(document.querySelectorAll('.category-checkbox:checked'))
+                .map(cb => parseInt(cb.dataset.id));
+            const selectedCountries = Array.from(document.querySelectorAll('.country-checkbox:checked'))
+                .map(cb => parseInt(cb.dataset.id));
+
+            // Get current categories and countries
+            const currentCategories = await ApiService.getPlaceCategories(placeId);
+            const currentCountries = await ApiService.getPlaceCountries(placeId);
+
+            const currentCategoryIds = currentCategories.map(c => c.id);
+            const currentCountryIds = currentCountries.map(c => c.id);
+
+            // Update categories
+            const categoriesToAdd = selectedCategories.filter(id => !currentCategoryIds.includes(id));
+            const categoriesToRemove = currentCategoryIds.filter(id => !selectedCategories.includes(id));
+
+            for (const catId of categoriesToAdd) {
+                await ApiService.assignCategoryToPlace(placeId, catId);
+            }
+            for (const catId of categoriesToRemove) {
+                await ApiService.removeCategoryFromPlace(placeId, catId);
+            }
+
+            // Update countries
+            const countriesToAdd = selectedCountries.filter(id => !currentCountryIds.includes(id));
+            const countriesToRemove = currentCountryIds.filter(id => !selectedCountries.includes(id));
+
+            for (const countryId of countriesToAdd) {
+                await ApiService.assignCountryToPlace(placeId, countryId);
+            }
+            for (const countryId of countriesToRemove) {
+                await ApiService.removeCountryFromPlace(placeId, countryId);
+            }
+
+            // Reload route and update UI
+            this.places = await this.routeManager.loadCurrentRoute();
+            await this.routeManager.loadRoutes();
+
+            showSuccess(`Updated "${newName}"`);
             this.closePlaceModal();
+
             if (this.onUpdate) {
                 this.onUpdate();
             }
+
+            // Silently refresh filter data without triggering map zoom
+            if (window.filterManager) {
+                await window.filterManager.refreshPlacesData();
+            }
+
+        } catch (error) {
+            console.error('Failed to update place:', error);
+            showError('Failed to update place');
         }
     }
 

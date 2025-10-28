@@ -292,7 +292,7 @@ export class FilterManager {
     }
 
     /**
-     * Refresh all places from API
+     * Refresh all places from API and apply filters (triggers map update)
      */
     async refreshPlaces() {
         try {
@@ -300,6 +300,20 @@ export class FilterManager {
             this.applyFilters();
         } catch (error) {
             console.error('Failed to refresh places:', error);
+        }
+    }
+
+    /**
+     * Refresh places data silently without applying filters (no map update)
+     * Use this when you just want to update the data without changing the map view
+     */
+    async refreshPlacesData() {
+        try {
+            this.allPlaces = await ApiService.getAllPlaces();
+            // Only update filter counts, don't trigger map update
+            this.updateFilterCounts();
+        } catch (error) {
+            console.error('Failed to refresh places data:', error);
         }
     }
 }
