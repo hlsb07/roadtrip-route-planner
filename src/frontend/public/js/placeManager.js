@@ -138,9 +138,16 @@ export class PlaceManager {
             modal.classList.add('location-change-mode');
         }
 
-        // Hide sidebar for better map focus
+        // Hide sidebar for better map focus (desktop)
         const sidebar = document.getElementById('sidebar');
         if (sidebar) sidebar.classList.add('location-change-hidden');
+
+        // Hide mobile navigation and panel for better map focus
+        const mobileNav = document.getElementById('mobileNav');
+        if (mobileNav) mobileNav.classList.add('location-change-hidden');
+
+        const mobilePanel = document.getElementById('mobilePanel');
+        if (mobilePanel) mobilePanel.classList.add('location-change-hidden');
 
         // Enable map coordinate selection
         this.enableMapCoordinateSelection();
@@ -190,9 +197,16 @@ export class PlaceManager {
             modal.classList.remove('location-change-mode');
         }
 
-        // Show sidebar again
+        // Show sidebar again (desktop)
         const sidebar = document.getElementById('sidebar');
         if (sidebar) sidebar.classList.remove('location-change-hidden');
+
+        // Show mobile navigation and panel again
+        const mobileNav = document.getElementById('mobileNav');
+        if (mobileNav) mobileNav.classList.remove('location-change-hidden');
+
+        const mobilePanel = document.getElementById('mobilePanel');
+        if (mobilePanel) mobilePanel.classList.remove('location-change-hidden');
 
         // Disable coordinate selection mode
         this.disableMapCoordinateSelection();
@@ -291,9 +305,16 @@ export class PlaceManager {
             modal.classList.remove('location-change-mode');
         }
 
-        // Show sidebar again if it was hidden
+        // Show sidebar again if it was hidden (desktop)
         const sidebar = document.getElementById('sidebar');
         if (sidebar) sidebar.classList.remove('location-change-hidden');
+
+        // Show mobile navigation and panel again if they were hidden
+        const mobileNav = document.getElementById('mobileNav');
+        if (mobileNav) mobileNav.classList.remove('location-change-hidden');
+
+        const mobilePanel = document.getElementById('mobilePanel');
+        if (mobilePanel) mobilePanel.classList.remove('location-change-hidden');
 
         // Remove location change banner if exists
         const banner = document.getElementById('locationChangeBanner');

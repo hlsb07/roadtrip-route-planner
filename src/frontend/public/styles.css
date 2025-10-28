@@ -809,11 +809,11 @@ textarea.form-input {
 }
 
 .mobile-content-panel.active {
-    max-height: 30vh;
+    max-height: 35vh;
 }
 
 .mobile-content-panel.expanded {
-    max-height: 85vh;
+    max-height: 80vh;
 }
 
 .mobile-panel-header {
@@ -864,12 +864,13 @@ textarea.form-input {
 
 .mobile-panel-content {
     overflow-y: auto;
-    max-height: calc(70vh - 40px);
+    max-height: calc(35vh - 56px); /* 35vh panel - 56px header (12px*2 padding + 8px margin-top + 24px title height) */
     background: #fafafa;
+    position: relative;
 }
 
 .mobile-content-panel.expanded .mobile-panel-content {
-    max-height: calc(85vh - 40px);
+    max-height: calc(80vh - 56px); /* 80vh panel - 56px header */
 }
 
 /* Mobile panel content styles */
@@ -880,13 +881,30 @@ textarea.form-input {
     border: none;
 }
 
-.mobile-content-panel .places-list {
+.mobile-content-panel .places-list,
+.mobile-content-panel .filters-container,
+.mobile-content-panel .campsites-list,
+.mobile-content-panel .mobile-section {
     background: #fafafa;
     padding: 10px;
+    padding-bottom: 20px; /* Extra padding at bottom to ensure last item is scrollable */
+    height: auto !important; /* Override inline height: 100% */
+    overflow-y: visible !important; /* Let parent handle scrolling */
+    min-height: 0; /* Allow content to determine height */
 }
 
 .mobile-content-panel .place-item {
     margin-bottom: 8px;
+}
+
+.mobile-content-panel .campsite-item {
+    margin-bottom: 8px;
+}
+
+/* Ensure last item in lists has enough bottom margin */
+.mobile-content-panel .place-item:last-child,
+.mobile-content-panel .campsite-item:last-child {
+    margin-bottom: 20px;
 }
 
 .mobile-content-panel .search-results {
@@ -961,7 +979,15 @@ textarea.form-input {
         max-height: 40vh;
     }
     .mobile-content-panel.expanded {
-        max-height: 85vh;
+        max-height: 80vh;
+    }
+
+    .mobile-panel-content {
+        max-height: calc(40vh - 56px);
+    }
+
+    .mobile-content-panel.expanded .mobile-panel-content {
+        max-height: calc(80vh - 56px);
     }
 
     /* Map controls repositioned */
@@ -1003,7 +1029,15 @@ textarea.form-input {
     }
 
     .mobile-content-panel.expanded {
-        max-height: 85vh;
+        max-height: 80vh;
+    }
+
+    .mobile-panel-content {
+        max-height: calc(40vh - 56px);
+    }
+
+    .mobile-content-panel.expanded .mobile-panel-content {
+        max-height: calc(80vh - 56px);
     }
 
     .map-btn {
@@ -1035,6 +1069,14 @@ textarea.form-input {
 
     .mobile-content-panel.expanded {
         max-height: 75vh;
+    }
+
+    .mobile-panel-content {
+        max-height: calc(60vh - 56px);
+    }
+
+    .mobile-content-panel.expanded .mobile-panel-content {
+        max-height: calc(75vh - 56px);
     }
 }
 
@@ -2261,6 +2303,12 @@ textarea.form-input {
 
 /* Hide sidebar during location change for better map focus */
 #sidebar.location-change-hidden {
+    display: none !important;
+}
+
+/* Hide mobile navigation and panel during location change */
+.mobile-nav.location-change-hidden,
+.mobile-content-panel.location-change-hidden {
     display: none !important;
 }
 
