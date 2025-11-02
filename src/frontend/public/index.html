@@ -20,20 +20,20 @@
             <div class="desktop-nav">
                 <div class="desktop-nav-items">
                     <button class="desktop-nav-item active" data-mode="routes" onclick="switchDesktopMode('routes')">
-                        <i class="fas fa-map-marked-alt"></i>
+                        <i class="fas fa-route"></i>
                         <span>Routes</span>
                     </button>
-                    <button class="desktop-nav-item" data-mode="filters" onclick="switchDesktopMode('filters')">
-                        <i class="fas fa-filter"></i>
-                        <span>Filters</span>
-                    </button>
                     <button class="desktop-nav-item" data-mode="search" onclick="switchDesktopMode('search')">
-                        <i class="fas fa-search"></i>
-                        <span>Add Place</span>
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Save Place</span>
                     </button>
                     <button class="desktop-nav-item" data-mode="places" onclick="switchDesktopMode('places')">
                         <i class="fas fa-list"></i>
-                        <span>Place List</span>
+                        <span>Route Places</span>
+                    </button>
+                    <button class="desktop-nav-item" data-mode="allplaces" onclick="switchDesktopMode('allplaces')">
+                        <i class="fas fa-database"></i>
+                        <span>All Places</span>
                     </button>
                     <button class="desktop-nav-item" data-mode="campsites" onclick="switchDesktopMode('campsites')">
                         <i class="fas fa-campground"></i>
@@ -112,6 +112,20 @@
             
             <div class="places-list" id="placesList"></div>
 
+            <div class="all-places-section" id="allPlacesSection" style="display: none;">
+                <div class="all-places-header">
+                    <h3><i class="fas fa-database"></i> All Places</h3>
+                    <span class="all-places-count" id="allPlacesCount">0 places</span>
+                </div>
+                <div class="all-places-search">
+                    <input type="text" id="allPlacesSearch" class="search-input" placeholder="Search all places...">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <div class="all-places-list" id="allPlacesList">
+                    <!-- All places will be populated here -->
+                </div>
+            </div>
+
             <div class="campsites-list" id="campsitesList"></div>
 
             <div class="filters-container" id="desktopFilters"></div>
@@ -120,6 +134,9 @@
         <div id="map"></div>
         
         <div class="map-controls">
+            <button class="map-btn" id="filterMapBtn" onclick="toggleFilterPanel()" title="Filters">
+                <i class="fas fa-filter"></i>
+            </button>
             <button class="map-btn" onclick="centerMap()" title="Center map">
                 <i class="fas fa-compress-arrows-alt"></i>
             </button>
@@ -131,28 +148,47 @@
             </button>
         </div>
 
+        <!-- Filter Panel Overlay (appears over map) -->
+        <div id="filterPanelOverlay" class="filter-panel-overlay" style="display: none;">
+            <div class="filter-panel-content">
+                <div class="filter-panel-header">
+                    <h3><i class="fas fa-filter"></i> Filters</h3>
+                    <button class="btn-close" onclick="toggleFilterPanel()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="filterPanelBody" class="filter-panel-body">
+                    <!-- Filter content will be populated here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Mobile Navigation -->
         <div class="mobile-nav" id="mobileNav">
             <div class="mobile-nav-items">
                 <button class="mobile-nav-item active" data-mode="routes" onclick="switchMobileMode('routes')">
-                    <i class="fas fa-map-marked-alt"></i>
+                    <i class="fas fa-route"></i>
                     <span>Routes</span>
                 </button>
-                <button class="mobile-nav-item" data-mode="filters" onclick="switchMobileMode('filters')">
-                    <i class="fas fa-filter"></i>
-                    <span>Filters</span>
-                </button>
                 <button class="mobile-nav-item" data-mode="search" onclick="switchMobileMode('search')">
-                    <i class="fas fa-search"></i>
-                    <span>Add Place</span>
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Save</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="places" onclick="switchMobileMode('places')">
                     <i class="fas fa-list"></i>
-                    <span>Place List</span>
+                    <span>Route</span>
+                </button>
+                <button class="mobile-nav-item" data-mode="allplaces" onclick="switchMobileMode('allplaces')">
+                    <i class="fas fa-database"></i>
+                    <span>All</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="campsites" onclick="switchMobileMode('campsites')">
                     <i class="fas fa-campground"></i>
-                    <span>Campsites</span>
+                    <span>Camp</span>
+                </button>
+                <button class="mobile-nav-item" data-mode="controls" onclick="switchMobileMode('controls')">
+                    <i class="fas fa-cog"></i>
+                    <span>Tools</span>
                 </button>
             </div>
         </div>
@@ -222,9 +258,19 @@
                     <!-- Places will be populated by placeManager.updatePlacesList() -->
                 </div>
 
-                <!-- Filters Section -->
-                <div class="mobile-section filters-container" data-section="filters" id="mobileFilters" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
-                    <!-- Filters will be populated here -->
+                <!-- All Places Section -->
+                <div class="mobile-section all-places-section" data-section="allplaces" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <div class="all-places-header">
+                        <h3><i class="fas fa-database"></i> All Places</h3>
+                        <span class="all-places-count" id="mobileAllPlacesCount">0 places</span>
+                    </div>
+                    <div class="all-places-search">
+                        <input type="text" id="mobileAllPlacesSearch" class="search-input" placeholder="Search all places...">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                    <div class="all-places-list" id="mobileAllPlacesList">
+                        <!-- All places will be populated here -->
+                    </div>
                 </div>
 
                 <!-- Campsites List Section -->
@@ -306,6 +352,11 @@
                     <i class="fas fa-map-marker-alt"></i> Change Location on Map
                 </button>
 
+                <!-- Remove from Route Button (conditional - only shows if place is in current route) -->
+                <button type="button" id="removeFromRouteBtn" class="btn-remove-from-route" style="display: none;" onclick="placeManager.removeFromCurrentRoute()">
+                    <i class="fas fa-minus-circle"></i> Remove from Current Route
+                </button>
+
                 <!-- Categories -->
                 <div class="form-group">
                     <label><i class="fas fa-tag"></i> Categories:</label>
@@ -352,6 +403,34 @@
         <div class="modal-overlay" onclick="closeAddPlacePositionModal()"></div>
     </div>
 
+    <div id="placeAddedSuccessModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-circle" style="color: #2A9D8F;"></i> Place Saved</h3>
+                <button class="btn-close" onclick="closePlaceAddedSuccessModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-instruction">
+                    "<span id="savedPlaceName"></span>" has been saved to your place library.
+                </p>
+                <p class="modal-sub-instruction">
+                    Would you like to add it to your current route?
+                </p>
+                <div class="modal-action-buttons">
+                    <button class="btn btn-primary btn-block" onclick="addSavedPlaceToRoute()">
+                        <i class="fas fa-plus"></i> Insert at Position...
+                    </button>
+                    <button class="btn btn-secondary btn-block" onclick="closePlaceAddedSuccessModal()">
+                        <i class="fas fa-times"></i> Don't Add to Route
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closePlaceAddedSuccessModal()"></div>
+    </div>
+
     <input type="file" id="importFile" style="display: none;" accept=".json">
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -374,6 +453,7 @@
             const searchSection = document.querySelector('.search-section');
             const controls = document.querySelector('.controls');
             const placesList = document.querySelector('.places-list');
+            const allPlacesSection = document.getElementById('allPlacesSection');
             const campsitesList = document.querySelector('.campsites-list');
 
             // Hide all sections first
@@ -381,26 +461,22 @@
             if (searchSection) searchSection.style.display = 'none';
             if (controls) controls.style.display = 'none';
             if (placesList) placesList.style.display = 'none';
+            if (allPlacesSection) allPlacesSection.style.display = 'none';
             if (campsitesList) campsitesList.style.display = 'none';
-
-            // Get filters container
-            const filtersContainer = document.getElementById('desktopFilters');
-            if (filtersContainer) filtersContainer.style.display = 'none';
 
             // Show the selected section
             switch(mode) {
                 case 'routes':
                     if (routeMgmt) routeMgmt.style.display = 'block';
-                    if (placesList) placesList.style.display = 'block';
-                    break;
-                case 'filters':
-                    if (filtersContainer) filtersContainer.style.display = 'block';
                     break;
                 case 'search':
                     if (searchSection) searchSection.style.display = 'block';
                     break;
                 case 'places':
                     if (placesList) placesList.style.display = 'block';
+                    break;
+                case 'allplaces':
+                    if (allPlacesSection) allPlacesSection.style.display = 'block';
                     break;
                 case 'campsites':
                     if (campsitesList) campsitesList.style.display = 'block';
@@ -432,10 +508,10 @@
 
             // Set title and show appropriate section
             const modes = {
-                routes: 'Route Selection',
-                filters: 'Filters',
-                search: 'Add Place',
-                places: 'Place List',
+                routes: 'Route Management',
+                search: 'Save Place',
+                places: 'Route Places',
+                allplaces: 'All Places',
                 campsites: 'Campsites',
                 controls: 'Tools'
             };
@@ -517,6 +593,33 @@
                         expandBtn.className = 'fas fa-chevron-up';
                     }
                 }
+            }
+        });
+
+        // Toggle filter panel overlay
+        window.toggleFilterPanel = function() {
+            const overlay = document.getElementById('filterPanelOverlay');
+            const filterBtn = document.getElementById('filterMapBtn');
+
+            if (overlay.style.display === 'none' || overlay.style.display === '') {
+                overlay.style.display = 'flex';
+                if (filterBtn) filterBtn.classList.add('active');
+
+                // Populate filter panel
+                if (window.filterManager) {
+                    window.filterManager.renderFilters();
+                }
+            } else {
+                overlay.style.display = 'none';
+                if (filterBtn) filterBtn.classList.remove('active');
+            }
+        };
+
+        // Close filter panel when clicking overlay background
+        document.addEventListener('click', (e) => {
+            const overlay = document.getElementById('filterPanelOverlay');
+            if (e.target === overlay) {
+                toggleFilterPanel();
             }
         });
     </script>

@@ -11,17 +11,12 @@ export class PlaceManager {
         this.sortingEnabled = false; // Track if sorting mode is active
     }
 
-    async addPlace(place) {
-        const currentRouteId = this.routeManager.getCurrentRouteId();
-        if (!currentRouteId) {
-            showError('No route selected. Create a route first.');
-            return false;
-        }
-        
+    async addPlace(place, addToRoute = false) {
         try {
-            // 1. Create place in Places table (if not already exists)
+            // 1. Create/save place in Places table (if not already exists)
             let placeId = place.id;
-            
+            let placeName = place.name;
+
             if (!placeId) {
                 const newPlace = await ApiService.createPlace(
                     place.name,
@@ -29,22 +24,35 @@ export class PlaceManager {
                     place.coords[1]
                 );
                 placeId = newPlace.id;
+                placeName = newPlace.name;
             }
-            
-            // 2. Add place to current route
-            await ApiService.addPlaceToRoute(currentRouteId, placeId);
-            
-            // 3. Reload current route and update UI
-            this.places = await this.routeManager.loadCurrentRoute();
-            await this.routeManager.loadRoutes(); // For place count update
-            
-            showSuccess(`Added "${place.name}" to route!`);
-            return true;
-            
+
+            // 2. If addToRoute is true, add place to current route
+            if (addToRoute) {
+                const currentRouteId = this.routeManager.getCurrentRouteId();
+                if (!currentRouteId) {
+                    showError('No route selected. Create a route first.');
+                    return { success: false };
+                }
+
+                await ApiService.addPlaceToRoute(currentRouteId, placeId);
+
+                // Reload current route and update UI
+                this.places = await this.routeManager.loadCurrentRoute();
+                await this.routeManager.loadRoutes(); // For place count update
+
+                showSuccess(`Added "${placeName}" to route!`);
+            } else {
+                // Just saved to database, show success modal
+                this.showPlaceAddedSuccessModal(placeId, placeName);
+            }
+
+            return { success: true, placeId, placeName };
+
         } catch (error) {
             console.error('Failed to add place:', error);
-            showError(error.message || 'Failed to add place to route');
-            return false;
+            showError(error.message || 'Failed to save place');
+            return { success: false };
         }
     }
 
@@ -110,6 +118,7 @@ export class PlaceManager {
         const nameInput = document.getElementById('placeName');
         const latInput = document.getElementById('placeLatitude');
         const lngInput = document.getElementById('placeLongitude');
+        const removeFromRouteBtn = document.getElementById('removeFromRouteBtn');
 
         if (!modal || !nameInput || !latInput || !lngInput) return;
 
@@ -121,6 +130,18 @@ export class PlaceManager {
         // Store the index and placeId for saving
         modal.dataset.placeIndex = index;
         modal.dataset.placeId = place.id;
+
+        // Show/hide "Remove from Route" button based on whether place is in current route
+        const currentRouteId = this.routeManager.getCurrentRouteId();
+        const isInCurrentRoute = this.places.some(p => p.id === place.id);
+
+        if (removeFromRouteBtn) {
+            if (currentRouteId && isInCurrentRoute) {
+                removeFromRouteBtn.style.display = 'block';
+            } else {
+                removeFromRouteBtn.style.display = 'none';
+            }
+        }
 
         // Load categories and countries
         await this.loadCategoriesAndCountries(place.id);
@@ -866,6 +887,109 @@ export class PlaceManager {
             console.error('Failed to add place to route:', error);
             showError(error.message || 'Failed to add place to route');
             return false;
+        }
+    }
+
+    /**
+     * Show "Place Added Successfully" modal after saving a place
+     */
+    showPlaceAddedSuccessModal(placeId, placeName) {
+        const modal = document.getElementById('placeAddedSuccessModal');
+        const placeNameSpan = document.getElementById('savedPlaceName');
+
+        if (!modal || !placeNameSpan) return;
+
+        // Set place name and ID
+        placeNameSpan.textContent = placeName;
+        modal.dataset.placeId = placeId;
+        modal.dataset.placeName = placeName;
+
+        // Show modal
+        modal.classList.add('active');
+    }
+
+    /**
+     * Close "Place Added Successfully" modal
+     */
+    closePlaceAddedSuccessModal() {
+        const modal = document.getElementById('placeAddedSuccessModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    /**
+     * Add saved place to route (called from success modal)
+     */
+    addSavedPlaceToRoute() {
+        const modal = document.getElementById('placeAddedSuccessModal');
+        if (!modal) return;
+
+        const placeId = parseInt(modal.dataset.placeId);
+        const placeName = modal.dataset.placeName;
+
+        // Close success modal
+        this.closePlaceAddedSuccessModal();
+
+        // Show position selector modal
+        this.showAddPlacePositionModal(placeId, placeName);
+    }
+
+    /**
+     * Remove place from current route (but keep in database)
+     */
+    async removeFromCurrentRoute() {
+        const modal = document.getElementById('editPlaceModal');
+        if (!modal) return;
+
+        const placeId = parseInt(modal.dataset.placeId);
+        const index = parseInt(modal.dataset.placeIndex);
+
+        if (!this.places[index]) return;
+
+        const place = this.places[index];
+        const currentRouteId = this.routeManager.getCurrentRouteId();
+
+        if (!currentRouteId) {
+            showError('No route selected');
+            return;
+        }
+
+        if (!confirm(`Remove "${place.name}" from this route?\n\nThe place will remain in your saved places.`)) {
+            return;
+        }
+
+        try {
+            // Remove from RoutePlace junction (not from Places table)
+            await ApiService.removePlaceFromRoute(currentRouteId, placeId);
+
+            // Reload route
+            this.places = await this.routeManager.loadCurrentRoute();
+            await this.routeManager.loadRoutes(); // For place count update
+
+            showSuccess(`Removed "${place.name}" from route`);
+
+            // Close modal
+            this.closePlaceModal();
+
+            // Update UI
+            if (this.onUpdate) {
+                this.onUpdate();
+            }
+
+            // Refresh filter data so it appears in All Places
+            if (window.filterManager) {
+                await window.filterManager.refreshPlaces(this.places);
+            }
+
+            // Update All Places list if available
+            if (window.allPlacesManager) {
+                window.allPlacesManager.updateAllPlacesList();
+            }
+
+        } catch (error) {
+            console.error('Failed to remove place from route:', error);
+            showError('Failed to remove place from route');
         }
     }
 }

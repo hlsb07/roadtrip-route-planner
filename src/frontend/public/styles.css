@@ -2764,3 +2764,359 @@ textarea.form-input {
         height: 20px;
     }
 }
+
+/* ============================================
+   FILTER PANEL OVERLAY (ON MAP)
+   ============================================ */
+
+.filter-panel-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    padding: 20px;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+}
+
+.filter-panel-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    max-width: 400px;
+    width: 100%;
+    max-height: calc(100vh - 40px);
+    display: flex;
+    flex-direction: column;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.filter-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.filter-panel-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #2A9D8F;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.map-btn.active {
+    background: #2A9D8F;
+    color: white;
+}
+
+/* Mobile filter panel overlay */
+@media (max-width: 768px) {
+    .filter-panel-overlay {
+        padding: 10px;
+    }
+
+    .filter-panel-content {
+        max-width: 100%;
+        max-height: calc(100vh - 20px);
+    }
+
+    .filter-panel-header {
+        padding: 15px;
+    }
+
+    .filter-panel-body {
+        padding: 15px;
+    }
+}
+
+/* ============================================
+   ALL PLACES SECTION
+   ============================================ */
+
+.all-places-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 15px;
+    height: 100%;
+    max-height: calc(100vh - 200px);
+}
+
+.all-places-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.all-places-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #2A9D8F;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.all-places-count {
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.all-places-search {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.all-places-search .search-input {
+    width: 100%;
+    padding: 12px 40px 12px 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 0.95rem;
+}
+
+.all-places-search .search-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #999;
+    pointer-events: none;
+}
+
+.all-places-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* All Place Card */
+.all-place-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.all-place-card:hover {
+    border-color: #2A9D8F;
+    box-shadow: 0 2px 8px rgba(42, 157, 143, 0.1);
+    background: #f0fdf8;
+}
+
+.all-place-card-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f0fdf8;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.all-place-card-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.all-place-card-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.all-place-card-tags {
+    font-size: 0.85rem;
+    color: #6c757d;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.all-place-card-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.all-place-btn {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.all-place-btn.add-btn {
+    background: #2A9D8F;
+    color: white;
+}
+
+.all-place-btn.add-btn:hover {
+    background: #248075;
+}
+
+.all-place-btn.edit-btn {
+    background: #667eea;
+    color: white;
+}
+
+.all-place-btn.edit-btn:hover {
+    background: #5568d3;
+}
+
+.all-place-btn.delete-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.all-place-btn.delete-btn:hover {
+    background: #c82333;
+}
+
+/* Empty state */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: #6c757d;
+}
+
+.empty-state p {
+    margin: 10px 0 0 0;
+    font-size: 1rem;
+}
+
+/* ============================================
+   PLACE ADDED SUCCESS MODAL
+   ============================================ */
+
+.modal-sub-instruction {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+
+.modal-action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.btn-block {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ============================================
+   REMOVE FROM ROUTE BUTTON
+   ============================================ */
+
+.btn-remove-from-route {
+    width: 100%;
+    padding: 12px 18px;
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    color: #856404;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.btn-remove-from-route:hover {
+    background: #ffc107;
+    color: white;
+    border-color: #ffc107;
+}
+
+.btn-remove-from-route i {
+    font-size: 1.1rem;
+}
+
+/* ============================================
+   MOBILE RESPONSIVENESS
+   ============================================ */
+
+@media (max-width: 768px) {
+    .all-place-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .all-place-card-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .all-place-btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    /* Smaller button text on mobile */
+    .all-place-btn span {
+        display: none;
+    }
+
+    .all-place-btn i {
+        margin: 0;
+    }
+}

@@ -4,6 +4,7 @@ import { SearchManager } from './searchManager.js';
 import { PlaceManager } from './placeManager.js';
 import { CampsiteManager } from './campsiteManager.js';
 import { FilterManager } from './filterManager.js';
+import { AllPlacesManager } from './allPlacesManager.js';
 import { showError, showSuccess } from './utils.js';
 import { CONFIG } from './config.js';
 
@@ -15,8 +16,9 @@ class App {
         this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
         this.filterManager = new FilterManager();
+        this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
 
-        // Set callback for search result selection
+        // Set callback for search result selection (save to database, don't add to route)
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
 
         // Set callback for filter changes
@@ -61,6 +63,9 @@ class App {
 
             // Initialize filters
             await this.filterManager.init();
+
+            // Initialize All Places Manager
+            this.allPlacesManager.updateAllPlacesList();
 
         } catch (error) {
             console.error('Failed to initialize app:', error);
@@ -165,8 +170,16 @@ class App {
     }
 
     async addPlace(place) {
-        const success = await this.placeManager.addPlace(place);
-        if (success) {
+        // Save place to database (don't add to route yet)
+        const result = await this.placeManager.addPlace(place, false);
+        if (result.success) {
+            // Refresh filter data to include new place
+            await this.filterManager.refreshPlaces(this.placeManager.getPlaces());
+
+            // Update all places list
+            this.allPlacesManager.updateAllPlacesList();
+
+            // Update UI
             this.updateUI();
         }
     }
@@ -283,6 +296,9 @@ class App {
     // UI Updates
     updateUI() {
         this.placeManager.updatePlacesList();
+
+        // Update All Places list
+        this.allPlacesManager.updateAllPlacesList();
 
         // Get current route places
         const routePlaces = this.placeManager.getPlaces();
@@ -461,12 +477,16 @@ window.clearRoute = () => window.app?.clearRoute();
 window.closePlaceModal = () => window.app?.placeManager?.closePlaceModal();
 window.savePlaceEdit = () => window.app?.placeManager?.savePlaceEdit();
 window.closeAddPlacePositionModal = () => window.app?.placeManager?.closeAddPlacePositionModal();
+window.closePlaceAddedSuccessModal = () => window.app?.placeManager?.closePlaceAddedSuccessModal();
+window.addSavedPlaceToRoute = () => window.app?.placeManager?.addSavedPlaceToRoute();
 
 // Global access for managers
 window.placeManager = null; // Will be set by app
 window.routeManager = null; // Will be set by app
 window.campsiteManager = null; // Will be set by app
 window.filterManager = null; // Will be set by app
+window.allPlacesManager = null; // Will be set by app
+window.CONFIG = CONFIG; // Make CONFIG available globally
 
 // Set global references after app initialization
 window.addEventListener('load', () => {
@@ -476,6 +496,7 @@ window.addEventListener('load', () => {
             window.routeManager = window.app.routeManager;
             window.campsiteManager = window.app.campsiteManager;
             window.filterManager = window.app.filterManager;
+            window.allPlacesManager = window.app.allPlacesManager;
         }
     }, 100);
 });

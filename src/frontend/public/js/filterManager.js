@@ -62,6 +62,13 @@ export class FilterManager {
             mobileFilterContainer.innerHTML = this.generateFilterHTML();
             this.attachFilterEventListeners(mobileFilterContainer);
         }
+
+        // Render filter panel body (for map overlay)
+        const filterPanelBody = document.getElementById('filterPanelBody');
+        if (filterPanelBody && filterPanelBody.children.length === 0) {
+            filterPanelBody.innerHTML = this.generateFilterHTML();
+            this.attachFilterEventListeners(filterPanelBody);
+        }
     }
 
     /**
