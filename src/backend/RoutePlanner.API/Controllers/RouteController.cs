@@ -58,12 +58,11 @@ namespace RoutePlanner.API.Controllers
                 PlaceCount = route.Places.Count,
                 Places = route.Places
                     .OrderBy(rp => rp.OrderIndex)
-                    .Select(rp => new PlaceDto
+                    .Select(rp => new MinimalPlaceDto
                     {
                         Id = rp.Place.Id,
                         Name = rp.Place.Name,
-                        Latitude = rp.Place.Location.Y,  // PostGIS: Y = Latitude
-                        Longitude = rp.Place.Location.X  // PostGIS: X = Longitude
+                        OrderIndex = rp.OrderIndex
                     })
                     .ToList()
             };

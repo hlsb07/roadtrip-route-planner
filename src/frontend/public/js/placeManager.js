@@ -416,20 +416,21 @@ export class PlaceManager {
                 await ApiService.removeCountryFromPlace(placeId, countryId);
             }
 
-            // Reload route and update UI
+            // Refresh filter data FIRST (fetch fresh data from API)
+            if (window.filterManager) {
+                await window.filterManager.refreshPlacesData();
+            }
+
+            // Then reload route (uses fresh filterManager.allPlaces)
             this.places = await this.routeManager.loadCurrentRoute();
             await this.routeManager.loadRoutes();
 
             showSuccess(`Updated "${newName}"`);
             this.closePlaceModal();
 
+            // Update UI to refresh map with new data
             if (this.onUpdate) {
                 this.onUpdate();
-            }
-
-            // Silently refresh filter data without triggering map zoom
-            if (window.filterManager) {
-                await window.filterManager.refreshPlacesData();
             }
 
         } catch (error) {

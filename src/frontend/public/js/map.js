@@ -132,6 +132,15 @@ export class MapService {
                 shadowSize: isSelected ? [50, 50] : [41, 41]
             });
 
+            // Create popup content with categories and countries
+            const categories = place.categories && place.categories.length > 0
+                ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+                : '';
+
+            const countries = place.countries && place.countries.length > 0
+                ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+                : '';
+
             const marker = L.marker(place.coords, { icon: customIcon })
                 .addTo(this.map)
                 .bindPopup(`
@@ -140,7 +149,17 @@ export class MapService {
                             <div class="place-number">${index + 1}</div>
                             <strong>${place.name}</strong>
                         </div>
+                        ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                        ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
                         <div class="map-popup-coords">Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</div>
+                        <div class="map-popup-actions">
+                            <button class="route-popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app?.placeManager?.showRenamePlaceModal(${index})" title="Edit place">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="route-popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})" title="Remove from route">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                         <div class="map-popup-links">
                             <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
                                target="_blank"
@@ -554,6 +573,15 @@ export class MapService {
                     shadowSize: isSelected ? [50, 50] : [41, 41]
                 });
 
+                // Create popup content with categories and countries
+                const categories = place.categories && place.categories.length > 0
+                    ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+                    : '';
+
+                const countries = place.countries && place.countries.length > 0
+                    ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+                    : '';
+
                 const marker = L.marker(place.coords, { icon: customIcon })
                     .addTo(this.map)
                     .bindPopup(`
@@ -562,7 +590,17 @@ export class MapService {
                                 <div class="place-number">${index + 1}</div>
                                 <strong>${place.name}</strong>
                             </div>
+                            ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                            ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
                             <div class="map-popup-coords">Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</div>
+                            <div class="map-popup-actions">
+                                <button class="route-popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app?.placeManager?.showRenamePlaceModal(${index})" title="Edit place">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="route-popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})" title="Remove from route">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                             <div class="map-popup-links">
                                 <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
                                    target="_blank"

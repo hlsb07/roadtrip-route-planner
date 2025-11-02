@@ -2609,6 +2609,52 @@ textarea.form-input {
     background: #c82333;
 }
 
+/* Route Place Popup Action Buttons (Icon-only, like place list) */
+.route-popup-action-btn {
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.route-popup-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.route-popup-action-btn:active {
+    transform: translateY(0);
+}
+
+.route-popup-action-btn.edit-btn {
+    color: #2A9D8F;
+    border-color: #2A9D8F;
+}
+
+.route-popup-action-btn.edit-btn:hover {
+    background: linear-gradient(135deg, #2A9D8F 0%, #3EBBA5 100%);
+    color: white;
+    border-color: #2A9D8F;
+}
+
+.route-popup-action-btn.delete-btn {
+    color: #e74c3c;
+    border-color: #e74c3c;
+}
+
+.route-popup-action-btn.delete-btn:hover {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    border-color: #e74c3c;
+}
+
 /* ============================================
    POSITION SELECTOR MODAL
    ============================================ */
@@ -2865,8 +2911,7 @@ textarea.form-input {
     flex-direction: column;
     overflow: hidden;
     padding: 15px;
-    height: 100%;
-    max-height: calc(100vh - 200px);
+    min-height: 0;
 }
 
 .all-places-header {
@@ -2915,6 +2960,7 @@ textarea.form-input {
 
 .all-places-list {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;

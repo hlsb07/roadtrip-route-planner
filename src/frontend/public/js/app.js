@@ -12,11 +12,11 @@ import { CONFIG } from './config.js';
 class App {
     constructor() {
         this.mapService = new MapService();
-        this.routeManager = new RouteManager();
+        this.filterManager = new FilterManager();  // Create filterManager first
+        this.routeManager = new RouteManager(this.filterManager);  // Pass filterManager
         this.searchManager = new SearchManager();
         this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
-        this.filterManager = new FilterManager();
         this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
         this.tagManager = new TagManager();
 
@@ -52,7 +52,10 @@ class App {
                 this.selectCampsite(index);
             });
 
-            // Load routes and first route
+            // Initialize filters FIRST (fetches all places with full data)
+            await this.filterManager.init();
+
+            // Load routes and first route (now can use filterManager.allPlaces)
             const places = await this.routeManager.loadRoutes();
             if (places && places.length > 0) {
                 this.placeManager.setPlaces(places);
@@ -62,9 +65,6 @@ class App {
             // Load campsites
             await this.campsiteManager.loadCampsites();
             this.updateCampsiteUI();
-
-            // Initialize filters
-            await this.filterManager.init();
 
             // Initialize All Places Manager
             this.allPlacesManager.updateAllPlacesList();

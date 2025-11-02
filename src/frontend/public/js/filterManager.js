@@ -301,7 +301,13 @@ export class FilterManager {
             checkbox.checked = false;
         });
 
-        this.applyFilters();
+        // Trigger full UI update through app to ensure proper route/non-route separation
+        if (window.app) {
+            window.app.updateUI();
+        } else {
+            this.applyFilters();
+        }
+
         this.renderFilters(); // Re-render to update counts and summary
     }
 
