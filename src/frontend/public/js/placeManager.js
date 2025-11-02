@@ -754,4 +754,118 @@ export class PlaceManager {
     deselectPlace() {
         this.selectedIndex = null;
     }
+
+    /**
+     * Show modal to select position for adding an existing place to route
+     */
+    showAddPlacePositionModal(placeId, placeName) {
+        const modal = document.getElementById('addPlacePositionModal');
+        const placeNameSpan = document.getElementById('placeToAddName');
+        const positionButtons = document.getElementById('positionButtons');
+
+        if (!modal || !placeNameSpan || !positionButtons) return;
+
+        // Set place name
+        placeNameSpan.textContent = placeName;
+
+        // Store placeId in modal dataset
+        modal.dataset.placeId = placeId;
+
+        // Generate position buttons based on current route length
+        const routeLength = this.places.length;
+        let buttonsHTML = '';
+
+        // Generate buttons for each position: [1], [2], [3], ..., [End]
+        for (let i = 1; i <= routeLength; i++) {
+            buttonsHTML += `
+                <button class="position-btn" onclick="placeManager.addExistingPlaceToRouteAtPosition(${placeId}, ${i - 1})">
+                    <i class="fas fa-arrow-down"></i>
+                    <span>Before ${i}. ${this.places[i - 1].name}</span>
+                </button>
+            `;
+        }
+
+        // Add "End" button
+        buttonsHTML += `
+            <button class="position-btn position-btn-end" onclick="placeManager.addExistingPlaceToRouteAtPosition(${placeId}, ${routeLength})">
+                <i class="fas fa-plus"></i>
+                <span>Add to End</span>
+            </button>
+        `;
+
+        positionButtons.innerHTML = buttonsHTML;
+
+        // Show modal
+        modal.classList.add('active');
+    }
+
+    /**
+     * Close the add place position modal
+     */
+    closeAddPlacePositionModal() {
+        const modal = document.getElementById('addPlacePositionModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    /**
+     * Add an existing place to the route at a specific position
+     * @param {number} placeId - The ID of the place to add
+     * @param {number} position - The position index (0-based) where to insert
+     */
+    async addExistingPlaceToRouteAtPosition(placeId, position) {
+        const currentRouteId = this.routeManager.getCurrentRouteId();
+        if (!currentRouteId) {
+            showError('No route selected. Create a route first.');
+            return false;
+        }
+
+        try {
+            // Add place to route (backend will handle position insertion)
+            await ApiService.addPlaceToRoute(currentRouteId, placeId);
+
+            // Reload current route to get updated order
+            this.places = await this.routeManager.loadCurrentRoute();
+
+            // If position is not at the end, reorder to put it at the desired position
+            if (position < this.places.length - 1) {
+                // Find the newly added place (it will be at the end)
+                const newlyAddedPlace = this.places[this.places.length - 1];
+
+                // Create new order array with place at desired position
+                const newOrder = [...this.places];
+                newOrder.splice(this.places.length - 1, 1); // Remove from end
+                newOrder.splice(position, 0, newlyAddedPlace); // Insert at position
+
+                // Get place IDs in new order
+                const reorderedIds = newOrder.map(p => p.id);
+
+                // Update order on backend
+                await ApiService.reorderPlaces(currentRouteId, reorderedIds);
+
+                // Reload to confirm
+                this.places = await this.routeManager.loadCurrentRoute();
+            }
+
+            await this.routeManager.loadRoutes(); // For place count update
+
+            showSuccess(`Added to route!`);
+
+            // Close modal
+            this.closeAddPlacePositionModal();
+
+            // Update UI
+            if (this.onUpdate) {
+                this.onUpdate();
+            }
+
+            return true;
+
+        } catch (error) {
+            console.error('Failed to add place to route:', error);
+            showError(error.message || 'Failed to add place to route');
+            return false;
+        }
+    }
 }

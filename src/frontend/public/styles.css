@@ -2531,3 +2531,236 @@ textarea.form-input {
         font-size: 0.95rem;
     }
 }
+
+/* ============================================
+   NON-ROUTE PLACES & DUAL MARKER SYSTEM
+   ============================================ */
+
+/* Gray markers for non-route places */
+.leaflet-marker-icon.non-route-marker {
+    filter: grayscale(100%) brightness(0.7);
+    opacity: 0.8;
+}
+
+/* Non-route place popup styling */
+.map-popup-content.non-route-popup {
+    min-width: 280px;
+}
+
+.non-route-badge {
+    display: inline-block;
+    background: #6c757d;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+/* Action buttons in non-route popup */
+.map-popup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 10px 0;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.popup-action-btn {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.popup-action-btn.add-to-route-btn {
+    background: #2A9D8F;
+    color: white;
+}
+
+.popup-action-btn.add-to-route-btn:hover {
+    background: #248075;
+}
+
+.popup-action-btn.edit-btn {
+    background: #667eea;
+    color: white;
+}
+
+.popup-action-btn.edit-btn:hover {
+    background: #5568d3;
+}
+
+.popup-action-btn.delete-btn {
+    background: #dc3545;
+    color: white;
+}
+
+.popup-action-btn.delete-btn:hover {
+    background: #c82333;
+}
+
+/* ============================================
+   POSITION SELECTOR MODAL
+   ============================================ */
+
+.modal-small {
+    max-width: 500px;
+}
+
+.modal-instruction {
+    color: #495057;
+    font-size: 0.95rem;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+#placeToAddName {
+    font-weight: 600;
+    color: #2A9D8F;
+}
+
+.position-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.position-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    text-align: left;
+}
+
+.position-btn:hover {
+    border-color: #2A9D8F;
+    background: #f0fdf8;
+    transform: translateX(4px);
+}
+
+.position-btn i {
+    color: #2A9D8F;
+    font-size: 1rem;
+}
+
+.position-btn span {
+    flex: 1;
+    font-weight: 500;
+    color: #333;
+}
+
+.position-btn-end {
+    background: #2A9D8F;
+    color: white;
+    border-color: #2A9D8F;
+    font-weight: 600;
+}
+
+.position-btn-end:hover {
+    background: #248075;
+    border-color: #248075;
+}
+
+.position-btn-end i {
+    color: white;
+}
+
+.position-btn-end span {
+    color: white;
+}
+
+/* ============================================
+   FILTER SCOPE TOGGLE
+   ============================================ */
+
+.filter-group.scope-toggle {
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+.scope-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.scope-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+}
+
+.scope-option:hover {
+    border-color: #2A9D8F;
+    background: #f0fdf8;
+}
+
+.scope-option input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #2A9D8F;
+}
+
+.scope-option input[type="radio"]:checked + span {
+    font-weight: 600;
+    color: #2A9D8F;
+}
+
+.scope-option span {
+    flex: 1;
+    color: #495057;
+}
+
+/* Mobile adjustments for scope toggle */
+@media (max-width: 768px) {
+    .position-buttons {
+        max-height: 300px;
+    }
+
+    .position-btn {
+        padding: 14px 16px;
+        min-height: 48px; /* Touch-friendly */
+    }
+
+    .scope-option {
+        padding: 12px 14px;
+        min-height: 48px; /* Touch-friendly */
+    }
+
+    .scope-option input[type="radio"] {
+        width: 20px;
+        height: 20px;
+    }
+}

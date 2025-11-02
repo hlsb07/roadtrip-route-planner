@@ -4,7 +4,8 @@ import { SearchManager } from './searchManager.js';
 import { PlaceManager } from './placeManager.js';
 import { CampsiteManager } from './campsiteManager.js';
 import { FilterManager } from './filterManager.js';
-import { showError } from './utils.js';
+import { showError, showSuccess } from './utils.js';
+import { CONFIG } from './config.js';
 
 class App {
     constructor() {
@@ -19,8 +20,8 @@ class App {
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
 
         // Set callback for filter changes
-        this.filterManager.onFilterChange((filteredPlaces) => {
-            this.updateMapWithFilteredPlaces(filteredPlaces);
+        this.filterManager.onFilterChange((filtered, scope) => {
+            this.updateMapWithFilteredPlaces(filtered, scope);
         });
 
         this.bindEventListeners();
@@ -282,10 +283,29 @@ class App {
     // UI Updates
     updateUI() {
         this.placeManager.updatePlacesList();
-        this.mapService.updateMap(this.placeManager.getPlaces());
-        // Re-center map to show all places in the current route
-        if (this.placeManager.getPlaces().length > 0) {
-            this.mapService.centerMap(this.placeManager.getPlaces());
+
+        // Get current route places
+        const routePlaces = this.placeManager.getPlaces();
+
+        // Get filtered places from FilterManager
+        const filtered = this.filterManager.getFilteredPlaces(routePlaces);
+        const scope = this.filterManager.filterScope;
+
+        // Update map based on filter scope
+        if (scope === 'route') {
+            // Show only route places (existing behavior)
+            this.mapService.updateMap(routePlaces);
+        } else if (scope === 'all') {
+            // Show only non-route places
+            this.mapService.updateMapWithBothPlaceTypes([], filtered.nonRoutePlaces);
+        } else {
+            // Show both (default)
+            this.mapService.updateMapWithBothPlaceTypes(routePlaces, filtered.nonRoutePlaces);
+        }
+
+        // Re-center map to show all visible places
+        if (routePlaces.length > 0 || filtered.nonRoutePlaces.length > 0) {
+            this.mapService.centerMap(routePlaces);
         }
     }
 
@@ -334,9 +354,87 @@ class App {
         this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
     }
 
-    updateMapWithFilteredPlaces(filteredPlaces) {
-        // Update map markers with filtered places
-        this.mapService.updateFilteredPlaces(filteredPlaces);
+    updateMapWithFilteredPlaces(filtered, scope) {
+        // Get current route places for context
+        const routePlaces = this.placeManager.getPlaces();
+
+        // Update map based on filter scope
+        if (scope === 'route') {
+            // Show only filtered route places
+            this.mapService.updateFilteredPlaces(filtered.routePlaces);
+        } else if (scope === 'all') {
+            // Show only filtered non-route places (as gray markers)
+            this.mapService.updateMapWithBothPlaceTypes([], filtered.nonRoutePlaces);
+        } else {
+            // Show both filtered route and non-route places
+            this.mapService.updateMapWithBothPlaceTypes(
+                routePlaces.filter(p => filtered.routePlaces.some(fp => fp.id === p.id)),
+                filtered.nonRoutePlaces
+            );
+        }
+    }
+
+    // Methods for handling non-route place actions from map popup
+    showAddPlacePositionModal(placeId, placeName) {
+        this.placeManager.showAddPlacePositionModal(placeId, placeName);
+    }
+
+    async editNonRoutePlace(placeId) {
+        // Find the place in filterManager's allPlaces
+        const place = this.filterManager.allPlaces.find(p => p.id === placeId);
+        if (!place) {
+            showError('Place not found');
+            return;
+        }
+
+        // Open edit modal using existing placeManager method
+        // We need to temporarily add this place to the places list for the modal to work
+        const tempIndex = this.placeManager.places.length;
+        this.placeManager.places.push({
+            id: place.id,
+            name: place.name,
+            coords: [place.latitude, place.longitude]
+        });
+
+        await this.placeManager.showRenamePlaceModal(tempIndex);
+
+        // Remove temporary place after modal closes
+        this.placeManager.places.splice(tempIndex, 1);
+    }
+
+    async deleteNonRoutePlace(placeId, placeName) {
+        if (!confirm(`Delete "${placeName}" permanently? This cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            // Check if place is used in any routes
+            const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`);
+            if (!response.ok) {
+                throw new Error('Failed to check place usage');
+            }
+
+            // Delete the place
+            const deleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
+                method: 'DELETE'
+            });
+
+            if (!deleteResponse.ok) {
+                throw new Error('Failed to delete place');
+            }
+
+            showSuccess(`Deleted "${placeName}"`);
+
+            // Refresh filter data
+            await this.filterManager.refreshPlaces(this.placeManager.getPlaces());
+
+            // Update UI
+            this.updateUI();
+
+        } catch (error) {
+            console.error('Failed to delete place:', error);
+            showError(error.message || 'Failed to delete place');
+        }
     }
 }
 
@@ -362,6 +460,7 @@ window.importRoute = () => window.app?.importRoute();
 window.clearRoute = () => window.app?.clearRoute();
 window.closePlaceModal = () => window.app?.placeManager?.closePlaceModal();
 window.savePlaceEdit = () => window.app?.placeManager?.savePlaceEdit();
+window.closeAddPlacePositionModal = () => window.app?.placeManager?.closeAddPlacePositionModal();
 
 // Global access for managers
 window.placeManager = null; // Will be set by app

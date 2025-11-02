@@ -330,7 +330,27 @@
             </div>
         </div>
         <div class="modal-overlay" onclick="closePlaceModal()"></div>
-    </div>    
+    </div>
+
+    <div id="addPlacePositionModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-marker-alt"></i> Add Place to Route</h3>
+                <button class="btn-close" onclick="closeAddPlacePositionModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="addPlaceModalText" class="modal-instruction">
+                    Select where to insert "<span id="placeToAddName"></span>" in your route:
+                </p>
+                <div id="positionButtons" class="position-buttons">
+                    <!-- Position buttons will be dynamically generated -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closeAddPlacePositionModal()"></div>
+    </div>
 
     <input type="file" id="importFile" style="display: none;" accept=".json">
 

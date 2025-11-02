@@ -10,6 +10,7 @@ export class FilterManager {
         this.allPlaces = [];
         this.selectedCategories = new Set();
         this.selectedCountries = new Set();
+        this.filterScope = 'both'; // 'route' | 'all' | 'both'
         this.onFilterChangeCallback = null;
     }
 
@@ -74,6 +75,45 @@ export class FilterManager {
                     <button class="btn-text" onclick="window.filterManager.clearAllFilters()">
                         Clear All
                     </button>
+                </div>
+
+                <!-- Filter Scope Toggle -->
+                <div class="filter-group scope-toggle">
+                    <div class="filter-group-header">
+                        <h4><i class="fas fa-layer-group"></i> Show Places</h4>
+                    </div>
+                    <div class="scope-options">
+                        <label class="scope-option">
+                            <input
+                                type="radio"
+                                name="filterScope"
+                                value="route"
+                                ${this.filterScope === 'route' ? 'checked' : ''}
+                                onchange="window.filterManager.setFilterScope('route')"
+                            >
+                            <span>Route Places Only</span>
+                        </label>
+                        <label class="scope-option">
+                            <input
+                                type="radio"
+                                name="filterScope"
+                                value="all"
+                                ${this.filterScope === 'all' ? 'checked' : ''}
+                                onchange="window.filterManager.setFilterScope('all')"
+                            >
+                            <span>All Places (Not in Route)</span>
+                        </label>
+                        <label class="scope-option">
+                            <input
+                                type="radio"
+                                name="filterScope"
+                                value="both"
+                                ${this.filterScope === 'both' ? 'checked' : ''}
+                                onchange="window.filterManager.setFilterScope('both')"
+                            >
+                            <span>Both</span>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Category Filters -->
@@ -165,15 +205,28 @@ export class FilterManager {
     }
 
     /**
-     * Get filtered places based on selected categories and countries
+     * Set filter scope (route, all, or both)
      */
-    getFilteredPlaces() {
-        // If no filters are active, return all places
-        if (this.selectedCategories.size === 0 && this.selectedCountries.size === 0) {
-            return this.allPlaces;
-        }
+    setFilterScope(scope) {
+        this.filterScope = scope;
+        this.applyFilters();
+    }
 
-        return this.allPlaces.filter(place => {
+    /**
+     * Get filtered places based on selected categories, countries, and scope
+     * Returns an object with { routePlaces, nonRoutePlaces, allFiltered }
+     */
+    getFilteredPlaces(currentRoutePlaces = []) {
+        // Get current route place IDs for separation
+        const routePlaceIds = new Set(currentRoutePlaces.map(p => p.id));
+
+        // Apply category and country filters to all places
+        const filteredPlaces = this.allPlaces.filter(place => {
+            // If no filters are active, include all places
+            if (this.selectedCategories.size === 0 && this.selectedCountries.size === 0) {
+                return true;
+            }
+
             let categoryMatch = this.selectedCategories.size === 0;
             let countryMatch = this.selectedCountries.size === 0;
 
@@ -194,25 +247,38 @@ export class FilterManager {
             // Place must match both category AND country filters (if active)
             return categoryMatch && countryMatch;
         });
+
+        // Separate into route and non-route places
+        const routePlaces = filteredPlaces.filter(p => routePlaceIds.has(p.id));
+        const nonRoutePlaces = filteredPlaces.filter(p => !routePlaceIds.has(p.id));
+
+        return {
+            routePlaces,
+            nonRoutePlaces,
+            allFiltered: filteredPlaces
+        };
     }
 
     /**
      * Apply current filters and trigger callback
+     * Requires current route places to be passed for proper separation
      */
-    applyFilters() {
-        const filteredPlaces = this.getFilteredPlaces();
+    applyFilters(currentRoutePlaces = []) {
+        const filtered = this.getFilteredPlaces(currentRoutePlaces);
 
         // Update UI to show filter counts
         this.updateFilterCounts();
 
         if (this.onFilterChangeCallback) {
-            this.onFilterChangeCallback(filteredPlaces);
+            this.onFilterChangeCallback(filtered, this.filterScope);
         }
 
         console.log('Filters applied:', {
+            scope: this.filterScope,
             categories: Array.from(this.selectedCategories),
             countries: Array.from(this.selectedCountries),
-            resultCount: filteredPlaces.length
+            routePlacesCount: filtered.routePlaces.length,
+            nonRoutePlacesCount: filtered.nonRoutePlaces.length
         });
     }
 
@@ -260,15 +326,23 @@ export class FilterManager {
     /**
      * Update filter counts in the UI
      */
-    updateFilterCounts() {
+    updateFilterCounts(currentRoutePlaces = []) {
         // Update the active filters summary in both desktop and mobile
         const summaries = document.querySelectorAll('.active-filters-summary');
+        const filtered = this.getFilteredPlaces(currentRoutePlaces);
+
         summaries.forEach(summary => {
             const count = this.getActiveFilterCount();
-            if (count > 0) {
+            if (count > 0 || this.filterScope !== 'both') {
+                const scopeText = this.filterScope === 'route' ? ' (route places)' :
+                                 this.filterScope === 'all' ? ' (non-route places)' : '';
+                const totalCount = this.filterScope === 'route' ? filtered.routePlaces.length :
+                                  this.filterScope === 'all' ? filtered.nonRoutePlaces.length :
+                                  filtered.allFiltered.length;
+
                 summary.innerHTML = `
                     <i class="fas fa-info-circle"></i>
-                    ${count} filter(s) active - ${this.getFilteredPlaces().length} places shown
+                    ${count} filter(s) active${scopeText} - ${totalCount} places shown
                 `;
                 summary.style.display = 'block';
             } else {
@@ -294,10 +368,10 @@ export class FilterManager {
     /**
      * Refresh all places from API and apply filters (triggers map update)
      */
-    async refreshPlaces() {
+    async refreshPlaces(currentRoutePlaces = []) {
         try {
             this.allPlaces = await ApiService.getAllPlaces();
-            this.applyFilters();
+            this.applyFilters(currentRoutePlaces);
         } catch (error) {
             console.error('Failed to refresh places:', error);
         }
@@ -307,11 +381,11 @@ export class FilterManager {
      * Refresh places data silently without applying filters (no map update)
      * Use this when you just want to update the data without changing the map view
      */
-    async refreshPlacesData() {
+    async refreshPlacesData(currentRoutePlaces = []) {
         try {
             this.allPlaces = await ApiService.getAllPlaces();
             // Only update filter counts, don't trigger map update
-            this.updateFilterCounts();
+            this.updateFilterCounts(currentRoutePlaces);
         } catch (error) {
             console.error('Failed to refresh places data:', error);
         }
