@@ -3120,3 +3120,419 @@ textarea.form-input {
         margin: 0;
     }
 }
+
+/* ============================================
+   TAG MANAGEMENT
+   ============================================ */
+
+/* Tags Tabs */
+.tags-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.tags-tab-btn {
+    flex: 1;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: #666;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.tags-tab-btn:hover {
+    color: #2A9D8F;
+    background: #f0fdf8;
+}
+
+.tags-tab-btn.active {
+    color: #2A9D8F;
+    border-bottom-color: #2A9D8F;
+}
+
+.tags-tab-btn i {
+    font-size: 1.1rem;
+}
+
+/* Tags Tab Content */
+.tags-tab-content {
+    display: none;
+}
+
+.tags-tab-content.active {
+    display: block;
+}
+
+/* Tags List Header */
+.tags-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.tags-list-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+/* Tags List */
+.tags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.tags-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.tags-list::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.tags-list::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.tags-list::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* Tag Item */
+.tag-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
+    background: white;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.tag-item:hover {
+    border-color: #2A9D8F;
+    box-shadow: 0 2px 6px rgba(42, 157, 143, 0.1);
+}
+
+.tag-icon {
+    font-size: 1.8rem;
+    min-width: 40px;
+    text-align: center;
+}
+
+.tag-name {
+    flex: 1;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #333;
+}
+
+.tag-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.tag-action-btn {
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    color: #666;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tag-action-btn:hover {
+    background: #f5f5f5;
+    border-color: #999;
+    color: #333;
+}
+
+.tag-action-btn.edit-btn:hover {
+    background: #e3f2fd;
+    border-color: #2196F3;
+    color: #2196F3;
+}
+
+.tag-action-btn.delete-btn:hover {
+    background: #ffebee;
+    border-color: #E76F51;
+    color: #E76F51;
+}
+
+/* Icon Input Group */
+.icon-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.icon-input {
+    flex: 1;
+    font-size: 1.2rem;
+    text-align: center;
+}
+
+/* Emoji Picker */
+.emoji-picker {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.emoji-picker-header {
+    margin-bottom: 10px;
+}
+
+.emoji-search {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+}
+
+.emoji-search:focus {
+    outline: none;
+    border-color: #2A9D8F;
+}
+
+.emoji-picker-categories {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+    overflow-x: auto;
+    padding-bottom: 5px;
+}
+
+.emoji-picker-categories::-webkit-scrollbar {
+    height: 6px;
+}
+
+.emoji-picker-categories::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.emoji-picker-categories::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.emoji-category-btn {
+    padding: 8px 12px;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.emoji-category-btn:hover {
+    border-color: #2A9D8F;
+    background: #f0fdf8;
+}
+
+.emoji-category-btn.active {
+    background: #2A9D8F;
+    border-color: #2A9D8F;
+    color: white;
+}
+
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+    gap: 5px;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 5px;
+}
+
+.emoji-picker-grid::-webkit-scrollbar {
+    width: 8px;
+}
+
+.emoji-picker-grid::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.emoji-picker-grid::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.emoji-picker-grid::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.emoji-btn {
+    padding: 10px;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-btn:hover {
+    background: #2A9D8F;
+    border-color: #2A9D8F;
+    transform: scale(1.1);
+}
+
+/* Delete Tag Modal */
+.delete-tag-places-list {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.delete-tag-places-scroll {
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+.delete-tag-places-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.delete-tag-places-scroll::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.delete-tag-places-scroll::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.delete-tag-place-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    color: #333;
+}
+
+.delete-tag-place-item i {
+    color: #E76F51;
+    font-size: 0.9rem;
+}
+
+/* Modal Medium Size (for edit tag modal) */
+.modal-medium {
+    max-width: 600px;
+}
+
+/* Empty State for Tags */
+.tags-list .empty-state {
+    padding: 40px 20px;
+}
+
+/* Mobile Responsiveness for Tags */
+@media (max-width: 768px) {
+    .tags-tabs {
+        gap: 5px;
+    }
+
+    .tags-tab-btn {
+        padding: 10px 15px;
+        font-size: 0.9rem;
+    }
+
+    .tags-tab-btn i {
+        font-size: 1rem;
+    }
+
+    .tags-list-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .tags-list-header .btn {
+        width: 100%;
+    }
+
+    .tag-item {
+        padding: 10px 12px;
+    }
+
+    .tag-icon {
+        font-size: 1.5rem;
+        min-width: 35px;
+    }
+
+    .tag-name {
+        font-size: 0.95rem;
+    }
+
+    .tag-action-btn {
+        padding: 6px 10px;
+        font-size: 0.85rem;
+    }
+
+    .icon-input-group {
+        flex-direction: column;
+    }
+
+    .icon-input-group .btn {
+        width: 100%;
+    }
+
+    .emoji-picker-grid {
+        grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+        gap: 3px;
+    }
+
+    .emoji-btn {
+        padding: 8px;
+        font-size: 1.3rem;
+    }
+
+    .emoji-category-btn {
+        padding: 6px 10px;
+        font-size: 1rem;
+    }
+}

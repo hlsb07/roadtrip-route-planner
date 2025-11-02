@@ -5,6 +5,7 @@ import { PlaceManager } from './placeManager.js';
 import { CampsiteManager } from './campsiteManager.js';
 import { FilterManager } from './filterManager.js';
 import { AllPlacesManager } from './allPlacesManager.js';
+import { TagManager } from './tagManager.js';
 import { showError, showSuccess } from './utils.js';
 import { CONFIG } from './config.js';
 
@@ -17,6 +18,7 @@ class App {
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
         this.filterManager = new FilterManager();
         this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
+        this.tagManager = new TagManager();
 
         // Set callback for search result selection (save to database, don't add to route)
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
@@ -486,6 +488,7 @@ window.routeManager = null; // Will be set by app
 window.campsiteManager = null; // Will be set by app
 window.filterManager = null; // Will be set by app
 window.allPlacesManager = null; // Will be set by app
+window.tagManager = null; // Will be set by app
 window.CONFIG = CONFIG; // Make CONFIG available globally
 
 // Set global references after app initialization
@@ -497,6 +500,7 @@ window.addEventListener('load', () => {
             window.campsiteManager = window.app.campsiteManager;
             window.filterManager = window.app.filterManager;
             window.allPlacesManager = window.app.allPlacesManager;
+            window.tagManager = window.app.tagManager;
         }
     }, 100);
 });
