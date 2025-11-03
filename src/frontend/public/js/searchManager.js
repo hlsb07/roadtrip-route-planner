@@ -101,7 +101,15 @@ export class SearchManager {
                             lon: result.longitude,
                             googlePlaceId: result.placeId,
                             name: result.name,
-                            fromCache: result.fromCache
+                            fromCache: result.fromCache,
+                            // Extended data
+                            rating: result.rating,
+                            userRatingsTotal: result.userRatingsTotal,
+                            priceLevel: result.priceLevel,
+                            website: result.website,
+                            phoneNumber: result.phoneNumber,
+                            openingHours: result.openingHours,
+                            photos: result.photos || []
                         }));
                         fromCache = backendResponse.fromCache;
 
@@ -164,16 +172,59 @@ export class SearchManager {
         results.forEach(result => {
             const item = document.createElement('div');
             item.className = 'search-result-item';
+
+            // Build rating display
+            let ratingHtml = '';
+            if (result.rating) {
+                const fullStars = Math.floor(result.rating);
+                const hasHalfStar = result.rating % 1 >= 0.5;
+                const starsHtml = '⭐'.repeat(fullStars) + (hasHalfStar ? '½' : '');
+                const reviewCount = result.userRatingsTotal ? ` (${result.userRatingsTotal})` : '';
+                ratingHtml = `<div class="place-rating">${starsHtml} ${result.rating.toFixed(1)}${reviewCount}</div>`;
+            }
+
+            // Build price level display
+            let priceLevelHtml = '';
+            if (result.priceLevel !== null && result.priceLevel !== undefined) {
+                const dollarSigns = '$'.repeat(result.priceLevel);
+                priceLevelHtml = `<span class="place-price">${dollarSigns}</span>`;
+            }
+
+            // Build photo thumbnail
+            let photoHtml = '';
+            if (result.photos && result.photos.length > 0 && result.photos[0].photoUrl) {
+                photoHtml = `
+                    <div class="place-photo">
+                        <img src="${result.photos[0].photoUrl}" alt="${result.name}" />
+                    </div>
+                `;
+            }
+
             item.innerHTML = `
-                <strong>${result.name || result.display_name.split(',')[0]}</strong><br>
-                <small>${result.display_name}</small>
-                ${result.fromCache ? '<span style="color: #34a853; font-size: 0.75rem;">✓ cached</span>' : ''}
+                ${photoHtml}
+                <div class="place-info">
+                    <div class="place-header">
+                        <strong>${result.name || result.display_name.split(',')[0]}</strong>
+                        ${priceLevelHtml}
+                        ${result.fromCache ? '<span class="cached-badge">✓ cached</span>' : ''}
+                    </div>
+                    ${ratingHtml}
+                    <small class="place-address">${result.display_name}</small>
+                </div>
             `;
             item.onclick = () => {
                 const place = {
                     name: result.name || result.display_name.split(',')[0],
                     coords: [parseFloat(result.lat), parseFloat(result.lon)],
-                    googlePlaceId: result.googlePlaceId
+                    googlePlaceId: result.googlePlaceId,
+                    // Pass extended data
+                    rating: result.rating,
+                    userRatingsTotal: result.userRatingsTotal,
+                    priceLevel: result.priceLevel,
+                    website: result.website,
+                    phoneNumber: result.phoneNumber,
+                    openingHours: result.openingHours,
+                    photos: result.photos || []
                 };
                 onSelect(place);
                 resultsDiv.classList.remove('active');

@@ -136,7 +136,15 @@ export class GoogleMapsBackendClient {
             googlePlaceId: result.placeId,
             name: result.name,
             types: result.types,
-            fromCache: result.fromCache
+            fromCache: result.fromCache,
+            // Extended place data
+            rating: result.rating,
+            userRatingsTotal: result.userRatingsTotal,
+            priceLevel: result.priceLevel,
+            website: result.website,
+            phoneNumber: result.phoneNumber,
+            openingHours: result.openingHours,
+            photos: result.photos || []
         }));
     }
 

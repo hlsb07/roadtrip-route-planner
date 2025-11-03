@@ -143,6 +143,9 @@ export class PlaceManager {
             }
         }
 
+        // Display Google Maps extended information if available
+        this.displayGooglePlaceInfo(place);
+
         // Load categories and countries
         await this.loadCategoriesAndCountries(place.id);
 
@@ -150,6 +153,76 @@ export class PlaceManager {
         modal.classList.add('active');
         nameInput.focus();
         nameInput.select();
+    }
+
+    displayGooglePlaceInfo(place) {
+        const infoSection = document.getElementById('googlePlaceInfo');
+        if (!infoSection) return;
+
+        // Check if we have any Google Maps data
+        const hasGoogleData = place.photos && place.photos.length > 0 ||
+                             place.rating || place.website || place.phoneNumber || place.priceLevel;
+
+        if (!hasGoogleData) {
+            infoSection.style.display = 'none';
+            return;
+        }
+
+        infoSection.style.display = 'block';
+
+        // Display photos
+        const photosGallery = document.getElementById('placePhotosGallery');
+        if (photosGallery && place.photos && place.photos.length > 0) {
+            photosGallery.innerHTML = place.photos.slice(0, 5).map(photo =>
+                `<img src="${photo.photoUrl}" alt="${place.name}" />`
+            ).join('');
+            photosGallery.style.display = 'grid';
+        } else if (photosGallery) {
+            photosGallery.style.display = 'none';
+        }
+
+        // Display rating
+        const ratingInfo = document.getElementById('placeRatingInfo');
+        const ratingValue = document.getElementById('placeRatingValue');
+        if (place.rating && ratingInfo && ratingValue) {
+            const stars = '⭐'.repeat(Math.floor(place.rating));
+            const reviewCount = place.userRatingsTotal ? ` (${place.userRatingsTotal} reviews)` : '';
+            ratingValue.textContent = `${stars} ${place.rating.toFixed(1)}${reviewCount}`;
+            ratingInfo.style.display = 'flex';
+        } else if (ratingInfo) {
+            ratingInfo.style.display = 'none';
+        }
+
+        // Display website
+        const websiteInfo = document.getElementById('placeWebsiteInfo');
+        const websiteLink = document.getElementById('placeWebsiteLink');
+        if (place.website && websiteInfo && websiteLink) {
+            websiteLink.href = place.website;
+            websiteInfo.style.display = 'flex';
+        } else if (websiteInfo) {
+            websiteInfo.style.display = 'none';
+        }
+
+        // Display phone
+        const phoneInfo = document.getElementById('placePhoneInfo');
+        const phoneLink = document.getElementById('placePhoneLink');
+        if (place.phoneNumber && phoneInfo && phoneLink) {
+            phoneLink.href = `tel:${place.phoneNumber}`;
+            phoneLink.textContent = place.phoneNumber;
+            phoneInfo.style.display = 'flex';
+        } else if (phoneInfo) {
+            phoneInfo.style.display = 'none';
+        }
+
+        // Display price level
+        const priceInfo = document.getElementById('placePriceInfo');
+        const priceValue = document.getElementById('placePriceValue');
+        if (place.priceLevel !== null && place.priceLevel !== undefined && priceInfo && priceValue) {
+            priceValue.textContent = '$'.repeat(place.priceLevel) + ' price level';
+            priceInfo.style.display = 'flex';
+        } else if (priceInfo) {
+            priceInfo.style.display = 'none';
+        }
     }
 
     startLocationChange() {

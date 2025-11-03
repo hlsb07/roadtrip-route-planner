@@ -363,6 +363,45 @@
                     <i class="fas fa-minus-circle"></i> Remove from Current Route
                 </button>
 
+                <!-- Google Maps Extended Information (conditional - only shows when available) -->
+                <div id="googlePlaceInfo" class="google-place-info" style="display: none;">
+                    <div class="info-section-header">
+                        <i class="fab fa-google"></i> Google Maps Information
+                    </div>
+
+                    <!-- Photo Gallery -->
+                    <div id="placePhotosGallery" class="place-photos-gallery" style="display: none;">
+                        <!-- Photos will be loaded here -->
+                    </div>
+
+                    <!-- Place Details Grid -->
+                    <div class="place-details-grid">
+                        <!-- Rating -->
+                        <div id="placeRatingInfo" class="place-detail-item" style="display: none;">
+                            <i class="fas fa-star" style="color: #fbbc04;"></i>
+                            <span id="placeRatingValue"></span>
+                        </div>
+
+                        <!-- Website -->
+                        <div id="placeWebsiteInfo" class="place-detail-item" style="display: none;">
+                            <i class="fas fa-globe" style="color: #4285f4;"></i>
+                            <a id="placeWebsiteLink" href="#" target="_blank" rel="noopener noreferrer">Visit Website</a>
+                        </div>
+
+                        <!-- Phone -->
+                        <div id="placePhoneInfo" class="place-detail-item" style="display: none;">
+                            <i class="fas fa-phone" style="color: #34a853;"></i>
+                            <a id="placePhoneLink" href="#"></a>
+                        </div>
+
+                        <!-- Price Level -->
+                        <div id="placePriceInfo" class="place-detail-item" style="display: none;">
+                            <i class="fas fa-dollar-sign" style="color: #34a853;"></i>
+                            <span id="placePriceValue"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Categories -->
                 <div class="form-group">
                     <label><i class="fas fa-tag"></i> Categories:</label>

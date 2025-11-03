@@ -67,9 +67,9 @@ namespace RoutePlanner.API.Services
             if (cachedResults.Any())
             {
                 _logger.LogInformation($"Cache HIT for query: {query}");
-                return new GoogleMapsSearchResponse
+                var results = cachedResults.Select(c =>
                 {
-                    Results = cachedResults.Select(c => new PlaceSearchResult
+                    var result = new PlaceSearchResult
                     {
                         PlaceId = c.GooglePlaceId,
                         Name = c.Name,
@@ -78,7 +78,14 @@ namespace RoutePlanner.API.Services
                         Longitude = c.Location.X,
                         Types = ParseTypes(c.Types),
                         FromCache = true
-                    }).ToList(),
+                    };
+                    PopulateExtendedDataFromCache(result, c.AdditionalData);
+                    return result;
+                }).ToList();
+
+                return new GoogleMapsSearchResponse
+                {
+                    Results = results,
                     FromCache = true,
                     Statistics = await GetCacheStatistics()
                 };
@@ -114,7 +121,7 @@ namespace RoutePlanner.API.Services
                 await _context.SaveChangesAsync();
 
                 _logger.LogInformation($"Cache HIT for place ID: {placeId}");
-                return new PlaceSearchResult
+                var cachedResult = new PlaceSearchResult
                 {
                     PlaceId = cached.GooglePlaceId,
                     Name = cached.Name,
@@ -124,6 +131,8 @@ namespace RoutePlanner.API.Services
                     Types = ParseTypes(cached.Types),
                     FromCache = true
                 };
+                PopulateExtendedDataFromCache(cachedResult, cached.AdditionalData);
+                return cachedResult;
             }
 
             // Call Google API
@@ -134,7 +143,7 @@ namespace RoutePlanner.API.Services
                 throw new InvalidOperationException("Google Maps API key not configured");
             }
 
-            var url = $"https://maps.googleapis.com/maps/api/place/details/json?place_id={placeId}&key={apiKey}&fields=place_id,name,formatted_address,geometry,types";
+            var url = $"https://maps.googleapis.com/maps/api/place/details/json?place_id={placeId}&key={apiKey}&fields=place_id,name,formatted_address,geometry,types,rating,user_ratings_total,price_level,website,formatted_phone_number,opening_hours,photos";
 
             var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
@@ -154,8 +163,26 @@ namespace RoutePlanner.API.Services
                 Longitude = geometry.GetProperty("lng").GetDouble(),
                 Types = result.TryGetProperty("types", out var types)
                     ? types.EnumerateArray().Select(t => t.GetString() ?? "").ToList()
-                    : new List<string>()
+                    : new List<string>(),
+                Rating = result.TryGetProperty("rating", out var rating) ? rating.GetDouble() : null,
+                UserRatingsTotal = result.TryGetProperty("user_ratings_total", out var ratingsTotal) ? ratingsTotal.GetInt32() : null,
+                PriceLevel = result.TryGetProperty("price_level", out var priceLevel) ? priceLevel.GetInt32() : null,
+                Website = result.TryGetProperty("website", out var website) ? website.GetString() : null,
+                PhoneNumber = result.TryGetProperty("formatted_phone_number", out var phone) ? phone.GetString() : null,
+                OpeningHours = result.TryGetProperty("opening_hours", out var hours)
+                    ? JsonSerializer.Serialize(hours) : null,
+                Photos = result.TryGetProperty("photos", out var photos)
+                    ? photos.EnumerateArray().Select(p => new PlacePhoto
+                    {
+                        PhotoReference = p.GetProperty("photo_reference").GetString() ?? "",
+                        Width = p.GetProperty("width").GetInt32(),
+                        Height = p.GetProperty("height").GetInt32()
+                    }).ToList()
+                    : new List<PlacePhoto>()
             };
+
+            // Populate photo URLs
+            PopulatePhotoUrls(placeResult);
 
             // Cache the result
             await CachePlaceDetails(placeResult);
@@ -221,7 +248,7 @@ namespace RoutePlanner.API.Services
                 throw new InvalidOperationException("Google Maps API key not configured");
             }
 
-            var url = $"https://maps.googleapis.com/maps/api/place/autocomplete/json?input={Uri.EscapeDataString(query)}&key={apiKey}&components=country:nz";
+            var url = $"https://maps.googleapis.com/maps/api/place/autocomplete/json?input={Uri.EscapeDataString(query)}&key={apiKey}";
 
             var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
@@ -253,7 +280,7 @@ namespace RoutePlanner.API.Services
         private async Task<PlaceSearchResult?> GetPlaceDetailsFromGoogle(string placeId)
         {
             var apiKey = _configuration["GoogleMaps:ApiKey"];
-            var url = $"https://maps.googleapis.com/maps/api/place/details/json?place_id={placeId}&key={apiKey}&fields=place_id,name,formatted_address,geometry,types";
+            var url = $"https://maps.googleapis.com/maps/api/place/details/json?place_id={placeId}&key={apiKey}&fields=place_id,name,formatted_address,geometry,types,rating,user_ratings_total,price_level,website,formatted_phone_number,opening_hours,photos";
 
             var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode) return null;
@@ -265,7 +292,7 @@ namespace RoutePlanner.API.Services
 
             var geometry = result.GetProperty("geometry").GetProperty("location");
 
-            return new PlaceSearchResult
+            var placeResult = new PlaceSearchResult
             {
                 PlaceId = result.GetProperty("place_id").GetString() ?? "",
                 Name = result.GetProperty("name").GetString() ?? "",
@@ -274,8 +301,108 @@ namespace RoutePlanner.API.Services
                 Longitude = geometry.GetProperty("lng").GetDouble(),
                 Types = result.TryGetProperty("types", out var types)
                     ? types.EnumerateArray().Select(t => t.GetString() ?? "").ToList()
-                    : new List<string>()
+                    : new List<string>(),
+                Rating = result.TryGetProperty("rating", out var rating) ? rating.GetDouble() : null,
+                UserRatingsTotal = result.TryGetProperty("user_ratings_total", out var ratingsTotal) ? ratingsTotal.GetInt32() : null,
+                PriceLevel = result.TryGetProperty("price_level", out var priceLevel) ? priceLevel.GetInt32() : null,
+                Website = result.TryGetProperty("website", out var website) ? website.GetString() : null,
+                PhoneNumber = result.TryGetProperty("formatted_phone_number", out var phone) ? phone.GetString() : null,
+                OpeningHours = result.TryGetProperty("opening_hours", out var hours)
+                    ? JsonSerializer.Serialize(hours) : null,
+                Photos = result.TryGetProperty("photos", out var photos)
+                    ? photos.EnumerateArray().Select(p => new PlacePhoto
+                    {
+                        PhotoReference = p.GetProperty("photo_reference").GetString() ?? "",
+                        Width = p.GetProperty("width").GetInt32(),
+                        Height = p.GetProperty("height").GetInt32()
+                    }).ToList()
+                    : new List<PlacePhoto>()
             };
+
+            // Populate photo URLs
+            PopulatePhotoUrls(placeResult);
+
+            return placeResult;
+        }
+
+        /// <summary>
+        /// Generate Google Photos URL from photo reference
+        /// </summary>
+        private string GeneratePhotoUrl(string photoReference, int maxWidth = 400)
+        {
+            var apiKey = _configuration["GoogleMaps:ApiKey"];
+            return $"https://maps.googleapis.com/maps/api/place/photo?maxwidth={maxWidth}&photo_reference={photoReference}&key={apiKey}";
+        }
+
+        /// <summary>
+        /// Populate photo URLs for a place result
+        /// </summary>
+        private void PopulatePhotoUrls(PlaceSearchResult result)
+        {
+            foreach (var photo in result.Photos)
+            {
+                photo.PhotoUrl = GeneratePhotoUrl(photo.PhotoReference, photo.Width);
+            }
+        }
+
+        /// <summary>
+        /// Serialize extended place data for caching
+        /// </summary>
+        private string? SerializeExtendedData(PlaceSearchResult result)
+        {
+            var extendedData = new
+            {
+                rating = result.Rating,
+                userRatingsTotal = result.UserRatingsTotal,
+                priceLevel = result.PriceLevel,
+                website = result.Website,
+                phoneNumber = result.PhoneNumber,
+                openingHours = result.OpeningHours,
+                photos = result.Photos
+            };
+
+            return JsonSerializer.Serialize(extendedData);
+        }
+
+        /// <summary>
+        /// Deserialize and populate extended data from cache
+        /// </summary>
+        private void PopulateExtendedDataFromCache(PlaceSearchResult result, string? additionalDataJson)
+        {
+            if (string.IsNullOrEmpty(additionalDataJson)) return;
+
+            try
+            {
+                var data = JsonSerializer.Deserialize<JsonElement>(additionalDataJson);
+
+                result.Rating = data.TryGetProperty("rating", out var rating) && rating.ValueKind != JsonValueKind.Null
+                    ? rating.GetDouble() : null;
+                result.UserRatingsTotal = data.TryGetProperty("userRatingsTotal", out var ratingsTotal) && ratingsTotal.ValueKind != JsonValueKind.Null
+                    ? ratingsTotal.GetInt32() : null;
+                result.PriceLevel = data.TryGetProperty("priceLevel", out var priceLevel) && priceLevel.ValueKind != JsonValueKind.Null
+                    ? priceLevel.GetInt32() : null;
+                result.Website = data.TryGetProperty("website", out var website) && website.ValueKind != JsonValueKind.Null
+                    ? website.GetString() : null;
+                result.PhoneNumber = data.TryGetProperty("phoneNumber", out var phone) && phone.ValueKind != JsonValueKind.Null
+                    ? phone.GetString() : null;
+                result.OpeningHours = data.TryGetProperty("openingHours", out var hours) && hours.ValueKind != JsonValueKind.Null
+                    ? hours.GetString() : null;
+
+                if (data.TryGetProperty("photos", out var photos) && photos.ValueKind == JsonValueKind.Array)
+                {
+                    result.Photos = photos.EnumerateArray().Select(p => new PlacePhoto
+                    {
+                        PhotoReference = p.GetProperty("photoReference").GetString() ?? "",
+                        Width = p.GetProperty("width").GetInt32(),
+                        Height = p.GetProperty("height").GetInt32(),
+                        PhotoUrl = p.TryGetProperty("photoUrl", out var url) ? url.GetString() : null
+                    }).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to deserialize extended data: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -293,6 +420,7 @@ namespace RoutePlanner.API.Services
                     FormattedAddress = result.FormattedAddress,
                     Location = _geometryFactory.CreatePoint(new Coordinate(result.Longitude, result.Latitude)),
                     Types = JsonSerializer.Serialize(result.Types),
+                    AdditionalData = SerializeExtendedData(result),
                     ApiType = "autocomplete",
                     CachedAt = DateTime.UtcNow,
                     ExpiresAt = DateTime.UtcNow.Add(_cacheTtl),
@@ -318,6 +446,7 @@ namespace RoutePlanner.API.Services
                 FormattedAddress = result.FormattedAddress,
                 Location = _geometryFactory.CreatePoint(new Coordinate(result.Longitude, result.Latitude)),
                 Types = JsonSerializer.Serialize(result.Types),
+                AdditionalData = SerializeExtendedData(result),
                 ApiType = "place_details",
                 CachedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.Add(_cacheTtl),
