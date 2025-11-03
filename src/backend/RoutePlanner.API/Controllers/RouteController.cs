@@ -92,7 +92,7 @@ namespace RoutePlanner.API.Controllers
                 Description = route.Description,
                 CreatedAt = route.CreatedAt,
                 UpdatedAt = route.UpdatedAt,
-                Places = new List<PlaceDto>(),
+                Places = new List<MinimalPlaceDto>(),
                 PlaceCount = 0
             };
 

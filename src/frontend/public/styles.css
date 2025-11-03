@@ -2907,9 +2907,7 @@ textarea.form-input {
 
 .all-places-section {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    overflow: auto;
     padding: 15px;
     min-height: 0;
 }
@@ -2959,11 +2957,9 @@ textarea.form-input {
 }
 
 .all-places-list {
+    overflow-y: auto;
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
     gap: 10px;
 }
 
@@ -2973,6 +2969,7 @@ textarea.form-input {
     align-items: center;
     gap: 12px;
     padding: 12px;
+    margin-bottom: 10px;
     background: white;
     border: 2px solid #e0e0e0;
     border-radius: 10px;

@@ -262,7 +262,7 @@
                 </div>
 
                 <!-- All Places Section -->
-                <div class="mobile-section all-places-section" data-section="allplaces" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                <div class="mobile-section all-places-section" data-section="allplaces" style="display: none; padding: 10px; background: #fafafa; height: 100%; flex-direction: column;">
                     <div class="all-places-header">
                         <h3><i class="fas fa-database"></i> All Places</h3>
                         <span class="all-places-count" id="mobileAllPlacesCount">0 places</span>
@@ -271,7 +271,7 @@
                         <input type="text" id="mobileAllPlacesSearch" class="search-input" placeholder="Search all places...">
                         <i class="fas fa-search search-icon"></i>
                     </div>
-                    <div class="all-places-list" id="mobileAllPlacesList">
+                    <div class="all-places-list" id="mobileAllPlacesList" style="overflow-y: auto; flex: 1;">
                         <!-- All places will be populated here -->
                     </div>
                 </div>
