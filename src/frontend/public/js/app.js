@@ -3,18 +3,30 @@ import { RouteManager } from './routeManager.js';
 import { SearchManager } from './searchManager.js';
 import { PlaceManager } from './placeManager.js';
 import { CampsiteManager } from './campsiteManager.js';
-import { showError } from './utils.js';
+import { FilterManager } from './filterManager.js';
+import { AllPlacesManager } from './allPlacesManager.js';
+import { TagManager } from './tagManager.js';
+import { showError, showSuccess } from './utils.js';
+import { CONFIG } from './config.js';
 
 class App {
     constructor() {
         this.mapService = new MapService();
-        this.routeManager = new RouteManager();
+        this.filterManager = new FilterManager();  // Create filterManager first
+        this.routeManager = new RouteManager(this.filterManager);  // Pass filterManager
         this.searchManager = new SearchManager();
         this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
+        this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
+        this.tagManager = new TagManager();
 
-        // Set callback for search result selection
+        // Set callback for search result selection (save to database, don't add to route)
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
+
+        // Set callback for filter changes
+        this.filterManager.onFilterChange((filtered, scope) => {
+            this.updateMapWithFilteredPlaces(filtered, scope);
+        });
 
         this.bindEventListeners();
         this.setupKeyboardShortcuts();
@@ -40,7 +52,10 @@ class App {
                 this.selectCampsite(index);
             });
 
-            // Load routes and first route
+            // Initialize filters FIRST (fetches all places with full data)
+            await this.filterManager.init();
+
+            // Load routes and first route (now can use filterManager.allPlaces)
             const places = await this.routeManager.loadRoutes();
             if (places && places.length > 0) {
                 this.placeManager.setPlaces(places);
@@ -50,6 +65,9 @@ class App {
             // Load campsites
             await this.campsiteManager.loadCampsites();
             this.updateCampsiteUI();
+
+            // Initialize All Places Manager
+            this.allPlacesManager.updateAllPlacesList();
 
         } catch (error) {
             console.error('Failed to initialize app:', error);
@@ -125,6 +143,11 @@ class App {
                     this.updateRoutesList();
                 });
             }
+
+            // Enter in place edit modal saves
+            if (e.key === 'Enter' && document.getElementById('editPlaceModal').classList.contains('active')) {
+                this.placeManager.savePlaceEdit();
+            }
         });
     }
 
@@ -149,8 +172,16 @@ class App {
     }
 
     async addPlace(place) {
-        const success = await this.placeManager.addPlace(place);
-        if (success) {
+        // Save place to database (don't add to route yet)
+        const result = await this.placeManager.addPlace(place, false);
+        if (result.success) {
+            // Refresh filter data to include new place
+            await this.filterManager.refreshPlaces(this.placeManager.getPlaces());
+
+            // Update all places list
+            this.allPlacesManager.updateAllPlacesList();
+
+            // Update UI
             this.updateUI();
         }
     }
@@ -267,7 +298,33 @@ class App {
     // UI Updates
     updateUI() {
         this.placeManager.updatePlacesList();
-        this.mapService.updateMap(this.placeManager.getPlaces());
+
+        // Update All Places list
+        this.allPlacesManager.updateAllPlacesList();
+
+        // Get current route places
+        const routePlaces = this.placeManager.getPlaces();
+
+        // Get filtered places from FilterManager
+        const filtered = this.filterManager.getFilteredPlaces(routePlaces);
+        const scope = this.filterManager.filterScope;
+
+        // Update map based on filter scope
+        if (scope === 'route') {
+            // Show only route places (existing behavior)
+            this.mapService.updateMap(routePlaces);
+        } else if (scope === 'all') {
+            // Show only non-route places
+            this.mapService.updateMapWithBothPlaceTypes([], filtered.nonRoutePlaces);
+        } else {
+            // Show both (default)
+            this.mapService.updateMapWithBothPlaceTypes(routePlaces, filtered.nonRoutePlaces);
+        }
+
+        // Re-center map to show all visible places
+        if (routePlaces.length > 0 || filtered.nonRoutePlaces.length > 0) {
+            this.mapService.centerMap(routePlaces);
+        }
     }
 
     selectPlace(index) {
@@ -314,6 +371,89 @@ class App {
         this.campsiteManager.updateCampsitesList();
         this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
     }
+
+    updateMapWithFilteredPlaces(filtered, scope) {
+        // Get current route places for context
+        const routePlaces = this.placeManager.getPlaces();
+
+        // Update map based on filter scope
+        if (scope === 'route') {
+            // Show only filtered route places
+            this.mapService.updateFilteredPlaces(filtered.routePlaces);
+        } else if (scope === 'all') {
+            // Show only filtered non-route places (as gray markers)
+            this.mapService.updateMapWithBothPlaceTypes([], filtered.nonRoutePlaces);
+        } else {
+            // Show both filtered route and non-route places
+            this.mapService.updateMapWithBothPlaceTypes(
+                routePlaces.filter(p => filtered.routePlaces.some(fp => fp.id === p.id)),
+                filtered.nonRoutePlaces
+            );
+        }
+    }
+
+    // Methods for handling non-route place actions from map popup
+    showAddPlacePositionModal(placeId, placeName) {
+        this.placeManager.showAddPlacePositionModal(placeId, placeName);
+    }
+
+    async editNonRoutePlace(placeId) {
+        // Find the place in filterManager's allPlaces
+        const place = this.filterManager.allPlaces.find(p => p.id === placeId);
+        if (!place) {
+            showError('Place not found');
+            return;
+        }
+
+        // Open edit modal using existing placeManager method
+        // We need to temporarily add this place to the places list for the modal to work
+        const tempIndex = this.placeManager.places.length;
+        this.placeManager.places.push({
+            id: place.id,
+            name: place.name,
+            coords: [place.latitude, place.longitude]
+        });
+
+        await this.placeManager.showRenamePlaceModal(tempIndex);
+
+        // Remove temporary place after modal closes
+        this.placeManager.places.splice(tempIndex, 1);
+    }
+
+    async deleteNonRoutePlace(placeId, placeName) {
+        if (!confirm(`Delete "${placeName}" permanently? This cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            // Check if place is used in any routes
+            const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`);
+            if (!response.ok) {
+                throw new Error('Failed to check place usage');
+            }
+
+            // Delete the place
+            const deleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
+                method: 'DELETE'
+            });
+
+            if (!deleteResponse.ok) {
+                throw new Error('Failed to delete place');
+            }
+
+            showSuccess(`Deleted "${placeName}"`);
+
+            // Refresh filter data
+            await this.filterManager.refreshPlaces(this.placeManager.getPlaces());
+
+            // Update UI
+            this.updateUI();
+
+        } catch (error) {
+            console.error('Failed to delete place:', error);
+            showError(error.message || 'Failed to delete place');
+        }
+    }
 }
 
 // Initialize app when DOM is loaded
@@ -336,11 +476,20 @@ window.getCurrentLocation = () => window.app?.getCurrentLocation();
 window.exportRoute = () => window.app?.exportRoute();
 window.importRoute = () => window.app?.importRoute();
 window.clearRoute = () => window.app?.clearRoute();
+window.closePlaceModal = () => window.app?.placeManager?.closePlaceModal();
+window.savePlaceEdit = () => window.app?.placeManager?.savePlaceEdit();
+window.closeAddPlacePositionModal = () => window.app?.placeManager?.closeAddPlacePositionModal();
+window.closePlaceAddedSuccessModal = () => window.app?.placeManager?.closePlaceAddedSuccessModal();
+window.addSavedPlaceToRoute = () => window.app?.placeManager?.addSavedPlaceToRoute();
 
 // Global access for managers
 window.placeManager = null; // Will be set by app
 window.routeManager = null; // Will be set by app
 window.campsiteManager = null; // Will be set by app
+window.filterManager = null; // Will be set by app
+window.allPlacesManager = null; // Will be set by app
+window.tagManager = null; // Will be set by app
+window.CONFIG = CONFIG; // Make CONFIG available globally
 
 // Set global references after app initialization
 window.addEventListener('load', () => {
@@ -349,6 +498,9 @@ window.addEventListener('load', () => {
             window.placeManager = window.app.placeManager;
             window.routeManager = window.app.routeManager;
             window.campsiteManager = window.app.campsiteManager;
+            window.filterManager = window.app.filterManager;
+            window.allPlacesManager = window.app.allPlacesManager;
+            window.tagManager = window.app.tagManager;
         }
     }, 100);
 });

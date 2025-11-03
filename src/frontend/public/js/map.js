@@ -4,6 +4,7 @@ export class MapService {
     constructor() {
         this.map = null;
         this.markers = [];
+        this.nonRouteMarkers = []; // Gray markers for places not in route
         this.campsiteMarkers = [];
         this.routePolyline = null;
         this.showRoute = true;
@@ -11,7 +12,11 @@ export class MapService {
         this.selectedMarkerIndex = null;
         this.selectedCampsiteIndex = null;
         this.onMarkerClick = null;
+        this.onNonRouteMarkerClick = null; // Callback for non-route marker clicks
         this.onCampsiteMarkerClick = null;
+        this.coordinateSelectionMode = false;
+        this.coordinateSelectionCallback = null;
+        this.coordinatePreviewMarker = null;
     }
 
     init() {
@@ -27,15 +32,68 @@ export class MapService {
 
     onMapClick(callback) {
         this.map.on('click', (e) => {
+            // Check if we're in coordinate selection mode
+            if (this.coordinateSelectionMode && this.coordinateSelectionCallback) {
+                // Update coordinate preview marker
+                if (this.coordinatePreviewMarker) {
+                    this.map.removeLayer(this.coordinatePreviewMarker);
+                }
+
+                // Create a special preview marker
+                const previewIcon = L.divIcon({
+                    html: '<div class="coordinate-preview-marker"><i class="fas fa-map-marker-alt"></i></div>',
+                    className: 'coordinate-preview-icon',
+                    iconSize: [30, 42],
+                    iconAnchor: [15, 42]
+                });
+
+                this.coordinatePreviewMarker = L.marker(e.latlng, { icon: previewIcon })
+                    .addTo(this.map)
+                    .bindPopup(`
+                        <div class="coord-preview-popup">
+                            <strong>New Location</strong><br>
+                            Lat: ${e.latlng.lat.toFixed(6)}<br>
+                            Lng: ${e.latlng.lng.toFixed(6)}
+                        </div>
+                    `)
+                    .openPopup();
+
+                // Call the callback with coordinates
+                this.coordinateSelectionCallback(e.latlng.lat, e.latlng.lng);
+                return;
+            }
+
+            // Normal map click behavior
             const coords = `${e.latlng.lat.toFixed(6)}, ${e.latlng.lng.toFixed(6)}`;
             callback(coords, e.latlng);
-            
+
             // Add temporary marker
             if (this.clickMarker) {
                 this.map.removeLayer(this.clickMarker);
             }
             this.clickMarker = L.marker(e.latlng).addTo(this.map);
         });
+    }
+
+    setCoordinateSelectionMode(enabled, callback = null) {
+        this.coordinateSelectionMode = enabled;
+        this.coordinateSelectionCallback = callback;
+
+        // Change cursor style
+        const mapContainer = document.getElementById('map');
+        if (mapContainer) {
+            if (enabled) {
+                mapContainer.classList.add('coordinate-selection-active');
+            } else {
+                mapContainer.classList.remove('coordinate-selection-active');
+            }
+        }
+
+        // Clear preview marker if disabling
+        if (!enabled && this.coordinatePreviewMarker) {
+            this.map.removeLayer(this.coordinatePreviewMarker);
+            this.coordinatePreviewMarker = null;
+        }
     }
 
     clearClickMarker() {
@@ -74,6 +132,15 @@ export class MapService {
                 shadowSize: isSelected ? [50, 50] : [41, 41]
             });
 
+            // Create popup content with categories and countries
+            const categories = place.categories && place.categories.length > 0
+                ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+                : '';
+
+            const countries = place.countries && place.countries.length > 0
+                ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+                : '';
+
             const marker = L.marker(place.coords, { icon: customIcon })
                 .addTo(this.map)
                 .bindPopup(`
@@ -82,7 +149,17 @@ export class MapService {
                             <div class="place-number">${index + 1}</div>
                             <strong>${place.name}</strong>
                         </div>
+                        ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                        ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
                         <div class="map-popup-coords">Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</div>
+                        <div class="map-popup-actions">
+                            <button class="route-popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app?.placeManager?.showRenamePlaceModal(${index})" title="Edit place">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="route-popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})" title="Remove from route">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                         <div class="map-popup-links">
                             <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
                                target="_blank"
@@ -174,6 +251,10 @@ export class MapService {
 
     setMarkerClickCallback(callback) {
         this.onMarkerClick = callback;
+    }
+
+    setNonRouteMarkerClickCallback(callback) {
+        this.onNonRouteMarkerClick = callback;
     }
 
     updateCampsiteMarkers(campsites) {
@@ -350,6 +431,278 @@ export class MapService {
 
     setCampsiteMarkerClickCallback(callback) {
         this.onCampsiteMarkerClick = callback;
+    }
+
+    /**
+     * Update map with filtered places (for category/country filtering)
+     * This creates separate markers for all places with visual indicators
+     */
+    updateFilteredPlaces(filteredPlaces) {
+        // Clear existing markers but keep campsites
+        this.markers.forEach(marker => this.map.removeLayer(marker));
+        this.markers = [];
+
+        // Clear existing route
+        if (this.routePolyline) {
+            this.map.removeLayer(this.routePolyline);
+        }
+
+        if (filteredPlaces.length === 0) return;
+
+        // Add markers for filtered places
+        filteredPlaces.forEach((place, index) => {
+            const isSelected = this.selectedMarkerIndex === index;
+
+            // Get category icon if available
+            const categoryIcon = place.categories && place.categories.length > 0
+                ? place.categories[0].icon
+                : null;
+
+            // Create custom marker with category icon
+            const iconSize = isSelected ? [35, 50] : [25, 41];
+            const iconAnchor = isSelected ? [17, 50] : [12, 41];
+
+            let marker;
+
+            // If there's a category icon, create a custom divIcon with emoji
+            if (categoryIcon) {
+                const divIcon = L.divIcon({
+                    html: `<div class="custom-marker ${isSelected ? 'selected' : ''}">
+                            <div class="marker-icon">${categoryIcon}</div>
+                           </div>`,
+                    className: 'custom-marker-container',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30],
+                    popupAnchor: [0, -30]
+                });
+
+                marker = L.marker([place.latitude, place.longitude], { icon: divIcon });
+            } else {
+                // Use default Leaflet marker
+                const customIcon = L.icon({
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconSize: iconSize,
+                    iconAnchor: iconAnchor,
+                    popupAnchor: [1, -34],
+                    shadowSize: isSelected ? [50, 50] : [41, 41]
+                });
+
+                marker = L.marker([place.latitude, place.longitude], { icon: customIcon });
+            }
+
+            // Create popup content
+            const categories = place.categories && place.categories.length > 0
+                ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+                : '';
+
+            const countries = place.countries && place.countries.length > 0
+                ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+                : '';
+
+            marker.addTo(this.map)
+                .bindPopup(`
+                    <div class="map-popup-content">
+                        <div class="map-popup-header">
+                            <strong>${place.name}</strong>
+                        </div>
+                        ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                        ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
+                        <div class="map-popup-coords">Lat: ${place.latitude.toFixed(4)}, Lng: ${place.longitude.toFixed(4)}</div>
+                        <div class="map-popup-links">
+                            <a href="https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}"
+                               target="_blank"
+                               class="link-btn google-maps">
+                                <i class="fas fa-map"></i> Google Maps
+                            </a>
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}"
+                               target="_blank"
+                               class="link-btn google-nav">
+                                <i class="fas fa-directions"></i> Navigate
+                            </a>
+                        </div>
+                    </div>
+                `);
+
+            this.markers.push(marker);
+        });
+
+        // Center map to show all filtered places
+        if (filteredPlaces.length > 0) {
+            const bounds = L.latLngBounds(
+                filteredPlaces.map(place => [place.latitude, place.longitude])
+            );
+            this.map.fitBounds(bounds, { padding: [50, 50] });
+        }
+    }
+
+    /**
+     * Update map with both route places (blue markers with polyline) and non-route places (gray markers)
+     * @param {Array} routePlaces - Places in the current route
+     * @param {Array} nonRoutePlaces - Places not in the current route
+     */
+    updateMapWithBothPlaceTypes(routePlaces, nonRoutePlaces) {
+        // Clear existing markers (route places)
+        this.markers.forEach(marker => this.map.removeLayer(marker));
+        this.markers = [];
+
+        // Clear existing non-route markers
+        this.nonRouteMarkers.forEach(marker => this.map.removeLayer(marker));
+        this.nonRouteMarkers = [];
+
+        // Clear existing route polyline
+        if (this.routePolyline) {
+            this.map.removeLayer(this.routePolyline);
+        }
+
+        // Add blue markers for route places (with numbers and polyline)
+        if (routePlaces && routePlaces.length > 0) {
+            routePlaces.forEach((place, index) => {
+                const isSelected = this.selectedMarkerIndex === index;
+
+                // Create custom icon with size based on selection
+                const iconSize = isSelected ? [35, 50] : [25, 41];
+                const iconAnchor = isSelected ? [17, 50] : [12, 41];
+
+                const customIcon = L.icon({
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconSize: iconSize,
+                    iconAnchor: iconAnchor,
+                    popupAnchor: [1, -34],
+                    shadowSize: isSelected ? [50, 50] : [41, 41]
+                });
+
+                // Create popup content with categories and countries
+                const categories = place.categories && place.categories.length > 0
+                    ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+                    : '';
+
+                const countries = place.countries && place.countries.length > 0
+                    ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+                    : '';
+
+                const marker = L.marker(place.coords, { icon: customIcon })
+                    .addTo(this.map)
+                    .bindPopup(`
+                        <div class="map-popup-content">
+                            <div class="map-popup-header">
+                                <div class="place-number">${index + 1}</div>
+                                <strong>${place.name}</strong>
+                            </div>
+                            ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                            ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
+                            <div class="map-popup-coords">Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</div>
+                            <div class="map-popup-actions">
+                                <button class="route-popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app?.placeManager?.showRenamePlaceModal(${index})" title="Edit place">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="route-popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})" title="Remove from route">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <div class="map-popup-links">
+                                <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
+                                   target="_blank"
+                                   class="link-btn google-maps">
+                                    <i class="fas fa-map"></i> Google Maps
+                                </a>
+                                <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}"
+                                   target="_blank"
+                                   class="link-btn google-nav">
+                                    <i class="fas fa-directions"></i> Navigate
+                                </a>
+                            </div>
+                        </div>
+                    `)
+                    .on('click', () => {
+                        if (this.onMarkerClick) {
+                            this.onMarkerClick(index);
+                        }
+                    });
+                this.markers.push(marker);
+            });
+
+            // Add route polyline if enabled
+            if (this.showRoute && routePlaces.length > 1) {
+                const coords = routePlaces.map(place => place.coords);
+                this.routePolyline = L.polyline(coords, {
+                    color: '#667eea',
+                    weight: 4,
+                    opacity: 0.7,
+                    smoothFactor: 1
+                }).addTo(this.map);
+            }
+        }
+
+        // Add gray markers for non-route places (no numbers, no polyline)
+        if (nonRoutePlaces && nonRoutePlaces.length > 0) {
+            nonRoutePlaces.forEach((place, index) => {
+                // Create gray custom icon
+                const grayIcon = L.icon({
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconSize: [20, 33],
+                    iconAnchor: [10, 33],
+                    popupAnchor: [1, -28],
+                    shadowSize: [33, 33],
+                    className: 'non-route-marker'
+                });
+
+                // Get category and country badges
+                const categories = place.categories && place.categories.length > 0
+                    ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+                    : '';
+
+                const countries = place.countries && place.countries.length > 0
+                    ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+                    : '';
+
+                const marker = L.marker([place.latitude, place.longitude], { icon: grayIcon })
+                    .addTo(this.map)
+                    .bindPopup(`
+                        <div class="map-popup-content non-route-popup">
+                            <div class="map-popup-header">
+                                <strong>${place.name}</strong>
+                                <span class="non-route-badge">Not in Route</span>
+                            </div>
+                            ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                            ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
+                            <div class="map-popup-coords">Lat: ${place.latitude.toFixed(4)}, Lng: ${place.longitude.toFixed(4)}</div>
+                            <div class="map-popup-actions">
+                                <button class="popup-action-btn add-to-route-btn" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                                    <i class="fas fa-plus"></i> Add to Route
+                                </button>
+                                <button class="popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app.editNonRoutePlace(${place.id})">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button class="popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app.deleteNonRoutePlace(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                            <div class="map-popup-links">
+                                <a href="https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}"
+                                   target="_blank"
+                                   class="link-btn google-maps">
+                                    <i class="fas fa-map"></i> Google Maps
+                                </a>
+                                <a href="https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}"
+                                   target="_blank"
+                                   class="link-btn google-nav">
+                                    <i class="fas fa-directions"></i> Navigate
+                                </a>
+                            </div>
+                        </div>
+                    `)
+                    .on('click', () => {
+                        if (this.onNonRouteMarkerClick) {
+                            this.onNonRouteMarkerClick(place.id, index);
+                        }
+                    });
+
+                this.nonRouteMarkers.push(marker);
+            });
+        }
     }
 }
 

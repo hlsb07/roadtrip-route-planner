@@ -2,10 +2,11 @@ import { ApiService } from './api.js';
 import { showSuccess, showError } from './utils.js';
 
 export class RouteManager {
-    constructor() {
+    constructor(filterManager = null) {
         this.routes = [];
         this.currentRouteId = null;
         this.isEditingRoute = false;
+        this.filterManager = filterManager;
     }
 
 
@@ -61,19 +62,51 @@ export class RouteManager {
 
     async loadCurrentRoute() {
         if (!this.currentRouteId) return [];
-        
+
         try {
             console.log('Loading current route:', this.currentRouteId);
             const route = await ApiService.getRoute(this.currentRouteId);
             console.log('Current route loaded:', route);
-            
-            // Convert places to expected format
+
+            // Enrich places with full data from filterManager
+            if (this.filterManager && this.filterManager.allPlaces) {
+                return route.places.map(minimalPlace => {
+                    // Find full place data
+                    const fullPlace = this.filterManager.allPlaces.find(p => p.id === minimalPlace.id);
+
+                    if (fullPlace) {
+                        // Return full place in expected format
+                        return {
+                            name: fullPlace.name,
+                            coords: [fullPlace.latitude, fullPlace.longitude],
+                            id: fullPlace.id,
+                            categories: fullPlace.categories || [],
+                            countries: fullPlace.countries || []
+                        };
+                    } else {
+                        // Fallback if place not found (shouldn't happen)
+                        console.warn(`Place ${minimalPlace.id} not found in filterManager.allPlaces`);
+                        return {
+                            name: minimalPlace.name,
+                            coords: [0, 0],  // Fallback coordinates
+                            id: minimalPlace.id,
+                            categories: [],
+                            countries: []
+                        };
+                    }
+                });
+            }
+
+            // Fallback if filterManager not available
+            console.warn('FilterManager not available, returning minimal place data');
             return route.places.map(p => ({
                 name: p.name,
-                coords: [p.latitude, p.longitude],
-                id: p.id
+                coords: [0, 0],  // No coordinates available in minimal DTO
+                id: p.id,
+                categories: [],
+                countries: []
             }));
-            
+
         } catch (error) {
             console.error('Failed to load current route:', error);
             showError('Failed to load route');

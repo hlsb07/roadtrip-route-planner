@@ -62,6 +62,22 @@ export class ApiService {
         return await response.json();
     }
 
+    static async updatePlace(placeId, name, latitude = null, longitude = null) {
+        const body = {};
+        if (name !== null && name !== undefined) body.name = name;
+        if (latitude !== null) body.latitude = latitude;
+        if (longitude !== null) body.longitude = longitude;
+
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update place');
+        }
+    }
+
     static async addPlaceToRoute(routeId, placeId) {
         const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places`, {
             method: 'POST',
@@ -87,12 +103,15 @@ export class ApiService {
     }
 
     static async reorderPlaces(routeId, placeIds) {
+        console.log('Reordering places:', { routeId, placeIds });
         const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places/reorder`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(placeIds)
         });
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Reorder failed:', response.status, errorText);
             throw new Error('Failed to reorder places');
         }
     }
@@ -139,5 +158,194 @@ export class ApiService {
         if (!response.ok) {
             throw new Error(`Failed to delete campsite: ${response.status}`);
         }
+    }
+
+    // Category API methods
+    static async getAllCategories() {
+        const response = await fetch(`${CONFIG.API_BASE}/categories`);
+        if (!response.ok) {
+            throw new Error(`Failed to load categories: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async getCategory(categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load category: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async createCategory(name, icon = '') {
+        const response = await fetch(`${CONFIG.API_BASE}/categories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, icon })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create category');
+        }
+        return await response.json();
+    }
+
+    static async updateCategory(categoryId, name, icon = '') {
+        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, icon })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update category');
+        }
+    }
+
+    static async deleteCategory(categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to delete category');
+        }
+    }
+
+    static async getPlacesByCategory(categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}/places`);
+        if (!response.ok) {
+            throw new Error(`Failed to load places for category: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    // Country API methods
+    static async getAllCountries() {
+        const response = await fetch(`${CONFIG.API_BASE}/countries`);
+        if (!response.ok) {
+            throw new Error(`Failed to load countries: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async getCountry(countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load country: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    static async createCountry(name, icon = '') {
+        const response = await fetch(`${CONFIG.API_BASE}/countries`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, icon })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create country');
+        }
+        return await response.json();
+    }
+
+    static async updateCountry(countryId, name, icon = '') {
+        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, icon })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update country');
+        }
+    }
+
+    static async deleteCountry(countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to delete country');
+        }
+    }
+
+    static async getPlacesByCountry(countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}/places`);
+        if (!response.ok) {
+            throw new Error(`Failed to load places for country: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    // Get all places (for filtering)
+    static async getAllPlaces() {
+        const response = await fetch(`${CONFIG.API_BASE}/places`);
+        if (!response.ok) {
+            throw new Error(`Failed to load places: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    // Place Category Management
+    static async assignCategoryToPlace(placeId, categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ categoryId })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to assign category');
+        }
+    }
+
+    static async removeCategoryFromPlace(placeId, categoryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories/${categoryId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to remove category');
+        }
+    }
+
+    static async getPlaceCategories(placeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories`);
+        if (!response.ok) {
+            throw new Error('Failed to get place categories');
+        }
+        return await response.json();
+    }
+
+    // Place Country Management
+    static async assignCountryToPlace(placeId, countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ countryId })
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to assign country');
+        }
+    }
+
+    static async removeCountryFromPlace(placeId, countryId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries/${countryId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to remove country');
+        }
+    }
+
+    static async getPlaceCountries(placeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries`);
+        if (!response.ok) {
+            throw new Error('Failed to get place countries');
+        }
+        return await response.json();
     }
 }

@@ -20,16 +20,20 @@
             <div class="desktop-nav">
                 <div class="desktop-nav-items">
                     <button class="desktop-nav-item active" data-mode="routes" onclick="switchDesktopMode('routes')">
-                        <i class="fas fa-map-marked-alt"></i>
+                        <i class="fas fa-route"></i>
                         <span>Routes</span>
                     </button>
                     <button class="desktop-nav-item" data-mode="search" onclick="switchDesktopMode('search')">
-                        <i class="fas fa-search"></i>
-                        <span>Add Place</span>
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Save Place</span>
                     </button>
                     <button class="desktop-nav-item" data-mode="places" onclick="switchDesktopMode('places')">
                         <i class="fas fa-list"></i>
-                        <span>Place List</span>
+                        <span>Route Places</span>
+                    </button>
+                    <button class="desktop-nav-item" data-mode="allplaces" onclick="switchDesktopMode('allplaces')">
+                        <i class="fas fa-database"></i>
+                        <span>All Places</span>
                     </button>
                     <button class="desktop-nav-item" data-mode="campsites" onclick="switchDesktopMode('campsites')">
                         <i class="fas fa-campground"></i>
@@ -95,6 +99,9 @@
             </div>
             
             <div class="controls">
+                <button class="btn btn-primary" onclick="openManageTagsModal()">
+                    <i class="fas fa-tags"></i> Manage Tags
+                </button>
                 <button class="btn" onclick="exportRoute()">
                     <i class="fas fa-download"></i> Export
                 </button>
@@ -108,12 +115,31 @@
             
             <div class="places-list" id="placesList"></div>
 
+            <div class="all-places-section" id="allPlacesSection" style="display: none;">
+                <div class="all-places-header">
+                    <h3><i class="fas fa-database"></i> All Places</h3>
+                    <span class="all-places-count" id="allPlacesCount">0 places</span>
+                </div>
+                <div class="all-places-search">
+                    <input type="text" id="allPlacesSearch" class="search-input" placeholder="Search all places...">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <div class="all-places-list" id="allPlacesList">
+                    <!-- All places will be populated here -->
+                </div>
+            </div>
+
             <div class="campsites-list" id="campsitesList"></div>
+
+            <div class="filters-container" id="desktopFilters"></div>
         </div>
 
         <div id="map"></div>
         
         <div class="map-controls">
+            <button class="map-btn" id="filterMapBtn" onclick="toggleFilterPanel()" title="Filters">
+                <i class="fas fa-filter"></i>
+            </button>
             <button class="map-btn" onclick="centerMap()" title="Center map">
                 <i class="fas fa-compress-arrows-alt"></i>
             </button>
@@ -125,24 +151,43 @@
             </button>
         </div>
 
+        <!-- Filter Panel Overlay (appears over map) -->
+        <div id="filterPanelOverlay" class="filter-panel-overlay" style="display: none;">
+            <div class="filter-panel-content">
+                <div class="filter-panel-header">
+                    <h3><i class="fas fa-filter"></i> Filters</h3>
+                    <button class="btn-close" onclick="toggleFilterPanel()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="filterPanelBody" class="filter-panel-body">
+                    <!-- Filter content will be populated here -->
+                </div>
+            </div>
+        </div>
+
         <!-- Mobile Navigation -->
         <div class="mobile-nav" id="mobileNav">
             <div class="mobile-nav-items">
                 <button class="mobile-nav-item active" data-mode="routes" onclick="switchMobileMode('routes')">
-                    <i class="fas fa-map-marked-alt"></i>
+                    <i class="fas fa-route"></i>
                     <span>Routes</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="search" onclick="switchMobileMode('search')">
-                    <i class="fas fa-search"></i>
-                    <span>Add Place</span>
+                    <i class="fas fa-plus-circle"></i>
+                    <span>Save</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="places" onclick="switchMobileMode('places')">
                     <i class="fas fa-list"></i>
-                    <span>Place List</span>
+                    <span>Route</span>
+                </button>
+                <button class="mobile-nav-item" data-mode="allplaces" onclick="switchMobileMode('allplaces')">
+                    <i class="fas fa-database"></i>
+                    <span>All</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="campsites" onclick="switchMobileMode('campsites')">
                     <i class="fas fa-campground"></i>
-                    <span>Campsites</span>
+                    <span>Camp</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="controls" onclick="switchMobileMode('controls')">
                     <i class="fas fa-cog"></i>
@@ -216,6 +261,21 @@
                     <!-- Places will be populated by placeManager.updatePlacesList() -->
                 </div>
 
+                <!-- All Places Section -->
+                <div class="mobile-section all-places-section" data-section="allplaces" style="display: none; padding: 10px; background: #fafafa; height: 100%; flex-direction: column;">
+                    <div class="all-places-header">
+                        <h3><i class="fas fa-database"></i> All Places</h3>
+                        <span class="all-places-count" id="mobileAllPlacesCount">0 places</span>
+                    </div>
+                    <div class="all-places-search">
+                        <input type="text" id="mobileAllPlacesSearch" class="search-input" placeholder="Search all places...">
+                        <i class="fas fa-search search-icon"></i>
+                    </div>
+                    <div class="all-places-list" id="mobileAllPlacesList" style="overflow-y: auto; flex: 1;">
+                        <!-- All places will be populated here -->
+                    </div>
+                </div>
+
                 <!-- Campsites List Section -->
                 <div class="mobile-section campsites-list" data-section="campsites" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
                     <!-- Campsites will be populated here -->
@@ -224,6 +284,9 @@
                 <!-- Controls Section -->
                 <div class="mobile-section" data-section="controls" style="display: none; padding: 15px;">
                     <div class="controls" style="border: none; padding: 0;">
+                        <button class="btn btn-primary" onclick="openManageTagsModal()">
+                            <i class="fas fa-tags"></i> Manage Tags
+                        </button>
                         <button class="btn" onclick="exportRoute()">
                             <i class="fas fa-download"></i> Export
                         </button>
@@ -263,7 +326,249 @@
             </div>
         </div>
         <div id="modalOverlay" class="modal-overlay" onclick="closeRouteModal()"></div>
-    </div>    
+    </div>
+
+    <div id="editPlaceModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Edit Place</h3>
+                <button class="btn-close" onclick="closePlaceModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Place Name -->
+                <div class="form-group">
+                    <label for="placeName"><i class="fas fa-map-marker-alt"></i> Place Name:</label>
+                    <input type="text" id="placeName" class="form-input" placeholder="Enter place name">
+                </div>
+
+                <!-- Coordinates -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="placeLatitude"><i class="fas fa-globe"></i> Latitude:</label>
+                        <input type="text" id="placeLatitude" class="form-input coords-input" placeholder="e.g., 51.5074" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="placeLongitude"><i class="fas fa-globe"></i> Longitude:</label>
+                        <input type="text" id="placeLongitude" class="form-input coords-input" placeholder="e.g., -0.1278" readonly>
+                    </div>
+                </div>
+                <button type="button" class="btn-change-location" onclick="placeManager.startLocationChange()">
+                    <i class="fas fa-map-marker-alt"></i> Change Location on Map
+                </button>
+
+                <!-- Remove from Route Button (conditional - only shows if place is in current route) -->
+                <button type="button" id="removeFromRouteBtn" class="btn-remove-from-route" style="display: none;" onclick="placeManager.removeFromCurrentRoute()">
+                    <i class="fas fa-minus-circle"></i> Remove from Current Route
+                </button>
+
+                <!-- Categories -->
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Categories:</label>
+                    <div id="categoriesContainer" class="multi-select-container">
+                        <!-- Categories will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Countries -->
+                <div class="form-group">
+                    <label><i class="fas fa-flag"></i> Countries:</label>
+                    <div id="countriesContainer" class="multi-select-container">
+                        <!-- Countries will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePlaceModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="savePlaceEdit()" id="savePlaceBtn">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closePlaceModal()"></div>
+    </div>
+
+    <div id="addPlacePositionModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-marker-alt"></i> Add Place to Route</h3>
+                <button class="btn-close" onclick="closeAddPlacePositionModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="addPlaceModalText" class="modal-instruction">
+                    Select where to insert "<span id="placeToAddName"></span>" in your route:
+                </p>
+                <div id="positionButtons" class="position-buttons">
+                    <!-- Position buttons will be dynamically generated -->
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closeAddPlacePositionModal()"></div>
+    </div>
+
+    <div id="placeAddedSuccessModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3><i class="fas fa-check-circle" style="color: #2A9D8F;"></i> Place Saved</h3>
+                <button class="btn-close" onclick="closePlaceAddedSuccessModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-instruction">
+                    "<span id="savedPlaceName"></span>" has been saved to your place library.
+                </p>
+                <p class="modal-sub-instruction">
+                    Would you like to add it to your current route?
+                </p>
+                <div class="modal-action-buttons">
+                    <button class="btn btn-primary btn-block" onclick="addSavedPlaceToRoute()">
+                        <i class="fas fa-plus"></i> Insert at Position...
+                    </button>
+                    <button class="btn btn-secondary btn-block" onclick="closePlaceAddedSuccessModal()">
+                        <i class="fas fa-times"></i> Don't Add to Route
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closePlaceAddedSuccessModal()"></div>
+    </div>
+
+    <!-- Manage Tags Modal -->
+    <div id="manageTagsModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-tags"></i> Manage Tags</h3>
+                <button class="btn-close" onclick="closeManageTagsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Tabs for Categories and Countries -->
+                <div class="tags-tabs">
+                    <button class="tags-tab-btn active" data-tab="categories" onclick="switchTagsTab('categories')">
+                        <i class="fas fa-tag"></i> Categories
+                    </button>
+                    <button class="tags-tab-btn" data-tab="countries" onclick="switchTagsTab('countries')">
+                        <i class="fas fa-flag"></i> Countries
+                    </button>
+                </div>
+
+                <!-- Categories Tab Content -->
+                <div id="categoriesTabContent" class="tags-tab-content active">
+                    <div class="tags-list-header">
+                        <h4>Categories</h4>
+                        <button class="btn btn-sm btn-primary" onclick="tagManager.showCreateTagForm('category')">
+                            <i class="fas fa-plus"></i> Add Category
+                        </button>
+                    </div>
+                    <div id="categoriesList" class="tags-list">
+                        <!-- Categories will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Countries Tab Content -->
+                <div id="countriesTabContent" class="tags-tab-content" style="display: none;">
+                    <div class="tags-list-header">
+                        <h4>Countries</h4>
+                        <button class="btn btn-sm btn-primary" onclick="tagManager.showCreateTagForm('country')">
+                            <i class="fas fa-plus"></i> Add Country
+                        </button>
+                    </div>
+                    <div id="countriesList" class="tags-list">
+                        <!-- Countries will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closeManageTagsModal()"></div>
+    </div>
+
+    <!-- Edit Tag Modal -->
+    <div id="editTagModal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h3 id="editTagModalTitle"><i class="fas fa-edit"></i> Edit Tag</h3>
+                <button class="btn-close" onclick="closeEditTagModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="tagName"><i class="fas fa-font"></i> Name:</label>
+                    <input type="text" id="tagName" class="form-input" placeholder="Enter tag name">
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-smile"></i> Icon:</label>
+                    <div class="icon-input-group">
+                        <input type="text" id="tagIcon" class="form-input icon-input" placeholder="Enter emoji or text">
+                        <button class="btn btn-secondary" onclick="toggleEmojiPicker()">
+                            <i class="fas fa-icons"></i> Pick Emoji
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Emoji Picker -->
+                <div id="emojiPicker" class="emoji-picker" style="display: none;">
+                    <div class="emoji-picker-header">
+                        <input type="text" id="emojiSearch" class="emoji-search" placeholder="Search emoji...">
+                    </div>
+                    <div class="emoji-picker-categories">
+                        <button class="emoji-category-btn active" data-category="all" onclick="filterEmojiCategory('all')">All</button>
+                        <button class="emoji-category-btn" data-category="smileys" onclick="filterEmojiCategory('smileys')">😀</button>
+                        <button class="emoji-category-btn" data-category="nature" onclick="filterEmojiCategory('nature')">🌿</button>
+                        <button class="emoji-category-btn" data-category="food" onclick="filterEmojiCategory('food')">🍕</button>
+                        <button class="emoji-category-btn" data-category="activities" onclick="filterEmojiCategory('activities')">⚽</button>
+                        <button class="emoji-category-btn" data-category="travel" onclick="filterEmojiCategory('travel')">✈️</button>
+                        <button class="emoji-category-btn" data-category="objects" onclick="filterEmojiCategory('objects')">💡</button>
+                        <button class="emoji-category-btn" data-category="symbols" onclick="filterEmojiCategory('symbols')">❤️</button>
+                        <button class="emoji-category-btn" data-category="flags" onclick="filterEmojiCategory('flags')">🏁</button>
+                    </div>
+                    <div class="emoji-picker-grid" id="emojiPickerGrid">
+                        <!-- Emojis will be populated here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditTagModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="tagManager.saveTag()">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closeEditTagModal()"></div>
+    </div>
+
+    <!-- Delete Tag Confirmation Modal -->
+    <div id="deleteTagModal" class="modal">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle" style="color: #E76F51;"></i> Delete Tag</h3>
+                <button class="btn-close" onclick="closeDeleteTagModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteTagMessage" class="modal-instruction">
+                    <!-- Message will be populated dynamically -->
+                </p>
+                <div id="deleteTagPlacesList" class="delete-tag-places-list" style="display: none;">
+                    <!-- Places using this tag will be listed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeleteTagModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirmDeleteTagBtn" onclick="tagManager.confirmDeleteTag()">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closeDeleteTagModal()"></div>
+    </div>
 
     <input type="file" id="importFile" style="display: none;" accept=".json">
 
@@ -287,6 +592,7 @@
             const searchSection = document.querySelector('.search-section');
             const controls = document.querySelector('.controls');
             const placesList = document.querySelector('.places-list');
+            const allPlacesSection = document.getElementById('allPlacesSection');
             const campsitesList = document.querySelector('.campsites-list');
 
             // Hide all sections first
@@ -294,19 +600,22 @@
             if (searchSection) searchSection.style.display = 'none';
             if (controls) controls.style.display = 'none';
             if (placesList) placesList.style.display = 'none';
+            if (allPlacesSection) allPlacesSection.style.display = 'none';
             if (campsitesList) campsitesList.style.display = 'none';
 
             // Show the selected section
             switch(mode) {
                 case 'routes':
                     if (routeMgmt) routeMgmt.style.display = 'block';
-                    if (placesList) placesList.style.display = 'block';
                     break;
                 case 'search':
                     if (searchSection) searchSection.style.display = 'block';
                     break;
                 case 'places':
                     if (placesList) placesList.style.display = 'block';
+                    break;
+                case 'allplaces':
+                    if (allPlacesSection) allPlacesSection.style.display = 'block';
                     break;
                 case 'campsites':
                     if (campsitesList) campsitesList.style.display = 'block';
@@ -338,9 +647,10 @@
 
             // Set title and show appropriate section
             const modes = {
-                routes: 'Route Selection',
-                search: 'Add Place',
-                places: 'Place List',
+                routes: 'Route Management',
+                search: 'Save Place',
+                places: 'Route Places',
+                allplaces: 'All Places',
                 campsites: 'Campsites',
                 controls: 'Tools'
             };
@@ -424,6 +734,117 @@
                 }
             }
         });
+
+        // Toggle filter panel overlay
+        window.toggleFilterPanel = function() {
+            const overlay = document.getElementById('filterPanelOverlay');
+            const filterBtn = document.getElementById('filterMapBtn');
+
+            if (overlay.style.display === 'none' || overlay.style.display === '') {
+                overlay.style.display = 'flex';
+                if (filterBtn) filterBtn.classList.add('active');
+
+                // Populate filter panel
+                if (window.filterManager) {
+                    window.filterManager.renderFilters();
+                }
+            } else {
+                overlay.style.display = 'none';
+                if (filterBtn) filterBtn.classList.remove('active');
+            }
+        };
+
+        // Close filter panel when clicking overlay background
+        document.addEventListener('click', (e) => {
+            const overlay = document.getElementById('filterPanelOverlay');
+            if (e.target === overlay) {
+                toggleFilterPanel();
+            }
+        });
+
+        // Tag Management Modal Functions
+        window.openManageTagsModal = function() {
+            const modal = document.getElementById('manageTagsModal');
+            if (modal) {
+                modal.classList.add('active');
+                // Initialize tag manager if available
+                if (window.tagManager) {
+                    window.tagManager.loadTags();
+                }
+            }
+        };
+
+        window.closeManageTagsModal = function() {
+            const modal = document.getElementById('manageTagsModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        };
+
+        window.switchTagsTab = function(tab) {
+            // Update active tab button
+            document.querySelectorAll('.tags-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tab);
+            });
+
+            // Show/hide tab content
+            const categoriesContent = document.getElementById('categoriesTabContent');
+            const countriesContent = document.getElementById('countriesTabContent');
+
+            if (tab === 'categories') {
+                categoriesContent.style.display = 'block';
+                countriesContent.style.display = 'none';
+            } else {
+                categoriesContent.style.display = 'none';
+                countriesContent.style.display = 'block';
+            }
+        };
+
+        window.closeEditTagModal = function() {
+            const modal = document.getElementById('editTagModal');
+            if (modal) {
+                modal.classList.remove('active');
+                // Hide emoji picker
+                const emojiPicker = document.getElementById('emojiPicker');
+                if (emojiPicker) {
+                    emojiPicker.style.display = 'none';
+                }
+            }
+        };
+
+        window.toggleEmojiPicker = function() {
+            const emojiPicker = document.getElementById('emojiPicker');
+            if (emojiPicker) {
+                if (emojiPicker.style.display === 'none' || !emojiPicker.style.display) {
+                    emojiPicker.style.display = 'block';
+                    // Initialize emoji picker if tagManager is available
+                    if (window.tagManager) {
+                        window.tagManager.initEmojiPicker();
+                    }
+                } else {
+                    emojiPicker.style.display = 'none';
+                }
+            }
+        };
+
+        window.filterEmojiCategory = function(category) {
+            // Update active category button
+            document.querySelectorAll('.emoji-category-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === category);
+            });
+
+            // Filter emojis if tagManager is available
+            if (window.tagManager) {
+                window.tagManager.filterEmojis(category);
+            }
+        };
+
+        window.closeDeleteTagModal = function() {
+            const modal = document.getElementById('deleteTagModal');
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        };
     </script>
 
     <script type="module" src="js/app.js"></script>
