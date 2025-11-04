@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RoutePlanner.API.Data;
 using RoutePlanner.API.DTOs;
 using RoutePlanner.API.Models;
+using RoutePlanner.API.Services;
 using NetTopologySuite.Geometries;
 
 namespace RoutePlanner.API.Controllers
@@ -12,11 +13,14 @@ namespace RoutePlanner.API.Controllers
     public class PlacesController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IPlaceService _placeService;
         private readonly GeometryFactory _geometryFactory;
+        private const int CurrentUserId = 1; // Hardcoded until authentication is implemented
 
-        public PlacesController(AppDbContext context)
+        public PlacesController(AppDbContext context, IPlaceService placeService)
         {
             _context = context;
+            _placeService = placeService;
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         }
 
@@ -25,6 +29,7 @@ namespace RoutePlanner.API.Controllers
         public async Task<ActionResult<List<PlaceDto>>> GetPlaces()
         {
             var places = await _context.Places
+                .Where(p => p.UserId == CurrentUserId)
                 .Include(p => p.PlaceCategories)
                 .ThenInclude(pc => pc.Category)
                 .Include(p => p.PlaceCountries)
@@ -32,9 +37,15 @@ namespace RoutePlanner.API.Controllers
                 .Select(p => new PlaceDto
                 {
                     Id = p.Id,
+                    UserId = p.UserId,
                     Name = p.Name,
                     Latitude = p.Location.Y,
                     Longitude = p.Location.X,
+                    Notes = p.Notes,
+                    GooglePlaceId = p.GooglePlaceId,
+                    CreatedAt = p.CreatedAt,
+                    UpdatedAt = p.UpdatedAt,
+                    LastViewedAt = p.LastViewedAt,
                     Categories = p.PlaceCategories.Select(pc => new CategoryDto
                     {
                         Id = pc.Category.Id,
@@ -61,6 +72,7 @@ namespace RoutePlanner.API.Controllers
         public async Task<ActionResult<PlaceDto>> GetPlace(int id)
         {
             var place = await _context.Places
+                .Where(p => p.UserId == CurrentUserId)
                 .Include(p => p.PlaceCategories)
                 .ThenInclude(pc => pc.Category)
                 .Include(p => p.PlaceCountries)
@@ -70,12 +82,22 @@ namespace RoutePlanner.API.Controllers
             if (place == null)
                 return NotFound();
 
+            // Update LastViewedAt
+            place.LastViewedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
             var placeDto = new PlaceDto
             {
                 Id = place.Id,
+                UserId = place.UserId,
                 Name = place.Name,
                 Latitude = place.Location.Y,
                 Longitude = place.Location.X,
+                Notes = place.Notes,
+                GooglePlaceId = place.GooglePlaceId,
+                CreatedAt = place.CreatedAt,
+                UpdatedAt = place.UpdatedAt,
+                LastViewedAt = place.LastViewedAt,
                 Categories = place.PlaceCategories.Select(pc => new CategoryDto
                 {
                     Id = pc.Category.Id,
@@ -104,8 +126,10 @@ namespace RoutePlanner.API.Controllers
             {
                 var place = new Place
                 {
+                    UserId = CurrentUserId,
                     Name = createDto.Name,
-                    Location = _geometryFactory.CreatePoint(new Coordinate(createDto.Longitude, createDto.Latitude))
+                    Location = _geometryFactory.CreatePoint(new Coordinate(createDto.Longitude, createDto.Latitude)),
+                    Notes = createDto.Notes
                 };
 
                 _context.Places.Add(place);
@@ -114,9 +138,13 @@ namespace RoutePlanner.API.Controllers
                 var placeDto = new PlaceDto
                 {
                     Id = place.Id,
+                    UserId = place.UserId,
                     Name = place.Name,
                     Latitude = place.Location.Y,
-                    Longitude = place.Location.X
+                    Longitude = place.Location.X,
+                    Notes = place.Notes,
+                    CreatedAt = place.CreatedAt,
+                    UpdatedAt = place.UpdatedAt
                 };
 
                 return CreatedAtAction(nameof(GetPlace), new { id = place.Id }, placeDto);
@@ -131,7 +159,7 @@ namespace RoutePlanner.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdatePlace(int id, UpdatePlaceDto updateDto)
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == id && p.UserId == CurrentUserId);
 
             if (place == null)
                 return NotFound();
@@ -149,6 +177,14 @@ namespace RoutePlanner.API.Controllers
                     new Coordinate(updateDto.Longitude.Value, updateDto.Latitude.Value));
             }
 
+            // Update notes if provided
+            if (updateDto.Notes != null)
+            {
+                place.Notes = updateDto.Notes;
+            }
+
+            place.UpdatedAt = DateTime.UtcNow;
+
             try
             {
                 await _context.SaveChangesAsync();
@@ -156,7 +192,7 @@ namespace RoutePlanner.API.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!await _context.Places.AnyAsync(p => p.Id == id))
+                if (!await _context.Places.AnyAsync(p => p.Id == id && p.UserId == CurrentUserId))
                     return NotFound();
                 throw;
             }
@@ -167,6 +203,7 @@ namespace RoutePlanner.API.Controllers
         public async Task<IActionResult> DeletePlace(int id)
         {
             var place = await _context.Places
+                .Where(p => p.UserId == CurrentUserId)
                 .Include(p => p.RoutePlaces)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -182,8 +219,8 @@ namespace RoutePlanner.API.Controllers
                     .Select(rp => rp.Route!.Name)
                     .ToListAsync();
 
-                return BadRequest(new 
-                { 
+                return BadRequest(new
+                {
                     message = "Cannot delete place because it is used in routes",
                     usedInRoutes = routeNames
                 });
@@ -200,6 +237,7 @@ namespace RoutePlanner.API.Controllers
         public async Task<IActionResult> ForceDeletePlace(int id)
         {
             var place = await _context.Places
+                .Where(p => p.UserId == CurrentUserId)
                 .Include(p => p.RoutePlaces)
                 .FirstOrDefaultAsync(p => p.Id == id);
 
@@ -208,7 +246,7 @@ namespace RoutePlanner.API.Controllers
 
             _context.RoutePlaces.RemoveRange(place.RoutePlaces);
             _context.Places.Remove(place);
-            
+
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Place and all route references deleted successfully" });
@@ -227,6 +265,7 @@ namespace RoutePlanner.API.Controllers
                 var radiusMeters = radiusKm * 1000;
 
                 var nearbyPlaces = await _context.Places
+                    .Where(p => p.UserId == CurrentUserId)
                     .Include(p => p.PlaceCategories)
                     .ThenInclude(pc => pc.Category)
                     .Include(p => p.PlaceCountries)
@@ -236,9 +275,15 @@ namespace RoutePlanner.API.Controllers
                     .Select(p => new PlaceDto
                     {
                         Id = p.Id,
+                        UserId = p.UserId,
                         Name = p.Name,
                         Latitude = p.Location.Y,
                         Longitude = p.Location.X,
+                        Notes = p.Notes,
+                        GooglePlaceId = p.GooglePlaceId,
+                        CreatedAt = p.CreatedAt,
+                        UpdatedAt = p.UpdatedAt,
+                        LastViewedAt = p.LastViewedAt,
                         Categories = p.PlaceCategories.Select(pc => new CategoryDto
                         {
                             Id = pc.Category.Id,
@@ -269,7 +314,7 @@ namespace RoutePlanner.API.Controllers
         [HttpGet("{id}/usage")]
         public async Task<ActionResult<object>> GetPlaceUsage(int id)
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == id && p.UserId == CurrentUserId);
             if (place == null)
                 return NotFound();
 
@@ -298,7 +343,7 @@ namespace RoutePlanner.API.Controllers
         [HttpPost("{id}/categories")]
         public async Task<IActionResult> AssignCategoryToPlace(int id, AssignCategoryDto assignDto)
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == id && p.UserId == CurrentUserId);
             if (place == null)
                 return NotFound(new { message = "Place not found" });
 
@@ -345,7 +390,7 @@ namespace RoutePlanner.API.Controllers
         [HttpGet("{id}/categories")]
         public async Task<ActionResult<List<CategoryDto>>> GetPlaceCategories(int id)
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == id && p.UserId == CurrentUserId);
             if (place == null)
                 return NotFound();
 
@@ -368,7 +413,7 @@ namespace RoutePlanner.API.Controllers
         [HttpPost("{id}/countries")]
         public async Task<IActionResult> AssignCountryToPlace(int id, AssignCountryDto assignDto)
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == id && p.UserId == CurrentUserId);
             if (place == null)
                 return NotFound(new { message = "Place not found" });
 
@@ -415,7 +460,7 @@ namespace RoutePlanner.API.Controllers
         [HttpGet("{id}/countries")]
         public async Task<ActionResult<List<CountryDto>>> GetPlaceCountries(int id)
         {
-            var place = await _context.Places.FindAsync(id);
+            var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == id && p.UserId == CurrentUserId);
             if (place == null)
                 return NotFound();
 
@@ -433,6 +478,144 @@ namespace RoutePlanner.API.Controllers
                 .ToListAsync();
 
             return Ok(countries);
+        }
+
+        // ===== Google Places Integration Endpoints =====
+
+        // POST: api/places/from-google
+        [HttpPost("from-google")]
+        public async Task<ActionResult<PlaceDto>> CreatePlaceFromGoogle(CreatePlaceFromGoogleDto createDto)
+        {
+            try
+            {
+                var place = await _placeService.CreatePlaceFromGoogle(
+                    createDto.GooglePlaceId,
+                    CurrentUserId,
+                    createDto.Notes);
+
+                var placeDto = new PlaceDto
+                {
+                    Id = place.Id,
+                    UserId = place.UserId,
+                    Name = place.Name,
+                    Latitude = place.Location.Y,
+                    Longitude = place.Location.X,
+                    Notes = place.Notes,
+                    GooglePlaceId = place.GooglePlaceId,
+                    CreatedAt = place.CreatedAt,
+                    UpdatedAt = place.UpdatedAt
+                };
+
+                return CreatedAtAction(nameof(GetPlace), new { id = place.Id }, placeDto);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error creating place from Google", error = ex.Message });
+            }
+        }
+
+        // POST: api/places/check-duplicate
+        [HttpPost("check-duplicate")]
+        public async Task<ActionResult<DuplicateCheckResponse>> CheckDuplicate(DuplicateCheckRequest request)
+        {
+            try
+            {
+                var result = await _placeService.CheckDuplicate(request.GooglePlaceId, CurrentUserId);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error checking duplicate", error = ex.Message });
+            }
+        }
+
+        // POST: api/places/{id}/refresh-google
+        [HttpPost("{id}/refresh-google")]
+        public async Task<ActionResult<RefreshGoogleDataResponse>> RefreshGoogleData(int id)
+        {
+            try
+            {
+                // Verify the place exists and belongs to current user
+                var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == id && p.UserId == CurrentUserId);
+                if (place == null)
+                    return NotFound(new { message = "Place not found" });
+
+                if (string.IsNullOrEmpty(place.GooglePlaceId))
+                    return BadRequest(new { message = "This place is not linked to Google Places" });
+
+                var result = await _placeService.RefreshGoogleData(id);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error refreshing Google data", error = ex.Message });
+            }
+        }
+
+        // GET: api/places/{id}/enriched
+        [HttpGet("{id}/enriched")]
+        public async Task<ActionResult<EnrichedPlaceDto>> GetEnrichedPlace(int id)
+        {
+            try
+            {
+                var enrichedPlace = await _placeService.GetEnrichedPlace(id, CurrentUserId);
+
+                if (enrichedPlace == null)
+                    return NotFound();
+
+                // Update LastViewedAt
+                var place = await _context.Places.FindAsync(id);
+                if (place != null)
+                {
+                    place.LastViewedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                }
+
+                return Ok(enrichedPlace);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error getting enriched place", error = ex.Message });
+            }
+        }
+
+        // PUT: api/places/{id}/notes
+        [HttpPut("{id}/notes")]
+        public async Task<IActionResult> UpdateNotes(int id, UpdateNotesDto updateDto)
+        {
+            try
+            {
+                var success = await _placeService.UpdateNotes(id, CurrentUserId, updateDto.Notes);
+
+                if (!success)
+                    return NotFound();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating notes", error = ex.Message });
+            }
+        }
+
+        // POST: api/places/reverse-geocode
+        [HttpPost("reverse-geocode")]
+        public async Task<ActionResult<object>> ReverseGeocodeExistingPlaces()
+        {
+            try
+            {
+                var count = await _placeService.ReverseGeocodeExistingPlaces(CurrentUserId);
+
+                return Ok(new
+                {
+                    message = $"Successfully linked {count} places to Google data",
+                    placesLinked = count
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error reverse geocoding places", error = ex.Message });
+            }
         }
     }
 }

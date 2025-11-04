@@ -30,10 +30,10 @@ namespace RoutePlanner.API.DTOs
         public string? Website { get; set; }
         public string? PhoneNumber { get; set; }
         public string? OpeningHours { get; set; }
-        public List<PlacePhoto> Photos { get; set; } = new();
+        public List<PlacePhotoDto> Photos { get; set; } = new();
     }
 
-    public class PlacePhoto
+    public class PlacePhotoDto
     {
         public string PhotoReference { get; set; } = string.Empty;
         public int Width { get; set; }

@@ -172,13 +172,13 @@ namespace RoutePlanner.API.Services
                 OpeningHours = result.TryGetProperty("opening_hours", out var hours)
                     ? JsonSerializer.Serialize(hours) : null,
                 Photos = result.TryGetProperty("photos", out var photos)
-                    ? photos.EnumerateArray().Select(p => new PlacePhoto
+                    ? photos.EnumerateArray().Select(p => new DTOs.PlacePhotoDto
                     {
                         PhotoReference = p.GetProperty("photo_reference").GetString() ?? "",
                         Width = p.GetProperty("width").GetInt32(),
                         Height = p.GetProperty("height").GetInt32()
                     }).ToList()
-                    : new List<PlacePhoto>()
+                    : new List<DTOs.PlacePhotoDto>()
             };
 
             // Populate photo URLs
@@ -310,13 +310,13 @@ namespace RoutePlanner.API.Services
                 OpeningHours = result.TryGetProperty("opening_hours", out var hours)
                     ? JsonSerializer.Serialize(hours) : null,
                 Photos = result.TryGetProperty("photos", out var photos)
-                    ? photos.EnumerateArray().Select(p => new PlacePhoto
+                    ? photos.EnumerateArray().Select(p => new DTOs.PlacePhotoDto
                     {
                         PhotoReference = p.GetProperty("photo_reference").GetString() ?? "",
                         Width = p.GetProperty("width").GetInt32(),
                         Height = p.GetProperty("height").GetInt32()
                     }).ToList()
-                    : new List<PlacePhoto>()
+                    : new List<DTOs.PlacePhotoDto>()
             };
 
             // Populate photo URLs
@@ -390,7 +390,7 @@ namespace RoutePlanner.API.Services
 
                 if (data.TryGetProperty("photos", out var photos) && photos.ValueKind == JsonValueKind.Array)
                 {
-                    result.Photos = photos.EnumerateArray().Select(p => new PlacePhoto
+                    result.Photos = photos.EnumerateArray().Select(p => new DTOs.PlacePhotoDto
                     {
                         PhotoReference = p.GetProperty("photoReference").GetString() ?? "",
                         Width = p.GetProperty("width").GetInt32(),
@@ -514,6 +514,145 @@ namespace RoutePlanner.API.Services
             await _context.SaveChangesAsync();
 
             _logger.LogInformation($"Cleaned {expired.Count} expired cache entries");
+        }
+
+        /// <summary>
+        /// Reverse geocode coordinates to find the nearest Google Place
+        /// Used for linking existing manual places to Google data
+        /// </summary>
+        /// <param name="lat">Latitude</param>
+        /// <param name="lng">Longitude</param>
+        /// <param name="placeTypes">Optional comma-separated place types to filter (e.g., "restaurant,cafe")</param>
+        /// <returns>Best matching place or null if not found</returns>
+        public async Task<PlaceSearchResult?> ReverseGeocode(double lat, double lng, string? placeTypes = null)
+        {
+            var apiKey = _configuration["GoogleMaps:ApiKey"];
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                throw new InvalidOperationException("Google Maps API key not configured");
+            }
+
+            // Build URL with optional type filtering
+            var url = $"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={apiKey}";
+            if (!string.IsNullOrEmpty(placeTypes))
+            {
+                url += $"&result_type={placeTypes}";
+            }
+
+            _logger.LogInformation($"Reverse geocoding coordinates: ({lat}, {lng})");
+
+            try
+            {
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
+
+                if (!data.TryGetProperty("results", out var results) || results.GetArrayLength() == 0)
+                {
+                    _logger.LogInformation($"No results found for reverse geocoding: ({lat}, {lng})");
+                    return null;
+                }
+
+                // Get the first (best) result
+                var firstResult = results[0];
+                var placeId = firstResult.GetProperty("place_id").GetString();
+
+                if (string.IsNullOrEmpty(placeId))
+                {
+                    return null;
+                }
+
+                // Get full place details using the place ID
+                var placeDetails = await GetPlaceDetails(placeId);
+
+                if (placeDetails != null)
+                {
+                    _logger.LogInformation($"Reverse geocode success: {placeDetails.Name}");
+                }
+
+                return placeDetails;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error reverse geocoding coordinates: ({lat}, {lng})");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Search for places near a location (e.g., clicked point on map)
+        /// Future feature for discovering places by clicking on map
+        /// </summary>
+        /// <param name="lat">Latitude</param>
+        /// <param name="lng">Longitude</param>
+        /// <param name="radiusMeters">Search radius in meters (max 50000)</param>
+        /// <param name="type">Optional place type to filter (e.g., "restaurant", "tourist_attraction")</param>
+        /// <returns>List of nearby places</returns>
+        public async Task<List<PlaceSearchResult>> NearbySearch(double lat, double lng, int radiusMeters, string? type = null)
+        {
+            var apiKey = _configuration["GoogleMaps:ApiKey"];
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                throw new InvalidOperationException("Google Maps API key not configured");
+            }
+
+            // Limit radius to Google's max
+            if (radiusMeters > 50000)
+            {
+                radiusMeters = 50000;
+            }
+
+            // Build URL with optional type filtering
+            var url = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius={radiusMeters}&key={apiKey}";
+            if (!string.IsNullOrEmpty(type))
+            {
+                url += $"&type={type}";
+            }
+
+            _logger.LogInformation($"Nearby search at ({lat}, {lng}) with radius {radiusMeters}m");
+
+            try
+            {
+                var response = await _httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var json = await response.Content.ReadAsStringAsync();
+                var data = JsonSerializer.Deserialize<JsonElement>(json);
+
+                if (!data.TryGetProperty("results", out var results))
+                {
+                    _logger.LogInformation($"No results found for nearby search at ({lat}, {lng})");
+                    return new List<PlaceSearchResult>();
+                }
+
+                var places = new List<PlaceSearchResult>();
+
+                foreach (var result in results.EnumerateArray())
+                {
+                    var placeId = result.GetProperty("place_id").GetString();
+                    if (string.IsNullOrEmpty(placeId)) continue;
+
+                    // Get full details for each place (includes photos, ratings, etc.)
+                    var placeDetails = await GetPlaceDetails(placeId);
+                    if (placeDetails != null)
+                    {
+                        places.Add(placeDetails);
+                    }
+
+                    // Limit to 20 results to avoid excessive API calls
+                    if (places.Count >= 20) break;
+                }
+
+                _logger.LogInformation($"Nearby search found {places.Count} places");
+                return places;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in nearby search at ({lat}, {lng})");
+                return new List<PlaceSearchResult>();
+            }
         }
     }
 }

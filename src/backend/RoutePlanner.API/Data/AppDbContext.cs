@@ -8,10 +8,18 @@ namespace RoutePlanner.API.Data
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
+        // Core Entities
+        public DbSet<User> Users { get; set; }
         public DbSet<Place> Places { get; set; }
         public DbSet<Models.Route> Routes { get; set; }
         public DbSet<RoutePlace> RoutePlaces { get; set; }
+
+        // Google Maps Integration
+        public DbSet<GooglePlaceData> GooglePlaceData { get; set; }
+        public DbSet<PlacePhoto> PlacePhotos { get; set; }
         public DbSet<GoogleMapsCache> GoogleMapsCache { get; set; }
+
+        // Other Entities
         public DbSet<Campsite> Campsites { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<PlaceCategory> PlaceCategories { get; set; }
@@ -22,27 +30,99 @@ namespace RoutePlanner.API.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // Place Konfiguration für PostGIS
+            // ===== User Configuration =====
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Username).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.Email).HasMaxLength(255).IsRequired();
+                entity.Property(e => e.PasswordHash).HasMaxLength(500).IsRequired();
+
+                // Unique constraints
+                entity.HasIndex(e => e.Username).IsUnique();
+                entity.HasIndex(e => e.Email).IsUnique();
+            });
+
+            // ===== GooglePlaceData Configuration =====
+            modelBuilder.Entity<GooglePlaceData>(entity =>
+            {
+                // GooglePlaceId is the primary key (string from Google)
+                entity.HasKey(e => e.GooglePlaceId);
+                entity.Property(e => e.GooglePlaceId).HasMaxLength(500).IsRequired();
+
+                entity.Property(e => e.Name).HasMaxLength(500).IsRequired();
+                entity.Property(e => e.FormattedAddress).HasMaxLength(1000);
+                entity.Property(e => e.Types).HasColumnType("text"); // JSON
+                entity.Property(e => e.OpeningHours).HasColumnType("text"); // JSON
+                entity.Property(e => e.BusinessStatus).HasMaxLength(50);
+                entity.Property(e => e.Website).HasMaxLength(500);
+                entity.Property(e => e.PhoneNumber).HasMaxLength(50);
+
+                // PostGIS Point for location
+                entity.Property(e => e.Location)
+                      .HasColumnType("geometry (point, 4326)")
+                      .IsRequired();
+
+                // Indexes for performance
+                entity.HasIndex(e => e.Name);
+                entity.HasIndex(e => e.Location).HasMethod("gist");
+                entity.HasIndex(e => e.LastSyncedAt);
+            });
+
+            // ===== PlacePhoto Configuration =====
+            modelBuilder.Entity<PlacePhoto>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                // Relationship to GooglePlaceData (shared photos)
+                entity.HasOne(e => e.GooglePlace)
+                      .WithMany(g => g.Photos)
+                      .HasForeignKey(e => e.GooglePlaceId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.Property(e => e.PhotoReference).HasMaxLength(500);
+                entity.Property(e => e.PhotoUrl).HasMaxLength(1000).IsRequired();
+                entity.Property(e => e.Source).HasMaxLength(50).IsRequired().HasDefaultValue("google");
+
+                // Indexes
+                entity.HasIndex(e => e.GooglePlaceId);
+                entity.HasIndex(e => new { e.GooglePlaceId, e.IsPrimary })
+                      .HasFilter("\"IsPrimary\" = true"); // Only one primary photo per place
+            });
+
+            // ===== Place Configuration =====
             modelBuilder.Entity<Place>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
-                
+                entity.Property(e => e.Notes).HasMaxLength(5000); // User notes can be longer
+                entity.Property(e => e.GooglePlaceId).HasMaxLength(500);
+
                 // GEOMETRY statt geography für einfachere Koordinaten-Zugriffe
                 entity.Property(e => e.Location)
                       .HasColumnType("geometry (point, 4326)")
                       .IsRequired();
-                
+
+                // Relationship to User
+                entity.HasOne(e => e.User)
+                      .WithMany(u => u.Places)
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Relationship to GooglePlaceData (optional)
+                entity.HasOne(e => e.GoogleData)
+                      .WithMany(g => g.Places)
+                      .HasForeignKey(e => e.GooglePlaceId)
+                      .OnDelete(DeleteBehavior.SetNull); // If Google data deleted, just remove link
+
                 // Räumlicher Index für Performance
-                entity.HasIndex(e => e.Location)
-                      .HasMethod("gist");
-                      
-                // // Ignore für Convenience Properties (werden von Location berechnet)
-                // entity.Ignore(e => e.Latitude);
-                // entity.Ignore(e => e.Longitude);
+                entity.HasIndex(e => e.Location).HasMethod("gist");
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => e.GooglePlaceId);
+                entity.HasIndex(e => new { e.UserId, e.GooglePlaceId }); // Prevent user duplicates
             });
 
-            // Route Konfiguration
+            // ===== Route Configuration =====
             modelBuilder.Entity<Models.Route>(entity =>
             {
                 entity.HasKey(e => e.Id);
@@ -50,6 +130,15 @@ namespace RoutePlanner.API.Data
                 entity.Property(e => e.Description).HasMaxLength(1000);
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
+
+                // Relationship to User
+                entity.HasOne(e => e.User)
+                      .WithMany(u => u.Routes)
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Index for user queries
+                entity.HasIndex(e => e.UserId);
             });
 
             // RoutePlace Konfiguration
@@ -216,34 +305,57 @@ namespace RoutePlanner.API.Data
         {
             var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
-            // Seed Places mit PostGIS Points
-            modelBuilder.Entity<Place>().HasData(
-                new 
-                { 
-                    Id = 1, 
-                    Name = "Christchurch",
-                    Location = geometryFactory.CreatePoint(new Coordinate(172.6362, -43.5321))
-                },
-                new 
-                { 
-                    Id = 2, 
-                    Name = "Wellington",
-                    Location = geometryFactory.CreatePoint(new Coordinate(174.7762, -41.2865))
-                },
-                new 
-                { 
-                    Id = 3, 
-                    Name = "Auckland",
-                    Location = geometryFactory.CreatePoint(new Coordinate(174.7633, -36.8485))
+            // Seed Default User (for existing data and testing)
+            modelBuilder.Entity<User>().HasData(
+                new User
+                {
+                    Id = 1,
+                    Username = "default",
+                    Email = "default@roadtrip.local",
+                    PasswordHash = "placeholder", // Will be replaced with real auth later
+                    CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 }
             );
 
-            // Seed Route
+            // Seed Places mit PostGIS Points (with UserId)
+            modelBuilder.Entity<Place>().HasData(
+                new
+                {
+                    Id = 1,
+                    UserId = 1,
+                    Name = "Christchurch",
+                    Location = geometryFactory.CreatePoint(new Coordinate(172.6362, -43.5321)),
+                    CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new
+                {
+                    Id = 2,
+                    UserId = 1,
+                    Name = "Wellington",
+                    Location = geometryFactory.CreatePoint(new Coordinate(174.7762, -41.2865)),
+                    CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                },
+                new
+                {
+                    Id = 3,
+                    UserId = 1,
+                    Name = "Auckland",
+                    Location = geometryFactory.CreatePoint(new Coordinate(174.7633, -36.8485)),
+                    CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                }
+            );
+
+            // Seed Route (with UserId)
             modelBuilder.Entity<Models.Route>().HasData(
-                new Models.Route 
-                { 
-                    Id = 1, 
-                    Name = "New Zealand Highlights", 
+                new Models.Route
+                {
+                    Id = 1,
+                    UserId = 1,
+                    Name = "New Zealand Highlights",
                     Description = "The best of New Zealand",
                     CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                     UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
