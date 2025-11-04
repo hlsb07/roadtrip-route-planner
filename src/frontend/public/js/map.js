@@ -132,48 +132,15 @@ export class MapService {
                 shadowSize: isSelected ? [50, 50] : [41, 41]
             });
 
-            // Create popup content with categories and countries
-            const categories = place.categories && place.categories.length > 0
-                ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
-                : '';
-
-            const countries = place.countries && place.countries.length > 0
-                ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
-                : '';
+            // Create popup content using helper method
+            const popupContent = this.buildPlacePopupContent(place, index, false);
 
             const marker = L.marker(place.coords, { icon: customIcon })
                 .addTo(this.map)
-                .bindPopup(`
-                    <div class="map-popup-content">
-                        <div class="map-popup-header">
-                            <div class="place-number">${index + 1}</div>
-                            <strong>${place.name}</strong>
-                        </div>
-                        ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
-                        ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
-                        <div class="map-popup-coords">Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</div>
-                        <div class="map-popup-actions">
-                            <button class="route-popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app?.placeManager?.showRenamePlaceModal(${index})" title="Edit place">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="route-popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})" title="Remove from route">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                        <div class="map-popup-links">
-                            <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
-                               target="_blank"
-                               class="link-btn google-maps">
-                                <i class="fas fa-map"></i> Google Maps
-                            </a>
-                            <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}"
-                               target="_blank"
-                               class="link-btn google-nav">
-                                <i class="fas fa-directions"></i> Navigate
-                            </a>
-                        </div>
-                    </div>
-                `)
+                .bindPopup(popupContent, {
+                    maxWidth: 350,
+                    className: 'place-popup-container'
+                })
                 .on('click', () => {
                     if (this.onMarkerClick) {
                         this.onMarkerClick(index);
@@ -434,6 +401,230 @@ export class MapService {
     }
 
     /**
+     * Build modern popup content for a place with Google Places data support
+     * @param {Object} place - Place object with coords, name, categories, countries, and optional googleData
+     * @param {number|null} index - Place index in route (null for non-route places)
+     * @param {boolean} isNonRoute - Whether this is a non-route place
+     * @returns {string} HTML content for popup
+     */
+    buildPlacePopupContent(place, index = null, isNonRoute = false) {
+        const lat = place.coords ? place.coords[0] : place.latitude;
+        const lng = place.coords ? place.coords[1] : place.longitude;
+
+        // Build image carousel if Google Photos are available
+        const imageGallery = place.googleData?.photos && place.googleData.photos.length > 0
+            ? `<div class="popup-image-carousel">
+                   <div class="carousel-container" id="place-carousel-${place.id || index}">
+                       ${place.googleData.photos.slice(0, 5).map((photo, idx) => `
+                           <img src="${photo.photoUrl}"
+                                alt="${place.name} photo ${idx + 1}"
+                                class="carousel-image ${idx === 0 ? 'active' : ''}"
+                                data-index="${idx}">
+                       `).join('')}
+                   </div>
+                   ${place.googleData.photos.length > 1
+                       ? `<button class="carousel-btn prev" onclick="event.stopPropagation(); navigateCarousel('place-carousel-${place.id || index}', -1)">
+                              <i class="fas fa-chevron-left"></i>
+                          </button>
+                          <button class="carousel-btn next" onclick="event.stopPropagation(); navigateCarousel('place-carousel-${place.id || index}', 1)">
+                              <i class="fas fa-chevron-right"></i>
+                          </button>
+                          <div class="carousel-indicators">
+                              ${place.googleData.photos.slice(0, 5).map((_, idx) => `
+                                  <span class="indicator ${idx === 0 ? 'active' : ''}"
+                                        onclick="event.stopPropagation(); goToSlide('place-carousel-${place.id || index}', ${idx})"></span>
+                              `).join('')}
+                          </div>`
+                       : ''
+                   }
+               </div>`
+            : '';
+
+        // Categories badges
+        const categories = place.categories && place.categories.length > 0
+            ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
+            : '';
+
+        // Countries badges
+        const countries = place.countries && place.countries.length > 0
+            ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
+            : '';
+
+        // Rating display
+        const ratingDisplay = place.googleData?.rating
+            ? `<div class="popup-rating">
+                   <span class="rating-stars">⭐</span>
+                   <strong>${place.googleData.rating.toFixed(1)}</strong>
+                   ${place.googleData.userRatingsTotal
+                       ? `<span class="rating-count">(${place.googleData.userRatingsTotal} reviews)</span>`
+                       : ''
+                   }
+               </div>`
+            : '';
+
+        // Price level display
+        const priceDisplay = place.googleData?.priceLevel
+            ? `<div class="popup-price">
+                   <span class="price-symbols">${'$'.repeat(place.googleData.priceLevel)}</span>
+                   <span class="price-label">Price level</span>
+               </div>`
+            : '';
+
+        // Address display
+        const addressDisplay = place.googleData?.formattedAddress
+            ? `<div class="popup-address">
+                   <i class="fas fa-map-marker-alt"></i>
+                   <span>${place.googleData.formattedAddress}</span>
+               </div>`
+            : '';
+
+        // Contact information
+        const contactInfo = [];
+
+        if (place.googleData?.phoneNumber) {
+            contactInfo.push(`
+                <a href="tel:${place.googleData.phoneNumber}" class="popup-contact-item" onclick="event.stopPropagation()">
+                    <i class="fas fa-phone"></i> ${place.googleData.phoneNumber}
+                </a>
+            `);
+        }
+
+        if (place.googleData?.website) {
+            contactInfo.push(`
+                <a href="${place.googleData.website}" target="_blank" class="popup-contact-item" onclick="event.stopPropagation()">
+                    <i class="fas fa-globe"></i> Website
+                </a>
+            `);
+        }
+
+        const contactSection = contactInfo.length > 0
+            ? `<div class="popup-contact-section">${contactInfo.join('')}</div>`
+            : '';
+
+        // Opening hours
+        let openingHoursSection = '';
+        if (place.googleData?.openingHours) {
+            try {
+                const hours = typeof place.googleData.openingHours === 'string'
+                    ? JSON.parse(place.googleData.openingHours)
+                    : place.googleData.openingHours;
+
+                if (hours.weekday_text && hours.weekday_text.length > 0) {
+                    openingHoursSection = `
+                        <div class="popup-hours-section">
+                            <div class="popup-section-title">
+                                <i class="fas fa-clock"></i> Opening Hours
+                            </div>
+                            <div class="popup-hours-list">
+                                ${hours.weekday_text.slice(0, 7).map(day =>
+                                    `<div class="hours-day">${day}</div>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.warn('Failed to parse opening hours:', e);
+            }
+        }
+
+        // Business status badge
+        const statusBadge = place.googleData?.businessStatus === 'OPERATIONAL'
+            ? '<span class="status-badge operational"><i class="fas fa-check-circle"></i> Open</span>'
+            : place.googleData?.businessStatus === 'CLOSED_TEMPORARILY'
+            ? '<span class="status-badge closed-temp"><i class="fas fa-exclamation-circle"></i> Temporarily Closed</span>'
+            : place.googleData?.businessStatus === 'CLOSED_PERMANENTLY'
+            ? '<span class="status-badge closed-perm"><i class="fas fa-times-circle"></i> Permanently Closed</span>'
+            : '';
+
+        // Build action buttons based on place type
+        let actionButtons = '';
+        if (isNonRoute) {
+            // Non-route place actions
+            actionButtons = `
+                <div class="map-popup-actions">
+                    <button class="popup-action-btn add-to-route-btn" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')" title="Add to route">
+                        <i class="fas fa-plus"></i> Add to Route
+                    </button>
+                    <button class="popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app.editNonRoutePlace(${place.id})" title="Edit place">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app.deleteNonRoutePlace(${place.id}, '${place.name.replace(/'/g, "\\'")}')" title="Delete place">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        } else if (index !== null) {
+            // Route place actions
+            actionButtons = `
+                <div class="map-popup-actions">
+                    <button class="route-popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app?.placeManager?.showRenamePlaceModal(${index})" title="Edit place">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="route-popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})" title="Remove from route">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        // External links (Google Maps, Navigation)
+        const externalLinks = `
+            <div class="map-popup-links">
+                <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}"
+                   target="_blank"
+                   class="link-btn google-maps"
+                   onclick="event.stopPropagation()">
+                    <i class="fas fa-map"></i> Google Maps
+                </a>
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"
+                   target="_blank"
+                   class="link-btn google-nav"
+                   onclick="event.stopPropagation()">
+                    <i class="fas fa-directions"></i> Navigate
+                </a>
+            </div>
+        `;
+
+        // Google Places badge
+        const googleBadge = place.googleData
+            ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google Place</span>'
+            : '';
+
+        // Assemble the complete popup
+        return `
+            <div class="map-popup-content place-popup ${place.googleData ? 'has-google-data' : ''}">
+                ${imageGallery}
+                <div class="map-popup-header">
+                    ${index !== null ? `<div class="place-number">${index + 1}</div>` : ''}
+                    <div class="header-content">
+                        <strong>${place.name}</strong>
+                        ${statusBadge}
+                        ${googleBadge}
+                        ${isNonRoute ? '<span class="non-route-badge">Not in Route</span>' : ''}
+                    </div>
+                </div>
+                ${ratingDisplay || priceDisplay ? `
+                    <div class="popup-quick-info">
+                        ${ratingDisplay}
+                        ${priceDisplay}
+                    </div>
+                ` : ''}
+                ${addressDisplay}
+                ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
+                ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
+                ${contactSection}
+                ${openingHoursSection}
+                <div class="map-popup-coords">
+                    <i class="fas fa-map-pin"></i> ${lat.toFixed(6)}, ${lng.toFixed(6)}
+                </div>
+                ${actionButtons}
+                ${externalLinks}
+            </div>
+        `;
+    }
+
+    /**
      * Update map with filtered places (for category/country filtering)
      * This creates separate markers for all places with visual indicators
      */
@@ -491,38 +682,14 @@ export class MapService {
                 marker = L.marker([place.latitude, place.longitude], { icon: customIcon });
             }
 
-            // Create popup content
-            const categories = place.categories && place.categories.length > 0
-                ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
-                : '';
-
-            const countries = place.countries && place.countries.length > 0
-                ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
-                : '';
+            // Create popup content using helper method
+            const popupContent = this.buildPlacePopupContent(place, null, false);
 
             marker.addTo(this.map)
-                .bindPopup(`
-                    <div class="map-popup-content">
-                        <div class="map-popup-header">
-                            <strong>${place.name}</strong>
-                        </div>
-                        ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
-                        ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
-                        <div class="map-popup-coords">Lat: ${place.latitude.toFixed(4)}, Lng: ${place.longitude.toFixed(4)}</div>
-                        <div class="map-popup-links">
-                            <a href="https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}"
-                               target="_blank"
-                               class="link-btn google-maps">
-                                <i class="fas fa-map"></i> Google Maps
-                            </a>
-                            <a href="https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}"
-                               target="_blank"
-                               class="link-btn google-nav">
-                                <i class="fas fa-directions"></i> Navigate
-                            </a>
-                        </div>
-                    </div>
-                `);
+                .bindPopup(popupContent, {
+                    maxWidth: 350,
+                    className: 'place-popup-container'
+                });
 
             this.markers.push(marker);
         });
@@ -573,48 +740,15 @@ export class MapService {
                     shadowSize: isSelected ? [50, 50] : [41, 41]
                 });
 
-                // Create popup content with categories and countries
-                const categories = place.categories && place.categories.length > 0
-                    ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
-                    : '';
-
-                const countries = place.countries && place.countries.length > 0
-                    ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
-                    : '';
+                // Create popup content using helper method
+                const popupContent = this.buildPlacePopupContent(place, index, false);
 
                 const marker = L.marker(place.coords, { icon: customIcon })
                     .addTo(this.map)
-                    .bindPopup(`
-                        <div class="map-popup-content">
-                            <div class="map-popup-header">
-                                <div class="place-number">${index + 1}</div>
-                                <strong>${place.name}</strong>
-                            </div>
-                            ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
-                            ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
-                            <div class="map-popup-coords">Lat: ${place.coords[0].toFixed(4)}, Lng: ${place.coords[1].toFixed(4)}</div>
-                            <div class="map-popup-actions">
-                                <button class="route-popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app?.placeManager?.showRenamePlaceModal(${index})" title="Edit place">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="route-popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})" title="Remove from route">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                            <div class="map-popup-links">
-                                <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
-                                   target="_blank"
-                                   class="link-btn google-maps">
-                                    <i class="fas fa-map"></i> Google Maps
-                                </a>
-                                <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}"
-                                   target="_blank"
-                                   class="link-btn google-nav">
-                                    <i class="fas fa-directions"></i> Navigate
-                                </a>
-                            </div>
-                        </div>
-                    `)
+                    .bindPopup(popupContent, {
+                        maxWidth: 350,
+                        className: 'place-popup-container'
+                    })
                     .on('click', () => {
                         if (this.onMarkerClick) {
                             this.onMarkerClick(index);
@@ -649,51 +783,15 @@ export class MapService {
                     className: 'non-route-marker'
                 });
 
-                // Get category and country badges
-                const categories = place.categories && place.categories.length > 0
-                    ? place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')
-                    : '';
-
-                const countries = place.countries && place.countries.length > 0
-                    ? place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')
-                    : '';
+                // Create popup content using helper method
+                const popupContent = this.buildPlacePopupContent(place, null, true);
 
                 const marker = L.marker([place.latitude, place.longitude], { icon: grayIcon })
                     .addTo(this.map)
-                    .bindPopup(`
-                        <div class="map-popup-content non-route-popup">
-                            <div class="map-popup-header">
-                                <strong>${place.name}</strong>
-                                <span class="non-route-badge">Not in Route</span>
-                            </div>
-                            ${categories ? `<div class="map-popup-categories">${categories}</div>` : ''}
-                            ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
-                            <div class="map-popup-coords">Lat: ${place.latitude.toFixed(4)}, Lng: ${place.longitude.toFixed(4)}</div>
-                            <div class="map-popup-actions">
-                                <button class="popup-action-btn add-to-route-btn" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
-                                    <i class="fas fa-plus"></i> Add to Route
-                                </button>
-                                <button class="popup-action-btn edit-btn" onclick="event.stopPropagation(); window.app.editNonRoutePlace(${place.id})">
-                                    <i class="fas fa-edit"></i> Edit
-                                </button>
-                                <button class="popup-action-btn delete-btn" onclick="event.stopPropagation(); window.app.deleteNonRoutePlace(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
-                                    <i class="fas fa-trash"></i> Delete
-                                </button>
-                            </div>
-                            <div class="map-popup-links">
-                                <a href="https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}"
-                                   target="_blank"
-                                   class="link-btn google-maps">
-                                    <i class="fas fa-map"></i> Google Maps
-                                </a>
-                                <a href="https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}"
-                                   target="_blank"
-                                   class="link-btn google-nav">
-                                    <i class="fas fa-directions"></i> Navigate
-                                </a>
-                            </div>
-                        </div>
-                    `)
+                    .bindPopup(popupContent, {
+                        maxWidth: 350,
+                        className: 'place-popup-container non-route-popup-container'
+                    })
                     .on('click', () => {
                         if (this.onNonRouteMarkerClick) {
                             this.onNonRouteMarkerClick(place.id, index);
