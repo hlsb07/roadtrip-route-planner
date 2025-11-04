@@ -98,6 +98,29 @@ namespace RoutePlanner.API.Controllers
         }
 
         /// <summary>
+        /// Search for nearby places at coordinates
+        /// GET: api/googlemaps/nearby?lat=40.7128&lng=-74.0060&radius=100&type=restaurant
+        /// </summary>
+        [HttpGet("nearby")]
+        public async Task<ActionResult<List<PlaceSearchResult>>> NearbySearch(
+            [FromQuery] double lat,
+            [FromQuery] double lng,
+            [FromQuery] int radius = 100,
+            [FromQuery] string? type = null)
+        {
+            try
+            {
+                var results = await _googleMapsService.NearbySearch(lat, lng, radius, type);
+                return Ok(new { results });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in nearby search at ({lat}, {lng})");
+                return StatusCode(500, new { error = "Nearby search failed", message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Clean expired cache entries (maintenance endpoint)
         /// POST: api/googlemaps/cache/clean
         /// </summary>

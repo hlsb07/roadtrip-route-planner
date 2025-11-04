@@ -25,6 +25,11 @@ export class PlaceManager {
                 );
                 placeId = newPlace.id;
                 placeName = newPlace.name;
+
+                // Reload filterManager.allPlaces to include the new place
+                if (this.routeManager && this.routeManager.filterManager) {
+                    this.routeManager.filterManager.allPlaces = await ApiService.getAllPlaces();
+                }
             }
 
             // 2. If addToRoute is true, add place to current route
@@ -54,6 +59,158 @@ export class PlaceManager {
             showError(error.message || 'Failed to save place');
             return { success: false };
         }
+    }
+
+    /**
+     * Add a place from Google Places with duplicate detection
+     * @param {string} googlePlaceId - Google Place ID
+     * @param {string} placeName - Name of the place
+     * @param {string|null} notes - Optional user notes
+     * @param {boolean} addToRoute - Whether to add to current route
+     * @returns {Promise<Object>} Result with success status, placeId, placeName
+     */
+    async addPlaceFromGoogle(googlePlaceId, placeName, notes = null, addToRoute = false) {
+        try {
+            // 1. Check for duplicates first
+            const duplicateCheck = await ApiService.checkDuplicateGooglePlace(googlePlaceId);
+
+            if (duplicateCheck.isDuplicate) {
+                // Show duplicate modal and return - let user decide
+                return await this.handleDuplicatePlace(duplicateCheck, googlePlaceId, placeName, notes, addToRoute);
+            }
+
+            // 2. No duplicate - create place from Google
+            const newPlace = await ApiService.createPlaceFromGoogle(googlePlaceId, notes);
+            const placeId = newPlace.id;
+            const savedPlaceName = newPlace.name;
+
+            // 3. Reload filterManager.allPlaces to include the new place
+            if (this.routeManager && this.routeManager.filterManager) {
+                this.routeManager.filterManager.allPlaces = await ApiService.getAllPlaces();
+            }
+
+            // 4. If addToRoute is true, add place to current route
+            if (addToRoute) {
+                const currentRouteId = this.routeManager.getCurrentRouteId();
+                if (!currentRouteId) {
+                    showError('No route selected. Create a route first.');
+                    return { success: false };
+                }
+
+                await ApiService.addPlaceToRoute(currentRouteId, placeId);
+
+                // Reload current route and update UI
+                this.places = await this.routeManager.loadCurrentRoute();
+                await this.routeManager.loadRoutes(); // For place count update
+
+                showSuccess(`Added "${savedPlaceName}" from Google to route!`);
+            } else {
+                // Just saved to database, show success modal
+                this.showPlaceAddedSuccessModal(placeId, savedPlaceName);
+            }
+
+            return { success: true, placeId, placeName: savedPlaceName };
+
+        } catch (error) {
+            console.error('Failed to add place from Google:', error);
+            showError(error.message || 'Failed to save place from Google');
+            return { success: false };
+        }
+    }
+
+    /**
+     * Handle duplicate place detection
+     * Shows modal with options to view existing or add anyway
+     */
+    async handleDuplicatePlace(duplicateCheck, googlePlaceId, placeName, notes, addToRoute) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('duplicatePlaceModal');
+            if (!modal) {
+                console.error('Duplicate place modal not found');
+                resolve({ success: false });
+                return;
+            }
+
+            // Populate modal content
+            const existingPlace = duplicateCheck.existingPlace;
+            document.getElementById('duplicatePlaceName').textContent = placeName;
+            document.getElementById('existingPlaceName').textContent = existingPlace.name;
+            document.getElementById('duplicateWarningMessage').textContent = duplicateCheck.message;
+
+            // Show/hide "Add Anyway" button based on coordinate difference
+            const addAnywayBtn = document.getElementById('duplicateAddAnywayBtn');
+            if (addAnywayBtn) {
+                if (duplicateCheck.coordinatesDiffer) {
+                    addAnywayBtn.style.display = 'inline-block';
+                } else {
+                    addAnywayBtn.style.display = 'none';
+                }
+            }
+
+            // Set up button handlers
+            const viewBtn = document.getElementById('duplicateViewBtn');
+            const cancelBtn = document.getElementById('duplicateCancelBtn');
+
+            const cleanup = () => {
+                modal.classList.remove('active');
+                if (viewBtn) viewBtn.onclick = null;
+                if (addAnywayBtn) addAnywayBtn.onclick = null;
+                if (cancelBtn) cancelBtn.onclick = null;
+            };
+
+            if (viewBtn) {
+                viewBtn.onclick = async () => {
+                    cleanup();
+                    // Open existing place in edit modal
+                    const placeIndex = this.places.findIndex(p => p.id === existingPlace.id);
+                    if (placeIndex !== -1) {
+                        await this.showRenamePlaceModal(placeIndex);
+                    }
+                    resolve({ success: false, duplicate: true });
+                };
+            }
+
+            if (addAnywayBtn) {
+                addAnywayBtn.onclick = async () => {
+                    cleanup();
+                    // Proceed with creating despite duplicate
+                    try {
+                        const newPlace = await ApiService.createPlaceFromGoogle(googlePlaceId, notes);
+
+                        // Reload filterManager.allPlaces to include the new place
+                        if (this.routeManager && this.routeManager.filterManager) {
+                            this.routeManager.filterManager.allPlaces = await ApiService.getAllPlaces();
+                        }
+
+                        if (addToRoute) {
+                            const currentRouteId = this.routeManager.getCurrentRouteId();
+                            if (currentRouteId) {
+                                await ApiService.addPlaceToRoute(currentRouteId, newPlace.id);
+                                this.places = await this.routeManager.loadCurrentRoute();
+                                await this.routeManager.loadRoutes();
+                                showSuccess(`Added "${newPlace.name}" to route!`);
+                            }
+                        } else {
+                            this.showPlaceAddedSuccessModal(newPlace.id, newPlace.name);
+                        }
+                        resolve({ success: true, placeId: newPlace.id, placeName: newPlace.name });
+                    } catch (error) {
+                        showError('Failed to add place');
+                        resolve({ success: false });
+                    }
+                };
+            }
+
+            if (cancelBtn) {
+                cancelBtn.onclick = () => {
+                    cleanup();
+                    resolve({ success: false, cancelled: true });
+                };
+            }
+
+            // Show modal
+            modal.classList.add('active');
+        });
     }
 
     async removePlace(index) {
@@ -118,7 +275,10 @@ export class PlaceManager {
         const nameInput = document.getElementById('placeName');
         const latInput = document.getElementById('placeLatitude');
         const lngInput = document.getElementById('placeLongitude');
+        const notesInput = document.getElementById('placeNotes');
         const removeFromRouteBtn = document.getElementById('removeFromRouteBtn');
+        const refreshGoogleBtn = document.getElementById('refreshGoogleDataBtn');
+        const googleDataBadge = document.getElementById('googleDataBadge');
 
         if (!modal || !nameInput || !latInput || !lngInput) return;
 
@@ -127,9 +287,36 @@ export class PlaceManager {
         latInput.value = place.coords[0];
         lngInput.value = place.coords[1];
 
+        // Set notes if available
+        if (notesInput) {
+            notesInput.value = place.notes || '';
+        }
+
         // Store the index and placeId for saving
         modal.dataset.placeIndex = index;
         modal.dataset.placeId = place.id;
+        modal.dataset.googlePlaceId = place.googlePlaceId || '';
+
+        // Show/hide Google data badge and refresh button
+        if (googleDataBadge) {
+            if (place.googlePlaceId || place.hasGoogleData) {
+                googleDataBadge.style.display = 'inline-block';
+                googleDataBadge.innerHTML = '<i class="fas fa-google"></i> Google Place';
+                googleDataBadge.className = 'place-badge google-badge';
+            } else {
+                googleDataBadge.style.display = 'inline-block';
+                googleDataBadge.innerHTML = '<i class="fas fa-map-marker-alt"></i> Manual Place';
+                googleDataBadge.className = 'place-badge manual-badge';
+            }
+        }
+
+        if (refreshGoogleBtn) {
+            if (place.googlePlaceId || place.hasGoogleData) {
+                refreshGoogleBtn.style.display = 'inline-block';
+            } else {
+                refreshGoogleBtn.style.display = 'none';
+            }
+        }
 
         // Show/hide "Remove from Route" button based on whether place is in current route
         const currentRouteId = this.routeManager.getCurrentRouteId();
@@ -144,7 +331,7 @@ export class PlaceManager {
         }
 
         // Display Google Maps extended information if available
-        this.displayGooglePlaceInfo(place);
+        await this.displayGooglePlaceInfoEnriched(place);
 
         // Load categories and countries
         await this.loadCategoriesAndCountries(place.id);
@@ -153,6 +340,142 @@ export class PlaceManager {
         modal.classList.add('active');
         nameInput.focus();
         nameInput.select();
+    }
+
+    /**
+     * Display enriched Google place information in edit modal
+     * Loads full data from backend if needed
+     */
+    async displayGooglePlaceInfoEnriched(place) {
+        const infoSection = document.getElementById('googlePlaceInfo');
+        if (!infoSection) return;
+
+        // If place has Google data, try to load enriched info
+        if (place.googlePlaceId || place.hasGoogleData) {
+            try {
+                // Load enriched place data from backend
+                const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+
+                // Update the modal with enriched data
+                if (enrichedPlace && enrichedPlace.googleData) {
+                    this.displayGoogleDataSection(enrichedPlace.googleData);
+                    infoSection.style.display = 'block';
+                    return;
+                }
+            } catch (error) {
+                console.error('Failed to load enriched place data:', error);
+            }
+        }
+
+        // Fallback to existing display method
+        this.displayGooglePlaceInfo(place);
+    }
+
+    /**
+     * Display Google data section with photos, rating, etc.
+     */
+    displayGoogleDataSection(googleData) {
+        const infoSection = document.getElementById('googlePlaceInfo');
+        if (!infoSection || !googleData) return;
+
+        // Display photos
+        const photosGallery = document.getElementById('placePhotosGallery');
+        if (photosGallery && googleData.photos && googleData.photos.length > 0) {
+            photosGallery.innerHTML = googleData.photos.slice(0, 5).map(photo =>
+                `<img src="${photo.photoUrl}" alt="${googleData.name}" />`
+            ).join('');
+            photosGallery.style.display = 'grid';
+        } else if (photosGallery) {
+            photosGallery.style.display = 'none';
+        }
+
+        // Display rating
+        const ratingInfo = document.getElementById('placeRatingInfo');
+        const ratingValue = document.getElementById('placeRatingValue');
+        if (googleData.rating && ratingInfo && ratingValue) {
+            const stars = '⭐'.repeat(Math.floor(googleData.rating));
+            const reviewCount = googleData.userRatingsTotal ? ` (${googleData.userRatingsTotal} reviews)` : '';
+            ratingValue.textContent = `${stars} ${googleData.rating.toFixed(1)}${reviewCount}`;
+            ratingInfo.style.display = 'flex';
+        } else if (ratingInfo) {
+            ratingInfo.style.display = 'none';
+        }
+
+        // Display website
+        const websiteInfo = document.getElementById('placeWebsiteInfo');
+        const websiteLink = document.getElementById('placeWebsiteLink');
+        if (googleData.website && websiteInfo && websiteLink) {
+            websiteLink.href = googleData.website;
+            websiteInfo.style.display = 'flex';
+        } else if (websiteInfo) {
+            websiteInfo.style.display = 'none';
+        }
+
+        // Display phone
+        const phoneInfo = document.getElementById('placePhoneInfo');
+        const phoneLink = document.getElementById('placePhoneLink');
+        if (googleData.phoneNumber && phoneInfo && phoneLink) {
+            phoneLink.href = `tel:${googleData.phoneNumber}`;
+            phoneLink.textContent = googleData.phoneNumber;
+            phoneInfo.style.display = 'flex';
+        } else if (phoneInfo) {
+            phoneInfo.style.display = 'none';
+        }
+
+        // Display price level
+        const priceInfo = document.getElementById('placePriceInfo');
+        const priceValue = document.getElementById('placePriceValue');
+        if (googleData.priceLevel !== null && googleData.priceLevel !== undefined && priceInfo && priceValue) {
+            priceValue.textContent = '$'.repeat(googleData.priceLevel) + ' price level';
+            priceInfo.style.display = 'flex';
+        } else if (priceInfo) {
+            priceInfo.style.display = 'none';
+        }
+
+        infoSection.style.display = 'block';
+    }
+
+    /**
+     * Refresh Google data for a place
+     */
+    async refreshGoogleDataForPlace() {
+        const modal = document.getElementById('editPlaceModal');
+        if (!modal) return;
+
+        const placeId = parseInt(modal.dataset.placeId);
+        const index = parseInt(modal.dataset.placeIndex);
+
+        if (!this.places[index]) return;
+
+        const refreshBtn = document.getElementById('refreshGoogleDataBtn');
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="fas fa-sync fa-spin"></i> Refreshing...';
+        }
+
+        try {
+            const result = await ApiService.refreshGoogleData(placeId);
+
+            // Show which fields were updated
+            if (result.updatedFields && result.updatedFields.length > 0) {
+                showSuccess(`Updated ${result.updatedFields.length} fields: ${result.updatedFields.join(', ')}`);
+            } else {
+                showSuccess('Google data is up to date!');
+            }
+
+            // Reload enriched data
+            const place = this.places[index];
+            await this.displayGooglePlaceInfoEnriched(place);
+
+        } catch (error) {
+            console.error('Failed to refresh Google data:', error);
+            showError(error.message || 'Failed to refresh Google data');
+        } finally {
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="fas fa-sync"></i> Refresh from Google';
+            }
+        }
     }
 
     displayGooglePlaceInfo(place) {
@@ -425,6 +748,7 @@ export class PlaceManager {
         const nameInput = document.getElementById('placeName');
         const latInput = document.getElementById('placeLatitude');
         const lngInput = document.getElementById('placeLongitude');
+        const notesInput = document.getElementById('placeNotes');
 
         if (!modal || !nameInput || !latInput || !lngInput) return;
 
@@ -433,6 +757,7 @@ export class PlaceManager {
         const newName = nameInput.value.trim();
         const newLat = parseFloat(latInput.value);
         const newLng = parseFloat(lngInput.value);
+        const newNotes = notesInput ? notesInput.value.trim() : null;
 
         // Validation
         if (!newName) {
@@ -451,8 +776,8 @@ export class PlaceManager {
         }
 
         try {
-            // Update place name and coordinates
-            await ApiService.updatePlace(placeId, newName, newLat, newLng);
+            // Update place name, coordinates, and notes
+            await ApiService.updatePlace(placeId, newName, newLat, newLng, newNotes);
 
             // Get selected categories and countries
             const selectedCategories = Array.from(document.querySelectorAll('.category-checkbox:checked'))

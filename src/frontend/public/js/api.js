@@ -62,11 +62,12 @@ export class ApiService {
         return await response.json();
     }
 
-    static async updatePlace(placeId, name, latitude = null, longitude = null) {
+    static async updatePlace(placeId, name, latitude = null, longitude = null, notes = null) {
         const body = {};
         if (name !== null && name !== undefined) body.name = name;
         if (latitude !== null) body.latitude = latitude;
         if (longitude !== null) body.longitude = longitude;
+        if (notes !== undefined) body.notes = notes; // Allow empty string to clear notes
 
         const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
             method: 'PUT',
@@ -345,6 +346,104 @@ export class ApiService {
         const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries`);
         if (!response.ok) {
             throw new Error('Failed to get place countries');
+        }
+        return await response.json();
+    }
+
+    // ===== Google Places Integration API Methods =====
+
+    /**
+     * Create a place from Google Places data
+     * @param {string} googlePlaceId - Google Place ID
+     * @param {string|null} notes - Optional user notes
+     * @returns {Promise<Object>} Created place
+     */
+    static async createPlaceFromGoogle(googlePlaceId, notes = null) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/from-google`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googlePlaceId, notes })
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Failed to create place from Google');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Check if a Google Place is already saved for the current user
+     * @param {string} googlePlaceId - Google Place ID
+     * @returns {Promise<Object>} Duplicate check result
+     */
+    static async checkDuplicateGooglePlace(googlePlaceId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/check-duplicate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googlePlaceId })
+        });
+        if (!response.ok) {
+            throw new Error('Failed to check duplicate');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Get enriched place data with Google information
+     * @param {number} placeId - Place ID
+     * @returns {Promise<Object>} Enriched place data
+     */
+    static async getEnrichedPlace(placeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/enriched`);
+        if (!response.ok) {
+            throw new Error('Failed to get enriched place data');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Refresh Google data for a place
+     * @param {number} placeId - Place ID
+     * @returns {Promise<Object>} Refresh result with updated fields
+     */
+    static async refreshGoogleData(placeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/refresh-google`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Failed to refresh Google data');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Update notes for a place
+     * @param {number} placeId - Place ID
+     * @param {string|null} notes - Notes text
+     * @returns {Promise<void>}
+     */
+    static async updatePlaceNotes(placeId, notes) {
+        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/notes`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes })
+        });
+        if (!response.ok) {
+            throw new Error('Failed to update notes');
+        }
+    }
+
+    /**
+     * Reverse geocode existing places to link them with Google data
+     * @returns {Promise<Object>} Result with count of linked places
+     */
+    static async reverseGeocodeExistingPlaces() {
+        const response = await fetch(`${CONFIG.API_BASE}/places/reverse-geocode`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to reverse geocode places');
         }
         return await response.json();
     }

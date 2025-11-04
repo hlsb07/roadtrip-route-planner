@@ -235,6 +235,96 @@ body {
     color: #4285f4;
 }
 
+/* Google Data Badges and Controls */
+.place-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 15px 0;
+    flex-wrap: wrap;
+}
+
+.place-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.google-badge {
+    background: #4285f4;
+    color: white;
+}
+
+.manual-badge {
+    background: #6c757d;
+    color: white;
+}
+
+/* Refresh Google Data Button */
+.btn-refresh-google {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #34a853;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.2s;
+}
+
+.btn-refresh-google:hover {
+    background: #2d8e47;
+}
+
+.btn-refresh-google:disabled {
+    background: #9e9e9e;
+    cursor: not-allowed;
+}
+
+.btn-refresh-google i.fa-spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Notes Textarea */
+.form-textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    min-height: 80px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.char-counter {
+    display: block;
+    text-align: right;
+    color: #999;
+    font-size: 0.85rem;
+    margin-top: 5px;
+}
+
 /* Photo Gallery */
 .place-photos-gallery {
     display: grid;

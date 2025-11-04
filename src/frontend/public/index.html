@@ -363,6 +363,21 @@
                     <i class="fas fa-minus-circle"></i> Remove from Current Route
                 </button>
 
+                <!-- Google Data Badge and Refresh Button -->
+                <div class="place-info-bar">
+                    <span id="googleDataBadge" class="place-badge" style="display: none;"></span>
+                    <button type="button" id="refreshGoogleDataBtn" class="btn-refresh-google" style="display: none;" onclick="placeManager.refreshGoogleDataForPlace()">
+                        <i class="fas fa-sync"></i> Refresh from Google
+                    </button>
+                </div>
+
+                <!-- Personal Notes -->
+                <div class="form-group">
+                    <label for="placeNotes"><i class="fas fa-sticky-note"></i> Personal Notes:</label>
+                    <textarea id="placeNotes" class="form-textarea" placeholder="Add your personal notes about this place..." rows="4" maxlength="2000"></textarea>
+                    <small class="char-counter"><span id="notesCharCount">0</span>/2000 characters</small>
+                </div>
+
                 <!-- Google Maps Extended Information (conditional - only shows when available) -->
                 <div id="googlePlaceInfo" class="google-place-info" style="display: none;">
                     <div class="info-section-header">
@@ -607,6 +622,88 @@
             </div>
         </div>
         <div class="modal-overlay" onclick="closeDeleteTagModal()"></div>
+    </div>
+
+    <!-- Save Options Modal (for Google Places) -->
+    <div id="saveOptionsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fab fa-google"></i> Save Google Place</h3>
+                <button class="btn-close" onclick="document.getElementById('saveOptionsModal').classList.remove('active')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p><strong id="saveOptionsPlaceName"></strong></p>
+                <div class="form-group">
+                    <label for="saveOptionsNotes"><i class="fas fa-sticky-note"></i> Notes (optional):</label>
+                    <textarea id="saveOptionsNotes" class="form-textarea" placeholder="Add notes..." rows="3" maxlength="2000"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="saveOptionsCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="saveOptionsOnlyBtn">
+                    <i class="fas fa-save"></i> Save to Places
+                </button>
+                <button class="btn btn-success" id="saveOptionsAddToRouteBtn">
+                    <i class="fas fa-plus"></i> Add to Route
+                </button>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="document.getElementById('saveOptionsModal').classList.remove('active')"></div>
+    </div>
+
+    <!-- Duplicate Place Modal -->
+    <div id="duplicatePlaceModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle" style="color: #f39c12;"></i> Duplicate Place</h3>
+                <button class="btn-close" onclick="document.getElementById('duplicatePlaceModal').classList.remove('active')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p><strong id="duplicatePlaceName"></strong></p>
+                <p id="duplicateWarningMessage" style="color: #f39c12; margin: 15px 0;"></p>
+                <p>Existing place: <strong id="existingPlaceName"></strong></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="duplicateCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="duplicateViewBtn">
+                    <i class="fas fa-eye"></i> View Existing
+                </button>
+                <button class="btn btn-warning" id="duplicateAddAnywayBtn" style="display: none;">
+                    <i class="fas fa-plus"></i> Add Anyway
+                </button>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="document.getElementById('duplicatePlaceModal').classList.remove('active')"></div>
+    </div>
+
+    <!-- Coordinates Options Modal -->
+    <div id="coordinatesOptionsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-marker-alt"></i> Add Place at Coordinates</h3>
+                <button class="btn-close" onclick="document.getElementById('coordinatesOptionsModal').classList.remove('active')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p><strong id="coordsOptionsLatLng"></strong></p>
+                <p style="margin: 15px 0;">Choose how to add this location:</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="coordsOptionsCancelBtn">Cancel</button>
+                <button class="btn btn-primary" id="coordsOptionsManualBtn">
+                    <i class="fas fa-map-pin"></i> Use Manual Coordinates
+                </button>
+                <button class="btn btn-success" id="coordsOptionsNearbyBtn">
+                    <i class="fab fa-google"></i> Search Nearby Google Places
+                </button>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="document.getElementById('coordinatesOptionsModal').classList.remove('active')"></div>
     </div>
 
     <input type="file" id="importFile" style="display: none;" accept=".json">

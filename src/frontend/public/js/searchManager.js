@@ -226,7 +226,15 @@ export class SearchManager {
                     openingHours: result.openingHours,
                     photos: result.photos || []
                 };
-                onSelect(place);
+
+                // If it's a Google place, show save options modal
+                if (place.googlePlaceId) {
+                    this.showSaveOptionsModal(place);
+                } else {
+                    // Regular place without Google data - use existing flow
+                    onSelect(place);
+                }
+
                 resultsDiv.classList.remove('active');
                 const input = this.getSearchInput();
                 if (input) input.value = '';
@@ -237,6 +245,89 @@ export class SearchManager {
         resultsDiv.classList.add('active');
     }
 
+    /**
+     * Show modal with options to save Google place
+     * @param {Object} place - Place data from Google
+     */
+    showSaveOptionsModal(place) {
+        const modal = document.getElementById('saveOptionsModal');
+        if (!modal) {
+            console.error('Save options modal not found');
+            // Fallback to old behavior
+            if (this.onSelectCallback) {
+                this.onSelectCallback(place);
+            }
+            return;
+        }
+
+        // Populate modal
+        document.getElementById('saveOptionsPlaceName').textContent = place.name;
+        const notesInput = document.getElementById('saveOptionsNotes');
+        if (notesInput) {
+            notesInput.value = '';
+        }
+
+        // Set up button handlers
+        const saveOnlyBtn = document.getElementById('saveOptionsOnlyBtn');
+        const addToRouteBtn = document.getElementById('saveOptionsAddToRouteBtn');
+        const cancelBtn = document.getElementById('saveOptionsCancelBtn');
+
+        const cleanup = () => {
+            modal.classList.remove('active');
+            if (saveOnlyBtn) saveOnlyBtn.onclick = null;
+            if (addToRouteBtn) addToRouteBtn.onclick = null;
+            if (cancelBtn) cancelBtn.onclick = null;
+        };
+
+        if (saveOnlyBtn) {
+            saveOnlyBtn.onclick = async () => {
+                const notes = notesInput ? notesInput.value.trim() : null;
+                cleanup();
+
+                // Get placeManager from window.app
+                if (window.app && window.app.placeManager) {
+                    await window.app.placeManager.addPlaceFromGoogle(
+                        place.googlePlaceId,
+                        place.name,
+                        notes,
+                        false // Don't add to route
+                    );
+                }
+            };
+        }
+
+        if (addToRouteBtn) {
+            addToRouteBtn.onclick = async () => {
+                const notes = notesInput ? notesInput.value.trim() : null;
+                cleanup();
+
+                // Get placeManager from window.app
+                if (window.app && window.app.placeManager) {
+                    await window.app.placeManager.addPlaceFromGoogle(
+                        place.googlePlaceId,
+                        place.name,
+                        notes,
+                        true // Add to route
+                    );
+
+                    // Update UI
+                    if (window.app.updateUI) {
+                        window.app.updateUI();
+                    }
+                }
+            };
+        }
+
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                cleanup();
+            };
+        }
+
+        // Show modal
+        modal.classList.add('active');
+    }
+
     addPlaceFromCoords(coordsStr) {
         const validation = validateCoordinates(coordsStr);
         if (!validation.valid) {
@@ -244,14 +335,142 @@ export class SearchManager {
             return null;
         }
 
-        const place = {
-            name: formatPlaceName(validation.lat, validation.lng),
-            coords: [validation.lat, validation.lng]
+        // Show options modal: Manual or Nearby Search
+        this.showCoordinatesOptionsModal(validation.lat, validation.lng);
+        return null; // Let modal handle the rest
+    }
+
+    /**
+     * Show modal with options for coordinates: manual or nearby search
+     * @param {number} lat - Latitude
+     * @param {number} lng - Longitude
+     */
+    showCoordinatesOptionsModal(lat, lng) {
+        const modal = document.getElementById('coordinatesOptionsModal');
+        if (!modal) {
+            console.error('Coordinates options modal not found');
+            // Fallback: create manual place
+            const place = {
+                name: formatPlaceName(lat, lng),
+                coords: [lat, lng]
+            };
+            if (this.onSelectCallback) {
+                this.onSelectCallback(place);
+            }
+            return;
+        }
+
+        // Populate modal
+        document.getElementById('coordsOptionsLatLng').textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+        // Set up button handlers
+        const manualBtn = document.getElementById('coordsOptionsManualBtn');
+        const nearbyBtn = document.getElementById('coordsOptionsNearbyBtn');
+        const cancelBtn = document.getElementById('coordsOptionsCancelBtn');
+
+        const cleanup = () => {
+            modal.classList.remove('active');
+            if (manualBtn) manualBtn.onclick = null;
+            if (nearbyBtn) nearbyBtn.onclick = null;
+            if (cancelBtn) cancelBtn.onclick = null;
         };
 
-        const input = this.getSearchInput();
-        if (input) input.value = '';
-        return place;
+        if (manualBtn) {
+            manualBtn.onclick = () => {
+                cleanup();
+                // Create manual place
+                const place = {
+                    name: formatPlaceName(lat, lng),
+                    coords: [lat, lng]
+                };
+                if (this.onSelectCallback) {
+                    this.onSelectCallback(place);
+                }
+            };
+        }
+
+        if (nearbyBtn) {
+            nearbyBtn.onclick = async () => {
+                cleanup();
+                await this.searchNearbyGooglePlaces(lat, lng);
+            };
+        }
+
+        if (cancelBtn) {
+            cancelBtn.onclick = () => {
+                cleanup();
+            };
+        }
+
+        // Show modal
+        modal.classList.add('active');
+    }
+
+    /**
+     * Search for nearby Google Places at coordinates
+     * @param {number} lat - Latitude
+     * @param {number} lng - Longitude
+     * @param {number} radius - Search radius in meters (default 100)
+     */
+    async searchNearbyGooglePlaces(lat, lng, radius = 100) {
+        const loading = this.getLoadingElement();
+        const results = this.getSearchResults();
+
+        if (loading) loading.classList.add('active');
+        if (results) results.classList.remove('active');
+
+        try {
+            // Call nearby search endpoint
+            const response = await googleMapsBackendClient.nearbySearch(lat, lng, radius);
+
+            if (loading) loading.classList.remove('active');
+
+            if (response.results && response.results.length > 0) {
+                // Convert nearby results to same format as search results
+                const formattedResults = response.results.map(result => ({
+                    display_name: result.formattedAddress || result.name,
+                    lat: result.latitude,
+                    lon: result.longitude,
+                    googlePlaceId: result.placeId,
+                    name: result.name,
+                    rating: result.rating,
+                    userRatingsTotal: result.userRatingsTotal,
+                    priceLevel: result.priceLevel,
+                    website: result.website,
+                    phoneNumber: result.phoneNumber,
+                    openingHours: result.openingHours,
+                    photos: result.photos || []
+                }));
+
+                // Show results in search results display
+                this.displaySearchResults(formattedResults, false, this.onSelectCallback);
+                showSuccess(`Found ${formattedResults.length} nearby places within ${radius}m`);
+            } else {
+                showError(`No nearby places found within ${radius}m. Try manual coordinates instead.`);
+                // Offer to create manual place
+                const place = {
+                    name: formatPlaceName(lat, lng),
+                    coords: [lat, lng]
+                };
+                if (confirm('Create a manual place at these coordinates instead?')) {
+                    if (this.onSelectCallback) {
+                        this.onSelectCallback(place);
+                    }
+                }
+            }
+        } catch (error) {
+            if (loading) loading.classList.remove('active');
+            console.error('Nearby search failed:', error);
+            showError('Nearby search failed. Try manual coordinates instead.');
+            // Fallback to manual place
+            const place = {
+                name: formatPlaceName(lat, lng),
+                coords: [lat, lng]
+            };
+            if (this.onSelectCallback) {
+                this.onSelectCallback(place);
+            }
+        }
     }
 
     parseGoogleMapsLink(url) {
