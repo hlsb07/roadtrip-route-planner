@@ -6,7 +6,7 @@ import { CampsiteManager } from './campsiteManager.js';
 import { FilterManager } from './filterManager.js';
 import { AllPlacesManager } from './allPlacesManager.js';
 import { TagManager } from './tagManager.js';
-import { showError, showSuccess } from './utils.js';
+import { showError, showSuccess, showConfirm } from './utils.js';
 import { CONFIG } from './config.js';
 
 class App {
@@ -421,7 +421,15 @@ class App {
     }
 
     async deleteNonRoutePlace(placeId, placeName) {
-        if (!confirm(`Delete "${placeName}" permanently? This cannot be undone.`)) {
+        const confirmed = await showConfirm({
+            title: 'Delete Place',
+            message: `Delete "${placeName}" permanently? This cannot be undone.`,
+            type: 'danger',
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
             return;
         }
 

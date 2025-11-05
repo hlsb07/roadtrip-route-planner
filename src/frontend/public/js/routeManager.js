@@ -1,5 +1,5 @@
 import { ApiService } from './api.js';
-import { showSuccess, showError } from './utils.js';
+import { showSuccess, showError, showConfirm } from './utils.js';
 
 export class RouteManager {
     constructor(filterManager = null) {
@@ -191,8 +191,16 @@ export class RouteManager {
         
         const currentRoute = this.routes.find(r => r.id === this.currentRouteId);
         if (!currentRoute) return;
-        
-        if (!confirm(`Delete route "${currentRoute.name}"? This cannot be undone.`)) {
+
+        const confirmed = await showConfirm({
+            title: 'Delete Route',
+            message: `Delete route "${currentRoute.name}"? This cannot be undone.`,
+            type: 'danger',
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
             return;
         }
         

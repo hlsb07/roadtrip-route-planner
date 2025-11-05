@@ -1,4 +1,4 @@
-import { showSuccess, showError } from './utils.js';
+import { showSuccess, showError, showConfirm } from './utils.js';
 
 /**
  * AllPlacesManager - Manages the "All Places" list (non-route places)
@@ -208,7 +208,15 @@ export class AllPlacesManager {
      * Delete a place from the database
      */
     async deletePlace(placeId, placeName) {
-        if (!confirm(`Delete "${placeName}" permanently?\n\nThis will remove it from all routes and cannot be undone.`)) {
+        const confirmed = await showConfirm({
+            title: 'Delete Place Permanently',
+            message: `Delete "${placeName}" permanently?\n\nThis will remove it from all routes and cannot be undone.`,
+            type: 'danger',
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
             return;
         }
 

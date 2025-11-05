@@ -1,13 +1,36 @@
+import { notificationManager } from './notificationManager.js';
+
 // Utility functions
 export function showSuccess(message) {
     console.log('✅', message);
-    // TODO: Replace with proper toast notification
-    alert(message);
+    notificationManager.success(message);
 }
 
 export function showError(message) {
     console.error('❌', message);
-    alert(message);
+    notificationManager.error(message);
+}
+
+export function showInfo(message) {
+    console.info('ℹ️', message);
+    notificationManager.info(message);
+}
+
+export function showWarning(message) {
+    console.warn('⚠️', message);
+    notificationManager.warning(message);
+}
+
+/**
+ * Show a confirmation dialog (replaces native confirm())
+ * @param {string|Object} options - Either a message string or options object
+ * @returns {Promise<boolean>} - Resolves to true if confirmed
+ */
+export async function showConfirm(options) {
+    if (typeof options === 'string') {
+        options = { message: options };
+    }
+    return await notificationManager.confirm(options);
 }
 
 export function parseGoogleMapsLink(url) {

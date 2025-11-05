@@ -1,5 +1,5 @@
 import { ApiService } from './api.js';
-import { parseGoogleMapsLink, validateCoordinates, formatPlaceName, showError } from './utils.js';
+import { parseGoogleMapsLink, validateCoordinates, formatPlaceName, showError, showConfirm } from './utils.js';
 import { googleMapsBackendClient } from './google-maps-backend-client.js';
 
 export class SearchManager {
@@ -452,10 +452,16 @@ export class SearchManager {
                     name: formatPlaceName(lat, lng),
                     coords: [lat, lng]
                 };
-                if (confirm('Create a manual place at these coordinates instead?')) {
-                    if (this.onSelectCallback) {
-                        this.onSelectCallback(place);
-                    }
+                const confirmed = await showConfirm({
+                    title: 'No Places Found',
+                    message: 'Create a manual place at these coordinates instead?',
+                    type: 'question',
+                    confirmText: 'Create',
+                    cancelText: 'Cancel'
+                });
+
+                if (confirmed && this.onSelectCallback) {
+                    this.onSelectCallback(place);
                 }
             }
         } catch (error) {

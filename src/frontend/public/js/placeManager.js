@@ -1,5 +1,5 @@
 import { ApiService } from './api.js';
-import { showSuccess, showError, sleep } from './utils.js';
+import { showSuccess, showError, sleep, showConfirm } from './utils.js';
 
 export class PlaceManager {
     constructor(routeManager, onUpdate = null) {
@@ -219,7 +219,15 @@ export class PlaceManager {
 
         const place = this.places[index];
 
-        if (!confirm(`Remove "${place.name}" from this route?`)) {
+        const confirmed = await showConfirm({
+            title: 'Remove from Route',
+            message: `Remove "${place.name}" from this route?`,
+            type: 'warning',
+            confirmText: 'Remove',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
             return false;
         }
 
@@ -1147,10 +1155,18 @@ export class PlaceManager {
         }
     }
 
-    clearRoute() {
+    async clearRoute() {
         if (this.places.length === 0) return;
 
-        if (confirm('Clear all places from your route?')) {
+        const confirmed = await showConfirm({
+            title: 'Clear Route',
+            message: 'Clear all places from your route?',
+            type: 'warning',
+            confirmText: 'Clear All',
+            cancelText: 'Cancel'
+        });
+
+        if (confirmed) {
             // Note: This would need API implementation
             this.places = [];
             return true;
@@ -1354,7 +1370,15 @@ export class PlaceManager {
             return;
         }
 
-        if (!confirm(`Remove "${place.name}" from this route?\n\nThe place will remain in your saved places.`)) {
+        const confirmed = await showConfirm({
+            title: 'Remove from Route',
+            message: `Remove "${place.name}" from this route?\n\nThe place will remain in your saved places.`,
+            type: 'warning',
+            confirmText: 'Remove',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
             return;
         }
 
