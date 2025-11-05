@@ -1,4 +1,5 @@
 import { CONFIG } from './config.js';
+import { ApiService } from './api.js';
 
 export class MapService {
     constructor() {
@@ -132,20 +133,17 @@ export class MapService {
                 shadowSize: isSelected ? [50, 50] : [41, 41]
             });
 
-            // Create popup content using helper method
-            const popupContent = this.buildPlacePopupContent(place, index, false);
-
             const marker = L.marker(place.coords, { icon: customIcon })
-                .addTo(this.map)
-                .bindPopup(popupContent, {
-                    maxWidth: 350,
-                    className: 'place-popup-container'
-                })
-                .on('click', () => {
-                    if (this.onMarkerClick) {
-                        this.onMarkerClick(index);
-                    }
-                });
+                .addTo(this.map);
+
+            // Setup popup with lazy loading for Google data
+            this.setupPlacePopup(marker, place, index, false);
+
+            marker.on('click', () => {
+                if (this.onMarkerClick) {
+                    this.onMarkerClick(index);
+                }
+            });
             this.markers.push(marker);
         });
 
@@ -398,6 +396,86 @@ export class MapService {
 
     setCampsiteMarkerClickCallback(callback) {
         this.onCampsiteMarkerClick = callback;
+    }
+
+    /**
+     * Setup popup for a place marker with lazy loading of Google data
+     * @param {L.Marker} marker - Leaflet marker instance
+     * @param {Object} place - Place object
+     * @param {number|null} index - Place index in route (null for non-route places)
+     * @param {boolean} isNonRoute - Whether this is a non-route place
+     */
+    setupPlacePopup(marker, place, index = null, isNonRoute = false) {
+        // Initial popup content (without Google data)
+        const initialContent = this.buildPlacePopupContent(place, index, isNonRoute);
+
+        const popup = L.popup({
+            maxWidth: 350,
+            className: 'place-popup-container'
+        }).setContent(initialContent);
+
+        marker.bindPopup(popup);
+
+        // If place has Google data, lazy load it when popup opens
+        if (place.hasGoogleData && place.id) {
+            let isLoading = false;
+            let googleDataCache = null;
+
+            marker.on('popupopen', async () => {
+                // If already loaded, use cached data
+                if (googleDataCache) {
+                    const enrichedPlaceWithCoords = {
+                        ...place,
+                        googleData: googleDataCache
+                    };
+                    const enrichedContent = this.buildPlacePopupContent(enrichedPlaceWithCoords, index, isNonRoute);
+                    popup.setContent(enrichedContent);
+                    return;
+                }
+
+                // If already loading, don't trigger again
+                if (isLoading) return;
+
+                isLoading = true;
+
+                // Add loading indicator
+                const loadingContent = initialContent.replace(
+                    '</div>',
+                    '<div class="google-data-loading"><i class="fas fa-spinner fa-spin"></i> Loading Google Places info...</div></div>'
+                );
+                popup.setContent(loadingContent);
+
+                try {
+                    // Fetch enriched place data with Google info
+                    const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+
+                    if (enrichedPlace && enrichedPlace.googleData) {
+                        // Cache the Google data
+                        googleDataCache = enrichedPlace.googleData;
+
+                        // Merge Google data into place object
+                        const enrichedPlaceWithCoords = {
+                            ...place,
+                            googleData: googleDataCache
+                        };
+
+                        // Update popup content with Google data
+                        const enrichedContent = this.buildPlacePopupContent(enrichedPlaceWithCoords, index, isNonRoute);
+                        popup.setContent(enrichedContent);
+                    }
+                } catch (error) {
+                    console.error('Failed to load Google data for place:', error);
+                    // Show error message
+                    const errorContent = initialContent.replace(
+                        '</div>',
+                        '<div class="google-data-error"><i class="fas fa-exclamation-triangle"></i> Failed to load Google Places info</div></div>'
+                    );
+                    popup.setContent(errorContent);
+                } finally {
+                    isLoading = false;
+                }
+            });
+        }
     }
 
     /**
@@ -682,14 +760,10 @@ export class MapService {
                 marker = L.marker([place.latitude, place.longitude], { icon: customIcon });
             }
 
-            // Create popup content using helper method
-            const popupContent = this.buildPlacePopupContent(place, null, false);
+            marker.addTo(this.map);
 
-            marker.addTo(this.map)
-                .bindPopup(popupContent, {
-                    maxWidth: 350,
-                    className: 'place-popup-container'
-                });
+            // Setup popup with lazy loading for Google data
+            this.setupPlacePopup(marker, place, null, false);
 
             this.markers.push(marker);
         });
@@ -740,20 +814,17 @@ export class MapService {
                     shadowSize: isSelected ? [50, 50] : [41, 41]
                 });
 
-                // Create popup content using helper method
-                const popupContent = this.buildPlacePopupContent(place, index, false);
-
                 const marker = L.marker(place.coords, { icon: customIcon })
-                    .addTo(this.map)
-                    .bindPopup(popupContent, {
-                        maxWidth: 350,
-                        className: 'place-popup-container'
-                    })
-                    .on('click', () => {
-                        if (this.onMarkerClick) {
-                            this.onMarkerClick(index);
-                        }
-                    });
+                    .addTo(this.map);
+
+                // Setup popup with lazy loading for Google data
+                this.setupPlacePopup(marker, place, index, false);
+
+                marker.on('click', () => {
+                    if (this.onMarkerClick) {
+                        this.onMarkerClick(index);
+                    }
+                });
                 this.markers.push(marker);
             });
 
@@ -783,20 +854,17 @@ export class MapService {
                     className: 'non-route-marker'
                 });
 
-                // Create popup content using helper method
-                const popupContent = this.buildPlacePopupContent(place, null, true);
-
                 const marker = L.marker([place.latitude, place.longitude], { icon: grayIcon })
-                    .addTo(this.map)
-                    .bindPopup(popupContent, {
-                        maxWidth: 350,
-                        className: 'place-popup-container non-route-popup-container'
-                    })
-                    .on('click', () => {
-                        if (this.onNonRouteMarkerClick) {
-                            this.onNonRouteMarkerClick(place.id, index);
-                        }
-                    });
+                    .addTo(this.map);
+
+                // Setup popup with lazy loading for Google data
+                this.setupPlacePopup(marker, place, null, true);
+
+                marker.on('click', () => {
+                    if (this.onNonRouteMarkerClick) {
+                        this.onNonRouteMarkerClick(place.id, index);
+                    }
+                });
 
                 this.nonRouteMarkers.push(marker);
             });

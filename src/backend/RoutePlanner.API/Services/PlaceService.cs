@@ -68,9 +68,14 @@ namespace RoutePlanner.API.Services
                 // Add photos
                 if (placeDetails.Photos.Any())
                 {
-                    _logger.LogInformation($"Adding {placeDetails.Photos.Count} photos");
+                    _logger.LogInformation($"Adding {placeDetails.Photos.Count} photos for place {googlePlaceId}");
                     foreach (var photoDto in placeDetails.Photos)
                     {
+                        if (string.IsNullOrEmpty(photoDto.PhotoUrl))
+                        {
+                            _logger.LogWarning($"Photo DTO has empty PhotoUrl! PhotoReference: {photoDto.PhotoReference}, Width: {photoDto.Width}");
+                        }
+
                         var photo = new PlacePhoto
                         {
                             GooglePlaceId = googlePlaceId,
@@ -83,7 +88,12 @@ namespace RoutePlanner.API.Services
                             OrderIndex = googleData.Photos.Count
                         };
                         googleData.Photos.Add(photo);
+                        _logger.LogDebug($"Added photo - Reference: {photoDto.PhotoReference}, URL: {(photoDto.PhotoUrl?.Length > 50 ? photoDto.PhotoUrl.Substring(0, 50) + "..." : photoDto.PhotoUrl)}");
                     }
+                }
+                else
+                {
+                    _logger.LogInformation($"No photos available for place {googlePlaceId}");
                 }
 
                 await _context.SaveChangesAsync();

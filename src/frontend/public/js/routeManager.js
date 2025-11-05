@@ -75,13 +75,15 @@ export class RouteManager {
                     const fullPlace = this.filterManager.allPlaces.find(p => p.id === minimalPlace.id);
 
                     if (fullPlace) {
-                        // Return full place in expected format
+                        // Return full place in expected format (include Google data flags)
                         return {
                             name: fullPlace.name,
                             coords: [fullPlace.latitude, fullPlace.longitude],
                             id: fullPlace.id,
                             categories: fullPlace.categories || [],
-                            countries: fullPlace.countries || []
+                            countries: fullPlace.countries || [],
+                            googlePlaceId: fullPlace.googlePlaceId || null,
+                            hasGoogleData: fullPlace.hasGoogleData || false
                         };
                     } else {
                         // Fallback if place not found (shouldn't happen)

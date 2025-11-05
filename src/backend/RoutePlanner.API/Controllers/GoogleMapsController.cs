@@ -138,5 +138,24 @@ namespace RoutePlanner.API.Controllers
                 return StatusCode(500, new { error = "Failed to clean cache", message = ex.Message });
             }
         }
+
+        /// <summary>
+        /// Clear ALL cache entries (for testing/debugging)
+        /// DELETE: api/googlemaps/cache/clear
+        /// </summary>
+        [HttpDelete("cache/clear")]
+        public async Task<ActionResult> ClearAllCache()
+        {
+            try
+            {
+                await _googleMapsService.ClearAllCache();
+                return Ok(new { message = "All cache entries cleared successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error clearing all cache");
+                return StatusCode(500, new { error = "Failed to clear cache", message = ex.Message });
+            }
+        }
     }
 }

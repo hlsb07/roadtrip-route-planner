@@ -339,10 +339,22 @@ namespace RoutePlanner.API.Services
         /// </summary>
         private void PopulatePhotoUrls(PlaceSearchResult result)
         {
+            _logger.LogInformation($"Populating photo URLs for {result.Photos.Count} photos");
+
             foreach (var photo in result.Photos)
             {
+                if (string.IsNullOrEmpty(photo.PhotoReference))
+                {
+                    _logger.LogWarning($"Photo has empty PhotoReference, skipping URL generation");
+                    continue;
+                }
+
                 photo.PhotoUrl = GeneratePhotoUrl(photo.PhotoReference, photo.Width);
+                _logger.LogDebug($"Generated photo URL: {(photo.PhotoUrl?.Length > 80 ? photo.PhotoUrl.Substring(0, 80) + "..." : photo.PhotoUrl)}");
             }
+
+            var photosWithUrl = result.Photos.Count(p => !string.IsNullOrEmpty(p.PhotoUrl));
+            _logger.LogInformation($"Generated URLs for {photosWithUrl} out of {result.Photos.Count} photos");
         }
 
         /// <summary>
@@ -390,13 +402,35 @@ namespace RoutePlanner.API.Services
 
                 if (data.TryGetProperty("photos", out var photos) && photos.ValueKind == JsonValueKind.Array)
                 {
-                    result.Photos = photos.EnumerateArray().Select(p => new DTOs.PlacePhotoDto
+                    result.Photos = photos.EnumerateArray().Select(p =>
                     {
-                        PhotoReference = p.GetProperty("photoReference").GetString() ?? "",
-                        Width = p.GetProperty("width").GetInt32(),
-                        Height = p.GetProperty("height").GetInt32(),
-                        PhotoUrl = p.TryGetProperty("photoUrl", out var url) ? url.GetString() : null
+                        // Try both PascalCase (C# serialization) and camelCase (JS serialization)
+                        var photoRef = p.TryGetProperty("PhotoReference", out var pr1) ? pr1.GetString()
+                                     : p.TryGetProperty("photoReference", out var pr2) ? pr2.GetString()
+                                     : "";
+
+                        var width = p.TryGetProperty("Width", out var w1) ? w1.GetInt32()
+                                  : p.TryGetProperty("width", out var w2) ? w2.GetInt32()
+                                  : 0;
+
+                        var height = p.TryGetProperty("Height", out var h1) ? h1.GetInt32()
+                                   : p.TryGetProperty("height", out var h2) ? h2.GetInt32()
+                                   : 0;
+
+                        var photoUrl = p.TryGetProperty("PhotoUrl", out var pu1) ? pu1.GetString()
+                                     : p.TryGetProperty("photoUrl", out var pu2) ? pu2.GetString()
+                                     : null;
+
+                        return new DTOs.PlacePhotoDto
+                        {
+                            PhotoReference = photoRef ?? "",
+                            Width = width,
+                            Height = height,
+                            PhotoUrl = photoUrl
+                        };
                     }).ToList();
+
+                    _logger.LogInformation($"Deserialized {result.Photos.Count} photos from cache");
                 }
             }
             catch (Exception ex)
@@ -514,6 +548,20 @@ namespace RoutePlanner.API.Services
             await _context.SaveChangesAsync();
 
             _logger.LogInformation($"Cleaned {expired.Count} expired cache entries");
+        }
+
+        /// <summary>
+        /// Clear ALL cache entries (for testing/debugging)
+        /// </summary>
+        public async Task ClearAllCache()
+        {
+            var allEntries = await _context.GoogleMapsCache.ToListAsync();
+            var count = allEntries.Count;
+
+            _context.GoogleMapsCache.RemoveRange(allEntries);
+            await _context.SaveChangesAsync();
+
+            _logger.LogWarning($"Cleared ALL {count} cache entries - this should only be used for testing!");
         }
 
         /// <summary>
