@@ -4471,3 +4471,123 @@ textarea.form-input {
         flex: 1;
     }
 }
+
+/* ===== KEYBOARD SHORTCUTS MODAL ===== */
+.shortcuts-section {
+    margin-bottom: 30px;
+}
+
+.shortcuts-section:last-of-type {
+    margin-bottom: 20px;
+}
+
+.shortcuts-section h3 {
+    font-size: 1.1rem;
+    color: #2A9D8F;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.shortcuts-section h3 i {
+    font-size: 1rem;
+}
+
+.shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.shortcut-item:last-child {
+    border-bottom: none;
+}
+
+.shortcut-keys {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-weight: 600;
+    min-width: 180px;
+}
+
+.shortcut-keys kbd {
+    display: inline-block;
+    padding: 4px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #333;
+    background: linear-gradient(to bottom, #f9f9f9, #e8e8e8);
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+}
+
+.shortcut-description {
+    flex: 1;
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.shortcuts-tip {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-left: 4px solid #2196f3;
+    padding: 15px;
+    border-radius: 8px;
+    color: #1565c0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.shortcuts-tip i {
+    font-size: 1.2rem;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.shortcuts-tip strong {
+    color: #0d47a1;
+}
+
+/* Enhanced selected place styling */
+.place-item.selected {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+    border-left: 4px solid #2196f3 !important;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2) !important;
+    transform: translateX(4px);
+}
+
+.place-item.selected .place-name {
+    color: #1565c0;
+    font-weight: 600;
+}
+
+/* Mobile responsive for shortcuts */
+@media (max-width: 768px) {
+    .shortcut-keys {
+        min-width: 140px;
+        font-size: 0.85rem;
+    }
+
+    .shortcut-keys kbd {
+        padding: 3px 8px;
+        font-size: 0.75rem;
+    }
+
+    .shortcut-description {
+        font-size: 0.85rem;
+    }
+
+    .shortcuts-tip {
+        font-size: 0.85rem;
+        padding: 12px;
+    }
+}

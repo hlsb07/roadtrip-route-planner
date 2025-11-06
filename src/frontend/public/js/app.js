@@ -130,25 +130,264 @@ class App {
         });
     }
 
+    /**
+     * Get the currently active view context
+     * @returns {Object} Context object with view info and selection
+     */
+    getActiveViewContext() {
+        // Check desktop nav
+        const activeDesktopNav = document.querySelector('.desktop-nav-item.active');
+        const activeMobileNav = document.querySelector('.mobile-nav-item.active');
+        const activeNav = activeDesktopNav || activeMobileNav;
+        const mode = activeNav?.dataset.mode || 'places';
+
+        // Check what's visible
+        const allPlacesVisible = document.getElementById('allPlacesSection')?.style.display !== 'none' ||
+                                 document.querySelector('.mobile-section[data-section="allplaces"]')?.style.display !== 'none';
+        const campsitesVisible = document.getElementById('campsitesList')?.style.display !== 'none' ||
+                                document.querySelector('.mobile-section[data-section="campsites"]')?.style.display !== 'none';
+
+        let context = {
+            mode: mode,
+            view: 'places', // default
+            selectedIndex: null,
+            items: [],
+            manager: null
+        };
+
+        if (allPlacesVisible || mode === 'allplaces') {
+            context.view = 'allplaces';
+            context.items = this.allPlacesManager.filteredPlaces || [];
+            context.manager = this.allPlacesManager;
+            // All places doesn't have selection yet, check for hover or clicked item
+            context.selectedIndex = null;
+        } else if (campsitesVisible || mode === 'campsites') {
+            context.view = 'campsites';
+            context.selectedIndex = this.campsiteManager.selectedIndex;
+            context.items = this.campsiteManager.campsites || [];
+            context.manager = this.campsiteManager;
+        } else {
+            // Default to route places
+            context.view = 'places';
+            context.selectedIndex = this.placeManager.selectedIndex;
+            context.items = this.placeManager.places || [];
+            context.manager = this.placeManager;
+        }
+
+        return context;
+    }
+
+    /**
+     * Deselect the current selection in the active view
+     */
+    deselectCurrentView() {
+        const context = this.getActiveViewContext();
+        if (context.view === 'places' && this.placeManager.selectedIndex !== null) {
+            this.placeManager.deselectPlace();
+            this.mapService.deselectPlace();
+            this.updateUI();
+        } else if (context.view === 'campsites' && this.campsiteManager.selectedIndex !== null) {
+            this.campsiteManager.deselectCampsite();
+            this.mapService.deselectCampsite();
+        }
+    }
+
     setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // ESC closes modal
+        document.addEventListener('keydown', async (e) => {
+            // Helper: Check if we should ignore shortcuts (typing in input/textarea)
+            const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+            const hasActiveModal = document.querySelector('.modal.active, .confirm-overlay.show');
+
+            // ESC always works - closes modal or deselects
             if (e.key === 'Escape') {
-                this.routeManager.closeRouteModal();
-            }
-            
-            // Enter in modal saves
-            if (e.key === 'Enter' && document.getElementById('routeModal').classList.contains('active')) {
-                this.routeManager.saveRoute().then(() => {
-                    this.updateRoutesList();
-                });
+                if (hasActiveModal) {
+                    this.routeManager.closeRouteModal();
+                } else {
+                    this.deselectCurrentView();
+                }
+                return;
             }
 
-            // Enter in place edit modal saves
-            if (e.key === 'Enter' && document.getElementById('editPlaceModal').classList.contains('active')) {
-                this.placeManager.savePlaceEdit();
+            // Modal-specific shortcuts
+            if (hasActiveModal) {
+                // Enter in route modal saves
+                if (e.key === 'Enter' && document.getElementById('routeModal')?.classList.contains('active')) {
+                    this.routeManager.saveRoute().then(() => {
+                        this.updateRoutesList();
+                    });
+                }
+                // Enter in place edit modal saves
+                if (e.key === 'Enter' && document.getElementById('editPlaceModal')?.classList.contains('active')) {
+                    this.placeManager.savePlaceEdit();
+                }
+                return; // Don't process other shortcuts when modal is open
+            }
+
+            // Don't process shortcuts when typing in inputs
+            if (isTyping && !['Escape'].includes(e.key)) {
+                return;
+            }
+
+            // === Context-Aware Shortcuts ===
+            const context = this.getActiveViewContext();
+            const selectedIndex = context.selectedIndex;
+            const items = context.items;
+
+            // Delete key - Remove/delete item based on view
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIndex !== null && !e.shiftKey) {
+                e.preventDefault();
+
+                if (context.view === 'places') {
+                    // Remove from route
+                    const success = await this.removePlace(selectedIndex);
+                    if (success) {
+                        this.updateUI();
+                    }
+                } else if (context.view === 'campsites') {
+                    // Campsites - just deselect for now
+                    this.campsiteManager.deselectCampsite();
+                }
+                return;
+            }
+
+            // Shift + Delete - Permanently delete place
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIndex !== null && e.shiftKey) {
+                e.preventDefault();
+                const item = items[selectedIndex];
+                if (item && context.view === 'places') {
+                    await this.deleteNonRoutePlace(item.id, item.name);
+                    this.updateUI();
+                }
+                return;
+            }
+
+            // Arrow Down - Select next item
+            if (e.key === 'ArrowDown' && items.length > 0) {
+                e.preventDefault();
+                const nextIndex = selectedIndex === null ? 0 : Math.min(selectedIndex + 1, items.length - 1);
+
+                if (context.view === 'places') {
+                    this.selectPlace(nextIndex);
+                } else if (context.view === 'campsites') {
+                    this.selectCampsite(nextIndex);
+                }
+                return;
+            }
+
+            // Arrow Up - Select previous item
+            if (e.key === 'ArrowUp' && items.length > 0) {
+                e.preventDefault();
+                const prevIndex = selectedIndex === null ? items.length - 1 : Math.max(selectedIndex - 1, 0);
+
+                if (context.view === 'places') {
+                    this.selectPlace(prevIndex);
+                } else if (context.view === 'campsites') {
+                    this.selectCampsite(prevIndex);
+                }
+                return;
+            }
+
+            // Enter - Edit selected item
+            if (e.key === 'Enter' && selectedIndex !== null) {
+                e.preventDefault();
+                const item = items[selectedIndex];
+                if (item && context.view === 'places') {
+                    await this.placeManager.showEditPlaceModal(selectedIndex);
+                }
+                return;
+            }
+
+            // Ctrl/Cmd + A - Focus search input
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                const searchInput = document.getElementById('search');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                return;
+            }
+
+            // ? - Show keyboard shortcuts help
+            if (e.key === '?' && !e.shiftKey) {
+                e.preventDefault();
+                this.showKeyboardShortcutsModal();
+                return;
             }
         });
+    }
+
+    showKeyboardShortcutsModal() {
+        // Check if modal already exists
+        let modal = document.getElementById('keyboardShortcutsModal');
+
+        if (!modal) {
+            // Create modal
+            modal = document.createElement('div');
+            modal.id = 'keyboardShortcutsModal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content modal-medium">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h2>
+                        <button class="close-modal" onclick="document.getElementById('keyboardShortcutsModal').classList.remove('active')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="shortcuts-section">
+                            <h3><i class="fas fa-trash"></i> Place Management</h3>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Delete</kbd> or <kbd>Backspace</kbd></span>
+                                <span class="shortcut-description">Remove selected place from route</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Shift</kbd> + <kbd>Delete</kbd></span>
+                                <span class="shortcut-description">Permanently delete selected place</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Enter</kbd></span>
+                                <span class="shortcut-description">Edit selected place</span>
+                            </div>
+                        </div>
+
+                        <div class="shortcuts-section">
+                            <h3><i class="fas fa-arrows-alt-v"></i> Navigation</h3>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>↑</kbd> Arrow Up</span>
+                                <span class="shortcut-description">Select previous place</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>↓</kbd> Arrow Down</span>
+                                <span class="shortcut-description">Select next place</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Esc</kbd></span>
+                                <span class="shortcut-description">Deselect place or close modal</span>
+                            </div>
+                        </div>
+
+                        <div class="shortcuts-section">
+                            <h3><i class="fas fa-plus"></i> General</h3>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl/Cmd</kbd> + <kbd>A</kbd></span>
+                                <span class="shortcut-description">Focus search input</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>?</kbd></span>
+                                <span class="shortcut-description">Show this help</span>
+                            </div>
+                        </div>
+
+                        <div class="shortcuts-tip">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Tip:</strong> Select a place by clicking it in the list or on the map, then use shortcuts for quick actions!
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        modal.classList.add('active');
     }
 
     // Public methods for global access
