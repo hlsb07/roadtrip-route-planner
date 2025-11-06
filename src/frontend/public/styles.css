@@ -2316,6 +2316,46 @@ textarea.form-input {
     width: 95%;
 }
 
+/* Desktop overflow handling - constrain modal height and make body scrollable */
+.modal-content.modal-large {
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-content.modal-large .modal-header {
+    flex-shrink: 0; /* Keep header fixed */
+}
+
+.modal-content.modal-large .modal-body {
+    overflow-y: auto;
+    flex: 1 1 auto; /* Allow body to grow and shrink */
+    max-height: calc(90vh - 140px); /* Leave space for header and footer */
+}
+
+.modal-content.modal-large .modal-footer {
+    flex-shrink: 0; /* Keep footer fixed */
+}
+
+/* Custom scrollbar for modal body */
+.modal-content.modal-large .modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-content.modal-large .modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.modal-content.modal-large .modal-body::-webkit-scrollbar-thumb {
+    background: #2A9D8F;
+    border-radius: 4px;
+}
+
+.modal-content.modal-large .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #258075;
+}
+
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2463,15 +2503,35 @@ textarea.form-input {
         font-size: 0.95rem;
     }
 
-    /* Make modal scrollable on mobile */
+    /* Make modal scrollable on mobile - use flexbox approach */
     .modal-content.modal-large {
         max-height: 100vh;
-        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
     }
 
-    .modal-body {
-        max-height: calc(100vh - 180px);
+    .modal-content.modal-large .modal-header {
+        flex-shrink: 0; /* Keep header fixed */
+    }
+
+    .modal-content.modal-large .modal-body {
         overflow-y: auto;
+        flex: 1 1 auto; /* Allow body to grow and shrink */
+        max-height: calc(100vh - 140px); /* Leave space for header and footer */
+    }
+
+    .modal-content.modal-large .modal-footer {
+        flex-shrink: 0; /* Keep footer fixed */
+    }
+
+    /* Custom scrollbar for mobile */
+    .modal-content.modal-large .modal-body::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .modal-content.modal-large .modal-body::-webkit-scrollbar-thumb {
+        background: #2A9D8F;
+        border-radius: 3px;
     }
 }
 
@@ -3220,6 +3280,23 @@ textarea.form-input {
     border-color: #2A9D8F;
     box-shadow: 0 2px 8px rgba(42, 157, 143, 0.1);
     background: #f0fdf8;
+}
+
+.all-place-card.selected {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-color: #2196f3;
+    border-left-width: 4px;
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
+    transform: translateX(2px);
+}
+
+.all-place-card.selected .all-place-card-name {
+    color: #1565c0;
+    font-weight: 700;
+}
+
+.all-place-card.selected .all-place-card-icon {
+    background: #e3f2fd;
 }
 
 .all-place-card-icon {

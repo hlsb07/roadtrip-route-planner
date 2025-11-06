@@ -11,9 +11,10 @@ export class MapService {
         this.showRoute = true;
         this.clickMarker = null;
         this.selectedMarkerIndex = null;
+        this.selectedAllPlaceIndex = null; // For All Places view selection
         this.selectedCampsiteIndex = null;
         this.onMarkerClick = null;
-        this.onNonRouteMarkerClick = null; // Callback for non-route marker clicks
+        this.onNonRouteMarkerClick = null; // Callback for non-route/filtered place marker clicks (used for gray markers and All Places view)
         this.onCampsiteMarkerClick = null;
         this.coordinateSelectionMode = false;
         this.coordinateSelectionCallback = null;
@@ -398,6 +399,20 @@ export class MapService {
         this.onCampsiteMarkerClick = callback;
     }
 
+    selectAllPlace(index) {
+        if (index < 0 || index >= this.markers.length) return;
+
+        this.selectedAllPlaceIndex = index;
+        const marker = this.markers[index];
+
+        // Open popup
+        marker.openPopup();
+    }
+
+    deselectAllPlace() {
+        this.selectedAllPlaceIndex = null;
+    }
+
     /**
      * Setup popup for a place marker with lazy loading of Google data
      * @param {L.Marker} marker - Leaflet marker instance
@@ -720,7 +735,7 @@ export class MapService {
 
         // Add markers for filtered places
         filteredPlaces.forEach((place, index) => {
-            const isSelected = this.selectedMarkerIndex === index;
+            const isSelected = this.selectedAllPlaceIndex === index;
 
             // Get category icon if available
             const categoryIcon = place.categories && place.categories.length > 0
@@ -764,6 +779,13 @@ export class MapService {
 
             // Setup popup with lazy loading for Google data
             this.setupPlacePopup(marker, place, null, false);
+
+            // Add click handler
+            marker.on('click', () => {
+                if (this.onNonRouteMarkerClick) {
+                    this.onNonRouteMarkerClick(place.id, index);
+                }
+            });
 
             this.markers.push(marker);
         });

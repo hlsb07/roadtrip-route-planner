@@ -52,6 +52,12 @@ class App {
                 this.selectCampsite(index);
             });
 
+            // Setup non-route/filtered place marker click handler
+            this.mapService.setNonRouteMarkerClickCallback((placeId, index) => {
+                // This is called when clicking markers in All Places view
+                this.allPlacesManager.selectCard(index);
+            });
+
             // Initialize filters FIRST (fetches all places with full data)
             await this.filterManager.init();
 
@@ -159,8 +165,7 @@ class App {
             context.view = 'allplaces';
             context.items = this.allPlacesManager.filteredPlaces || [];
             context.manager = this.allPlacesManager;
-            // All places doesn't have selection yet, check for hover or clicked item
-            context.selectedIndex = null;
+            context.selectedIndex = this.allPlacesManager.selectedIndex;
         } else if (campsitesVisible || mode === 'campsites') {
             context.view = 'campsites';
             context.selectedIndex = this.campsiteManager.selectedIndex;
@@ -186,6 +191,10 @@ class App {
             this.placeManager.deselectPlace();
             this.mapService.deselectPlace();
             this.updateUI();
+        } else if (context.view === 'allplaces' && this.allPlacesManager.selectedIndex !== null) {
+            this.allPlacesManager.deselectCard();
+            this.mapService.deselectAllPlace();
+            this.allPlacesManager.updateAllPlacesList();
         } else if (context.view === 'campsites' && this.campsiteManager.selectedIndex !== null) {
             this.campsiteManager.deselectCampsite();
             this.mapService.deselectCampsite();
@@ -243,6 +252,13 @@ class App {
                     if (success) {
                         this.updateUI();
                     }
+                } else if (context.view === 'allplaces') {
+                    // All Places - permanently delete (with confirmation)
+                    const item = items[selectedIndex];
+                    if (item) {
+                        await this.allPlacesManager.deletePlace(item.id, item.name);
+                        this.allPlacesManager.updateAllPlacesList();
+                    }
                 } else if (context.view === 'campsites') {
                     // Campsites - just deselect for now
                     this.campsiteManager.deselectCampsite();
@@ -250,13 +266,16 @@ class App {
                 return;
             }
 
-            // Shift + Delete - Permanently delete place
+            // Shift + Delete - Permanently delete place (same as Delete in All Places)
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIndex !== null && e.shiftKey) {
                 e.preventDefault();
                 const item = items[selectedIndex];
-                if (item && context.view === 'places') {
+                if (item && (context.view === 'places' || context.view === 'allplaces')) {
                     await this.deleteNonRoutePlace(item.id, item.name);
                     this.updateUI();
+                    if (context.view === 'allplaces') {
+                        this.allPlacesManager.updateAllPlacesList();
+                    }
                 }
                 return;
             }
@@ -268,6 +287,10 @@ class App {
 
                 if (context.view === 'places') {
                     this.selectPlace(nextIndex);
+                } else if (context.view === 'allplaces') {
+                    this.allPlacesManager.selectCard(nextIndex);
+                    this.mapService.selectAllPlace(nextIndex);
+                    this.allPlacesManager.updateAllPlacesList();
                 } else if (context.view === 'campsites') {
                     this.selectCampsite(nextIndex);
                 }
@@ -281,6 +304,10 @@ class App {
 
                 if (context.view === 'places') {
                     this.selectPlace(prevIndex);
+                } else if (context.view === 'allplaces') {
+                    this.allPlacesManager.selectCard(prevIndex);
+                    this.mapService.selectAllPlace(prevIndex);
+                    this.allPlacesManager.updateAllPlacesList();
                 } else if (context.view === 'campsites') {
                     this.selectCampsite(prevIndex);
                 }
@@ -293,6 +320,8 @@ class App {
                 const item = items[selectedIndex];
                 if (item && context.view === 'places') {
                     await this.placeManager.showEditPlaceModal(selectedIndex);
+                } else if (item && context.view === 'allplaces') {
+                    await this.allPlacesManager.editPlace(item.id);
                 }
                 return;
             }

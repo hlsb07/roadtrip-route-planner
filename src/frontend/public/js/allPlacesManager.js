@@ -11,6 +11,7 @@ export class AllPlacesManager {
         this.allPlaces = []; // All non-route places
         this.filteredPlaces = []; // Filtered non-route places
         this.searchQuery = '';
+        this.selectedIndex = null; // Selected place index
     }
 
     /**
@@ -105,7 +106,7 @@ export class AllPlacesManager {
             a.name.localeCompare(b.name)
         );
 
-        return sortedPlaces.map(place => {
+        return sortedPlaces.map((place, index) => {
             // Get first category icon if available
             const categoryIcon = place.categories && place.categories.length > 0
                 ? place.categories[0].icon || '📍'
@@ -124,8 +125,14 @@ export class AllPlacesManager {
             // Build tags string
             const tags = [countries, categories].filter(t => t).join(' · ');
 
+            // Check if this card is selected
+            const isSelected = this.selectedIndex === index;
+
             return `
-                <div class="all-place-card" data-place-id="${place.id}" onclick="allPlacesManager.viewPlaceOnMap(${place.id})">
+                <div class="all-place-card ${isSelected ? 'selected' : ''}"
+                     data-place-id="${place.id}"
+                     data-index="${index}"
+                     onclick="allPlacesManager.selectCard(${index})">
                     <div class="all-place-card-icon">${categoryIcon}</div>
                     <div class="all-place-card-content">
                         <div class="all-place-card-name">${place.name}</div>
@@ -145,6 +152,45 @@ export class AllPlacesManager {
                 </div>
             `;
         }).join('');
+    }
+
+    /**
+     * Select a card by index
+     */
+    selectCard(index) {
+        // Toggle selection
+        if (this.selectedIndex === index) {
+            this.selectedIndex = null; // Deselect if clicking the same card
+            // Deselect map marker if app is available
+            if (window.app?.mapService) {
+                window.app.mapService.deselectAllPlace();
+            }
+        } else {
+            this.selectedIndex = index; // Select the card
+            // Select map marker if app is available
+            if (window.app?.mapService) {
+                window.app.mapService.selectAllPlace(index);
+            }
+        }
+        this.updateAllPlacesList(); // Re-render to show selection
+
+        // Show place on map
+        const place = this.filteredPlaces[index];
+        if (place) {
+            this.viewPlaceOnMap(place.id);
+        }
+    }
+
+    /**
+     * Deselect the current card
+     */
+    deselectCard() {
+        this.selectedIndex = null;
+        // Deselect map marker if app is available
+        if (window.app?.mapService) {
+            window.app.mapService.deselectAllPlace();
+        }
+        this.updateAllPlacesList();
     }
 
     /**
