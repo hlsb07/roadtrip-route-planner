@@ -311,14 +311,17 @@
     <!-- Mobile Docked Popup (Above Navigation Bar) -->
     <div id="mobileDockedPopup" class="mobile-docked-popup">
         <div class="mobile-popup-header">
-            <span class="mobile-popup-position" id="mobilePopupPosition"></span>
+            <div class="mobile-popup-title-section">
+                <span class="mobile-popup-position" id="mobilePopupPosition"></span>
+                <h3 class="mobile-popup-place-name" id="mobilePopupPlaceName"></h3>
+            </div>
             <button class="mobile-popup-close" onclick="window.mapService?.hideMobileDockedPopup()">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <div class="mobile-popup-content" id="mobilePopupContent">
             <!-- Content will be dynamically injected here -->
-            <!-- Buttons are now part of content, no separate footer -->
+            <!-- Carousel and buttons only -->
         </div>
     </div>
 
@@ -326,7 +329,7 @@
     <div id="fullscreenImageGallery" class="fullscreen-gallery">
         <div class="gallery-header">
             <span class="gallery-counter" id="galleryCounter">1 / 1</span>
-            <button class="gallery-close" onclick="window.mapService?.hideFullscreenImageGallery()">
+            <button class="gallery-close" onclick="closePhotosGallery()">
                 <i class="fas fa-times"></i>
             </button>
         </div>

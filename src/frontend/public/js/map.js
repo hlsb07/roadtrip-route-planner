@@ -20,6 +20,9 @@ export class MapService {
         this.coordinateSelectionCallback = null;
         this.coordinatePreviewMarker = null;
         this.currentMobilePopupData = null; // Store current popup data for "View Details" button
+        this.currentPopupPhotos = null; // Store photos for fullscreen gallery
+        this.galleryPhotos = null; // Current photos in fullscreen gallery
+        this.currentGalleryIndex = 0; // Current image index in gallery
     }
 
     init() {
@@ -769,13 +772,18 @@ export class MapService {
 
     /**
      * Build simplified mobile popup content for docked popup
-     * Compact design: Image + Name + Number + Buttons only (no scrolling)
+     * Returns object with header data and content HTML
+     * Compact design: Carousel + Buttons in content, Name + Position in header
      */
     buildMobilePlacePopupContent(place, index, isNonRoute, lat, lng) {
         // Compact carousel (100px height, clickable for fullscreen)
         const photos = place.googleData?.photos || [];
+
+        // Store photos for fullscreen gallery access
+        this.currentPopupPhotos = photos;
+
         const imageCarousel = photos.length > 0
-            ? `<div class="popup-image-carousel" onclick="window.mapService?. Image + Name + Number + Buttons?(${JSON.stringify(photos).replace(/"/g, '&quot;')}, 0)">
+            ? `<div class="popup-image-carousel" onclick="openPhotosGallery(); event.stopPropagation();">
                    <div class="carousel-container" id="mobile-carousel-${place.id || index}">
                        ${photos.slice(0, 3).map((photo, idx) => `
                            <img src="${photo.photoUrl}"
@@ -796,19 +804,6 @@ export class MapService {
                </div>`
             : '';
 
-        // Place header with number and name
-        const placeHeader = `
-            <div class="mobile-popup-place-header">
-                ${index !== null ? `<div class="mobile-popup-place-number">${index + 1}</div>` : ''}
-                <div class="mobile-popup-place-info">
-                    <h3 class="mobile-popup-place-name">${place.name}</h3>
-                    <div class="mobile-popup-badges">
-                        ${place.googleData ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>' : ''}
-                    </div>
-                </div>
-            </div>
-        `;
-
         // Stacked buttons (View Details + primary action)
         let buttons = '';
         if (isNonRoute) {
@@ -816,7 +811,7 @@ export class MapService {
             buttons = `
                 <div class="mobile-popup-buttons">
                     <button class="btn btn-primary" onclick="event.stopPropagation(); window.app?.openPlaceDetailsFromPopup()">
-                        <i class="fas fa-info-circle"></i> View Details
+                        <i class="fas fa-info-circle"></i>
                     </button>
                     <button class="btn btn-primary" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
                         <i class="fas fa-plus"></i> Add to Route
@@ -828,21 +823,30 @@ export class MapService {
             buttons = `
                 <div class="mobile-popup-buttons">
                     <button class="btn btn-primary" onclick="event.stopPropagation(); window.app?.openPlaceDetailsFromPopup()">
-                        <i class="fas fa-info-circle"></i> View Details
+                        <i class="fas fa-info-circle"></i>
                     </button>
                     <button class="btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
-                        <i class="fas fa-minus-circle"></i> Remove from Route
+                        <i class="fas fa-trash"></i>
                     </button>
                 </div>
             `;
         }
 
-        // Assemble compact mobile popup
-        return `
-            ${imageCarousel}
-            ${placeHeader}
-            ${buttons}
-        `;
+        // Prepare header data
+        const position = index !== null ? `${index + 1}` : '';
+        const badges = place.googleData
+            ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>'
+            : '';
+
+        // Return object with header and content
+        return {
+            header: {
+                position: position,
+                placeName: place.name,
+                badges: badges
+            },
+            content: `${imageCarousel}${buttons}`
+        };
     }
 
     /**
@@ -1029,11 +1033,14 @@ export class MapService {
         return window.innerWidth <= 768;
     }
 
-    showMobileDockedPopup(content, placeId, placeData) {
+    showMobileDockedPopup(contentData, placeId, placeData) {
         if (!this.isMobileView()) return;
 
         const popup = document.getElementById('mobileDockedPopup');
         const popupContent = document.getElementById('mobilePopupContent');
+        const popupPosition = document.getElementById('mobilePopupPosition');
+        const popupPlaceName = document.getElementById('mobilePopupPlaceName');
+        const popupBadges = document.getElementById('mobilePopupBadges');
 
         if (!popup || !popupContent) return;
 
@@ -1048,29 +1055,65 @@ export class MapService {
             }
         }
 
-        // Set content and show popup
-        popupContent.innerHTML = content;
-        popup.classList.add('show');
+        // Handle both new object format and old string format (backwards compatibility)
+        let content, headerData;
+        if (typeof contentData === 'object' && contentData.content !== undefined) {
+            // New format: {header: {...}, content: '...'}
+            content = contentData.content;
+            headerData = contentData.header;
+        } else {
+            // Old format: just a string (for campsites, etc.)
+            content = contentData;
+            headerData = null;
+        }
 
-        // Update position indicator (will be set by app.js when navigating)
-        const positionEl = document.getElementById('mobilePopupPosition');
-        if (positionEl && placeData) {
-            // Try to determine position from context
-            if (placeData.index !== null && placeData.index !== undefined) {
-                // Route place
-                const total = window.app?.placeManager?.places?.length || 0;
-                positionEl.textContent = total > 0 ? `${placeData.index + 1} of ${total}` : '';
-            } else {
-                // All place - get from selected index
-                const selectedIndex = window.app?.allPlacesManager?.selectedIndex;
-                const total = window.app?.allPlacesManager?.filteredPlaces?.length || 0;
-                if (selectedIndex !== null && total > 0) {
-                    positionEl.textContent = `${selectedIndex + 1} of ${total}`;
+        // Set content
+        popupContent.innerHTML = content;
+
+        // Update header if header data is provided
+        if (headerData) {
+            // Set place name
+            if (popupPlaceName) {
+                popupPlaceName.textContent = headerData.placeName || '';
+            }
+
+            // Set badges
+            if (popupBadges) {
+                popupBadges.innerHTML = headerData.badges || '';
+            }
+
+            // Set position
+            if (popupPosition && headerData.position) {
+                const total = placeData?.index !== null && placeData?.index !== undefined
+                    ? window.app?.placeManager?.places?.length || 0
+                    : window.app?.allPlacesManager?.filteredPlaces?.length || 0;
+
+                popupPosition.textContent = total > 0 ? `${headerData.position} of ${total}` : '';
+            }
+        } else {
+            // Fallback: try to determine position from placeData (for campsites)
+            if (popupPosition && placeData) {
+                if (placeData.index !== null && placeData.index !== undefined) {
+                    const total = window.app?.placeManager?.places?.length || 0;
+                    popupPosition.textContent = total > 0 ? `${placeData.index + 1} of ${total}` : '';
                 } else {
-                    positionEl.textContent = '';
+                    const selectedIndex = window.app?.allPlacesManager?.selectedIndex;
+                    const total = window.app?.allPlacesManager?.filteredPlaces?.length || 0;
+                    if (selectedIndex !== null && total > 0) {
+                        popupPosition.textContent = `${selectedIndex + 1} of ${total}`;
+                    } else {
+                        popupPosition.textContent = '';
+                    }
                 }
             }
+
+            // Clear name and badges for non-place popups
+            if (popupPlaceName) popupPlaceName.textContent = '';
+            if (popupBadges) popupBadges.innerHTML = '';
         }
+
+        // Show popup
+        popup.classList.add('show');
 
         // Add click outside to close
         setTimeout(() => {
@@ -1112,8 +1155,21 @@ export class MapService {
     // FULLSCREEN IMAGE GALLERY
     // ============================================
 
+    openCurrentPhotosGallery() {
+        console.log('openCurrentPhotosGallery called, photos:', this.currentPopupPhotos);
+        if (this.currentPopupPhotos && this.currentPopupPhotos.length > 0) {
+            this.showFullscreenImageGallery(this.currentPopupPhotos, 0);
+        } else {
+            console.warn('No photos available for gallery');
+        }
+    }
+
     showFullscreenImageGallery(photos, startIndex = 0) {
-        if (!photos || photos.length === 0) return;
+        console.log('showFullscreenImageGallery called with photos:', photos, 'startIndex:', startIndex);
+        if (!photos || photos.length === 0) {
+            console.warn('No photos provided to gallery');
+            return;
+        }
 
         const gallery = document.getElementById('fullscreenImageGallery');
         const galleryImages = document.getElementById('galleryImages');
@@ -1121,17 +1177,24 @@ export class MapService {
         const prevBtn = document.getElementById('galleryPrev');
         const nextBtn = document.getElementById('galleryNext');
 
-        if (!gallery || !galleryImages) return;
+        if (!gallery || !galleryImages) {
+            console.error('Gallery elements not found!', { gallery, galleryImages });
+            return;
+        }
 
         this.galleryPhotos = photos;
         this.currentGalleryIndex = startIndex;
 
         // Build gallery images
-        galleryImages.innerHTML = photos.map((photo, idx) => `
+        const galleryHTML = photos.map((photo, idx) => `
             <div class="gallery-image ${idx === startIndex ? 'active' : ''}" data-index="${idx}">
                 <img src="${photo.photoUrl}" alt="Image ${idx + 1}">
             </div>
         `).join('');
+
+        console.log('Gallery HTML generated:', galleryHTML);
+        galleryImages.innerHTML = galleryHTML;
+        console.log('Gallery images innerHTML set. Child count:', galleryImages.children.length);
 
         // Update counter
         if (galleryCounter) {
@@ -1153,7 +1216,9 @@ export class MapService {
         this.setupGallerySwipe();
 
         // Show gallery
+        console.log('Adding show class to gallery');
         gallery.classList.add('show');
+        console.log('Gallery classes:', gallery.className);
 
         // Prevent body scroll
         document.body.style.overflow = 'hidden';

@@ -6,6 +6,7 @@ import { CampsiteManager } from './campsiteManager.js';
 import { FilterManager } from './filterManager.js';
 import { AllPlacesManager } from './allPlacesManager.js';
 import { TagManager } from './tagManager.js';
+import { ApiService } from './api.js';
 import { showError, showSuccess, showConfirm } from './utils.js';
 import { CONFIG } from './config.js';
 
@@ -208,8 +209,15 @@ class App {
             const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
             const hasActiveModal = document.querySelector('.modal.active, .confirm-overlay.show');
 
-            // ESC always works - closes mobile popup, modal, or deselects
+            // ESC always works - closes fullscreen gallery, mobile popup, modal, or deselects
             if (e.key === 'Escape') {
+                // Check if fullscreen image gallery is open (highest priority)
+                const fullscreenGallery = document.getElementById('fullscreenImageGallery');
+                if (fullscreenGallery && fullscreenGallery.classList.contains('show')) {
+                    this.mapService.hideFullscreenImageGallery();
+                    return;
+                }
+
                 // Check if mobile docked popup is open
                 const mobilePopup = document.getElementById('mobileDockedPopup');
                 if (mobilePopup && mobilePopup.classList.contains('show')) {
@@ -745,7 +753,11 @@ class App {
 
     setupMobilePopupSwipe() {
         const popup = document.getElementById('mobileDockedPopup');
-        if (!popup) return;
+        console.log('setupMobilePopupSwipe - popup element:', popup);
+        if (!popup) {
+            console.warn('Mobile popup element not found during setup');
+            return;
+        }
 
         let startX = 0;
         let startY = 0;
@@ -753,6 +765,7 @@ class App {
         popup.addEventListener('touchstart', (e) => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
+            console.log('Touch start:', startX, startY);
         }, { passive: true });
 
         popup.addEventListener('touchend', (e) => {
@@ -762,8 +775,11 @@ class App {
             const diffX = startX - endX;
             const diffY = startY - endY;
 
+            console.log('Touch end - diffX:', diffX, 'diffY:', diffY);
+
             // Horizontal swipe (min 50px), ignore if vertical swipe is dominant
             if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                console.log('Swipe detected:', diffX > 0 ? 'left (next)' : 'right (previous)');
                 if (diffX > 0) {
                     // Swipe left - next place
                     this.navigateToNextPlace();
@@ -771,67 +787,107 @@ class App {
                     // Swipe right - previous place
                     this.navigateToPreviousPlace();
                 }
+            } else {
+                console.log('Swipe threshold not met');
             }
         }, { passive: true });
+
+        console.log('Mobile popup swipe listeners attached');
     }
 
     navigateToNextPlace() {
+        console.log('navigateToNextPlace called');
         const popupData = this.mapService.getCurrentMobilePopupData();
-        if (!popupData) return;
+        console.log('Popup data:', popupData);
+        if (!popupData) {
+            console.warn('No popup data available');
+            return;
+        }
 
         const { placeData } = popupData;
         const context = this.getActiveViewContext();
+        console.log('Context:', context, 'Place data:', placeData);
 
-        if (context.mode === 'places' && context.view === 'places') {
-            // Route Places view
+        // Determine view based on placeData and context
+        const isRoutePlace = placeData && placeData.index !== null && !placeData.isNonRoute;
+        const isAllPlacesView = context.view === 'allplaces' || context.mode === 'allplaces';
+
+        if (isRoutePlace) {
+            // Route Places view (including when viewing from "Routes" tab)
             const currentIndex = placeData.index;
             const nextIndex = currentIndex + 1;
+            console.log('Route Places - current:', currentIndex, 'next:', nextIndex, 'total:', this.placeManager.places.length);
 
             if (nextIndex < this.placeManager.places.length) {
                 this.showPlaceInMobilePopup(nextIndex, false);
                 this.updatePopupPositionIndicator(nextIndex + 1, this.placeManager.places.length);
+            } else {
+                console.log('Already at last place');
             }
-        } else if (context.mode === 'allplaces' && context.view === 'allplaces') {
+        } else if (isAllPlacesView) {
             // All Places view
             const currentIndex = this.allPlacesManager.selectedIndex;
             const nextIndex = currentIndex !== null ? currentIndex + 1 : 0;
+            console.log('All Places - current:', currentIndex, 'next:', nextIndex, 'total:', this.allPlacesManager.filteredPlaces.length);
 
             if (nextIndex < this.allPlacesManager.filteredPlaces.length) {
                 this.allPlacesManager.selectCard(nextIndex);
                 this.mapService.selectAllPlace(nextIndex);
                 this.showAllPlaceInMobilePopup(nextIndex);
                 this.updatePopupPositionIndicator(nextIndex + 1, this.allPlacesManager.filteredPlaces.length);
+            } else {
+                console.log('Already at last place');
             }
+        } else {
+            console.log('Unknown view - isRoutePlace:', isRoutePlace, 'isAllPlacesView:', isAllPlacesView);
         }
     }
 
     navigateToPreviousPlace() {
+        console.log('navigateToPreviousPlace called');
         const popupData = this.mapService.getCurrentMobilePopupData();
-        if (!popupData) return;
+        console.log('Popup data:', popupData);
+        if (!popupData) {
+            console.warn('No popup data available');
+            return;
+        }
 
         const { placeData } = popupData;
         const context = this.getActiveViewContext();
+        console.log('Context:', context, 'Place data:', placeData);
 
-        if (context.mode === 'places' && context.view === 'places') {
-            // Route Places view
+        // Determine view based on placeData and context
+        const isRoutePlace = placeData && placeData.index !== null && !placeData.isNonRoute;
+        const isAllPlacesView = context.view === 'allplaces' || context.mode === 'allplaces';
+
+        if (isRoutePlace) {
+            // Route Places view (including when viewing from "Routes" tab)
             const currentIndex = placeData.index;
             const prevIndex = currentIndex - 1;
+            console.log('Route Places - current:', currentIndex, 'prev:', prevIndex);
 
             if (prevIndex >= 0) {
                 this.showPlaceInMobilePopup(prevIndex, false);
                 this.updatePopupPositionIndicator(prevIndex + 1, this.placeManager.places.length);
+            } else {
+                console.log('Already at first place');
             }
-        } else if (context.mode === 'allplaces' && context.view === 'allplaces') {
+        } else if (isAllPlacesView) {
             // All Places view
             const currentIndex = this.allPlacesManager.selectedIndex;
             const prevIndex = currentIndex !== null ? currentIndex - 1 : -1;
+            console.log('All Places - current:', currentIndex, 'prev:', prevIndex);
 
             if (prevIndex >= 0) {
                 this.allPlacesManager.selectCard(prevIndex);
                 this.mapService.selectAllPlace(prevIndex);
                 this.showAllPlaceInMobilePopup(prevIndex);
                 this.updatePopupPositionIndicator(prevIndex + 1, this.allPlacesManager.filteredPlaces.length);
+            } else {
+                console.log('Already at first place');
             }
+        } else {
+            console.log('Unknown view - isRoutePlace:', isRoutePlace, 'isAllPlacesView:', isAllPlacesView);
         }
     }
 
@@ -1035,6 +1091,14 @@ window.savePlaceEdit = () => window.app?.placeManager?.savePlaceEdit();
 window.closeAddPlacePositionModal = () => window.app?.placeManager?.closeAddPlacePositionModal();
 window.closePlaceAddedSuccessModal = () => window.app?.placeManager?.closePlaceAddedSuccessModal();
 window.addSavedPlaceToRoute = () => window.app?.placeManager?.addSavedPlaceToRoute();
+
+// Mobile popup gallery
+window.openPhotosGallery = () => window.app?.mapService?.openCurrentPhotosGallery();
+window.closePhotosGallery = () => window.app?.mapService?.hideFullscreenImageGallery();
+
+// Mobile popup navigation
+window.navigateToNextPlace = () => window.app?.navigateToNextPlace();
+window.navigateToPreviousPlace = () => window.app?.navigateToPreviousPlace();
 
 // Global access for managers
 window.placeManager = null; // Will be set by app
