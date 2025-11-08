@@ -307,7 +307,24 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Mobile Docked Popup (Above Navigation Bar) -->
+    <div id="mobileDockedPopup" class="mobile-docked-popup">
+        <div class="mobile-popup-header">
+            <button class="mobile-popup-close" onclick="window.mapService?.hideMobileDockedPopup()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="mobile-popup-content" id="mobilePopupContent">
+            <!-- Content will be dynamically injected here -->
+        </div>
+        <div class="mobile-popup-footer">
+            <button class="btn btn-primary btn-view-details" onclick="window.app?.openPlaceDetailsFromPopup()">
+                <i class="fas fa-info-circle"></i> View Details
+            </button>
+        </div>
+    </div>
+
     <div id="routeModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -334,10 +351,10 @@
         <div id="modalOverlay" class="modal-overlay" onclick="closeRouteModal()"></div>
     </div>
 
-    <div id="editPlaceModal" class="modal">
+    <div id="editPlaceModal" class="modal" data-mode="edit">
         <div class="modal-content modal-large">
             <div class="modal-header">
-                <h3><i class="fas fa-edit"></i> Edit Place</h3>
+                <h3 id="editPlaceModalTitle"><i class="fas fa-edit"></i> Edit Place</h3>
                 <button class="btn-close" onclick="closePlaceModal()">
                     <i class="fas fa-times"></i>
                 </button>
@@ -360,19 +377,19 @@
                         <input type="text" id="placeLongitude" class="form-input coords-input" placeholder="e.g., -0.1278" readonly>
                     </div>
                 </div>
-                <button type="button" class="btn-change-location" onclick="placeManager.startLocationChange()">
+                <button type="button" class="btn-change-location edit-mode-only" onclick="placeManager.startLocationChange()">
                     <i class="fas fa-map-marker-alt"></i> Change Location on Map
                 </button>
 
                 <!-- Remove from Route Button (conditional - only shows if place is in current route) -->
-                <button type="button" id="removeFromRouteBtn" class="btn-remove-from-route" style="display: none;" onclick="placeManager.removeFromCurrentRoute()">
+                <button type="button" id="removeFromRouteBtn" class="btn-remove-from-route edit-mode-only" style="display: none;" onclick="placeManager.removeFromCurrentRoute()">
                     <i class="fas fa-minus-circle"></i> Remove from Current Route
                 </button>
 
                 <!-- Google Data Badge and Refresh Button -->
                 <div class="place-info-bar">
                     <span id="googleDataBadge" class="place-badge" style="display: none;"></span>
-                    <button type="button" id="refreshGoogleDataBtn" class="btn-refresh-google" style="display: none;" onclick="placeManager.refreshGoogleDataForPlace()">
+                    <button type="button" id="refreshGoogleDataBtn" class="btn-refresh-google edit-mode-only" style="display: none;" onclick="placeManager.refreshGoogleDataForPlace()">
                         <i class="fas fa-sync"></i> Refresh from Google
                     </button>
                 </div>
@@ -420,6 +437,30 @@
                             <i class="fas fa-dollar-sign" style="color: #34a853;"></i>
                             <span id="placePriceValue"></span>
                         </div>
+
+                        <!-- Business Status -->
+                        <div id="placeStatusInfo" class="place-detail-item" style="display: none;">
+                            <i class="fas fa-info-circle" style="color: #34a853;"></i>
+                            <span id="placeStatusValue"></span>
+                        </div>
+                    </div>
+
+                    <!-- Address -->
+                    <div id="placeAddressInfo" class="place-address-section" style="display: none;">
+                        <div class="info-subsection-header">
+                            <i class="fas fa-map-marker-alt"></i> Address
+                        </div>
+                        <div id="placeAddressValue" class="info-text"></div>
+                    </div>
+
+                    <!-- Opening Hours -->
+                    <div id="placeHoursInfo" class="place-hours-section" style="display: none;">
+                        <div class="info-subsection-header">
+                            <i class="fas fa-clock"></i> Opening Hours
+                        </div>
+                        <div id="placeHoursValue" class="info-hours-list">
+                            <!-- Hours will be loaded here -->
+                        </div>
                     </div>
                 </div>
 
@@ -440,10 +481,21 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closePlaceModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="savePlaceEdit()" id="savePlaceBtn">
-                    <i class="fas fa-save"></i> Save Changes
-                </button>
+                <div class="modal-mode-buttons">
+                    <!-- View Mode Buttons -->
+                    <button class="btn btn-secondary view-mode-only" onclick="closePlaceModal()">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                    <button class="btn btn-primary btn-switch-to-edit view-mode-only" onclick="window.app?.switchPlaceModalMode('edit')">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+
+                    <!-- Edit Mode Buttons -->
+                    <button class="btn btn-secondary edit-mode-only" onclick="closePlaceModal()">Cancel</button>
+                    <button class="btn btn-primary edit-mode-only" onclick="savePlaceEdit()" id="savePlaceBtn">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                </div>
             </div>
         </div>
         <div class="modal-overlay" onclick="closePlaceModal()"></div>

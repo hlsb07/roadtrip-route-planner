@@ -19,6 +19,7 @@ export class MapService {
         this.coordinateSelectionMode = false;
         this.coordinateSelectionCallback = null;
         this.coordinatePreviewMarker = null;
+        this.currentMobilePopupData = null; // Store current popup data for "View Details" button
     }
 
     init() {
@@ -334,40 +335,55 @@ export class MapService {
                 ? `<div style="margin-top: 5px;"><strong>Price:</strong> ${campsite.price}</div>`
                 : '';
 
-            const marker = L.marker([campsite.latitude, campsite.longitude], { icon: customIcon })
-                .addTo(this.map)
-                .bindPopup(`
-                    <div class="map-popup-content campsite-popup">
-                        ${imageGallery}
-                        <div class="map-popup-header">
-                            <i class="fas fa-campground" style="color: #2A9D8F;"></i>
-                            <strong style="margin-left: 5px;">${campsite.name || 'Unnamed Campsite'}</strong>
-                        </div>
-                        <div class="popup-info">
-                            <div><strong>Type:</strong> ${typesList}</div>
-                            ${ratingDisplay}
-                            ${priceDisplay}
-                        </div>
-                        ${servicesList}
-                        ${activitiesList}
-                        <div class="map-popup-coords">Lat: ${campsite.latitude.toFixed(4)}, Lng: ${campsite.longitude.toFixed(4)}</div>
-                        <div class="map-popup-links">
-                            <a href="https://www.google.com/maps/search/?api=1&query=${campsite.latitude},${campsite.longitude}"
-                               target="_blank"
-                               class="link-btn google-maps">
-                                <i class="fas fa-map"></i> Google Maps
-                            </a>
-                            ${campsite.sourceUrl ? `
-                                <a href="${campsite.sourceUrl}"
-                                   target="_blank"
-                                   class="link-btn"
-                                   style="background: #3EBBA5; color: white;">
-                                    <i class="fas fa-external-link-alt"></i> Park4Night
-                                </a>
-                            ` : ''}
-                        </div>
+            // Build campsite popup content
+            const campsitePopupContent = `
+                <div class="map-popup-content campsite-popup">
+                    ${imageGallery}
+                    <div class="map-popup-header">
+                        <i class="fas fa-campground" style="color: #2A9D8F;"></i>
+                        <strong style="margin-left: 5px;">${campsite.name || 'Unnamed Campsite'}</strong>
                     </div>
-                `, {
+                    <div class="popup-info">
+                        <div><strong>Type:</strong> ${typesList}</div>
+                        ${ratingDisplay}
+                        ${priceDisplay}
+                    </div>
+                    ${servicesList}
+                    ${activitiesList}
+                    <div class="map-popup-coords">Lat: ${campsite.latitude.toFixed(4)}, Lng: ${campsite.longitude.toFixed(4)}</div>
+                    <div class="map-popup-links">
+                        <a href="https://www.google.com/maps/search/?api=1&query=${campsite.latitude},${campsite.longitude}"
+                           target="_blank"
+                           class="link-btn google-maps"
+                           onclick="event.stopPropagation()">
+                            <i class="fas fa-map"></i> Google Maps
+                        </a>
+                        ${campsite.sourceUrl ? `
+                            <a href="${campsite.sourceUrl}"
+                               target="_blank"
+                               class="link-btn"
+                               style="background: #3EBBA5; color: white;"
+                               onclick="event.stopPropagation()">
+                                <i class="fas fa-external-link-alt"></i> Park4Night
+                            </a>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            const marker = L.marker([campsite.latitude, campsite.longitude], { icon: customIcon })
+                .addTo(this.map);
+
+            // On mobile, use docked popup; on desktop, use Leaflet popup
+            if (this.isMobileView()) {
+                marker.on('click', () => {
+                    this.showMobileDockedPopup(campsitePopupContent, campsite.id, { campsite, index });
+                    if (this.onCampsiteMarkerClick) {
+                        this.onCampsiteMarkerClick(index);
+                    }
+                });
+            } else {
+                marker.bindPopup(campsitePopupContent, {
                     maxWidth: 350,
                     className: 'campsite-popup-container'
                 })
@@ -376,6 +392,7 @@ export class MapService {
                         this.onCampsiteMarkerClick(index);
                     }
                 });
+            }
 
             this.campsiteMarkers.push(marker);
         });
@@ -421,7 +438,35 @@ export class MapService {
      * @param {boolean} isNonRoute - Whether this is a non-route place
      */
     setupPlacePopup(marker, place, index = null, isNonRoute = false) {
-        // Initial popup content (without Google data)
+        // On mobile, use docked popup instead of Leaflet popup
+        if (this.isMobileView()) {
+            marker.on('click', async () => {
+                // Build mobile popup content
+                let mobileContent = this.buildPlacePopupContent(place, index, isNonRoute, true);
+
+                // If place has Google data, try to load it
+                if (place.hasGoogleData && place.id) {
+                    try {
+                        const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+                        if (enrichedPlace && enrichedPlace.googleData) {
+                            const enrichedPlaceWithCoords = {
+                                ...place,
+                                googleData: enrichedPlace.googleData
+                            };
+                            mobileContent = this.buildPlacePopupContent(enrichedPlaceWithCoords, index, isNonRoute, true);
+                        }
+                    } catch (error) {
+                        console.warn('Failed to load Google data for mobile popup:', error);
+                    }
+                }
+
+                // Show docked popup
+                this.showMobileDockedPopup(mobileContent, place.id, { place, index, isNonRoute });
+            });
+            return; // Skip Leaflet popup setup on mobile
+        }
+
+        // Desktop: Use Leaflet popup
         const initialContent = this.buildPlacePopupContent(place, index, isNonRoute);
 
         const popup = L.popup({
@@ -500,9 +545,14 @@ export class MapService {
      * @param {boolean} isNonRoute - Whether this is a non-route place
      * @returns {string} HTML content for popup
      */
-    buildPlacePopupContent(place, index = null, isNonRoute = false) {
+    buildPlacePopupContent(place, index = null, isNonRoute = false, isMobile = false) {
         const lat = place.coords ? place.coords[0] : place.latitude;
         const lng = place.coords ? place.coords[1] : place.longitude;
+
+        // Mobile version - simplified content for docked popup
+        if (isMobile) {
+            return this.buildMobilePlacePopupContent(place, index, isNonRoute, lat, lng);
+        }
 
         // Build image carousel if Google Photos are available
         const imageGallery = place.googleData?.photos && place.googleData.photos.length > 0
@@ -718,6 +768,122 @@ export class MapService {
     }
 
     /**
+     * Build simplified mobile popup content for docked popup
+     */
+    buildMobilePlacePopupContent(place, index, isNonRoute, lat, lng) {
+        // Photo carousel (simplified for mobile)
+        const imageCarousel = place.googleData?.photos && place.googleData.photos.length > 0
+            ? `<div class="popup-image-carousel">
+                   <div class="carousel-container" id="mobile-carousel-${place.id || index}">
+                       ${place.googleData.photos.slice(0, 3).map((photo, idx) => `
+                           <img src="${photo.photoUrl}"
+                                alt="${place.name}"
+                                class="carousel-image ${idx === 0 ? 'active' : ''}"
+                                data-index="${idx}">
+                       `).join('')}
+                   </div>
+                   ${place.googleData.photos.length > 1
+                       ? `<button class="carousel-btn prev" onclick="event.stopPropagation(); navigateCarousel('mobile-carousel-${place.id || index}', -1)">
+                              <i class="fas fa-chevron-left"></i>
+                          </button>
+                          <button class="carousel-btn next" onclick="event.stopPropagation(); navigateCarousel('mobile-carousel-${place.id || index}', 1)">
+                              <i class="fas fa-chevron-right"></i>
+                          </button>`
+                       : ''
+                   }
+               </div>`
+            : '';
+
+        // Place header with number and name
+        const placeHeader = `
+            <div class="mobile-popup-place-header">
+                ${index !== null ? `<div class="mobile-popup-place-number">${index + 1}</div>` : ''}
+                <div class="mobile-popup-place-info">
+                    <h3 class="mobile-popup-place-name">${place.name}</h3>
+                    <div class="mobile-popup-badges">
+                        ${place.googleData ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>' : ''}
+                        ${isNonRoute ? '<span class="non-route-badge">Not in Route</span>' : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Rating and price (brief info)
+        const quickInfo = [];
+        if (place.googleData?.rating) {
+            quickInfo.push(`
+                <div class="mobile-popup-rating">
+                    <span class="stars">⭐</span>
+                    <strong>${place.googleData.rating.toFixed(1)}</strong>
+                    ${place.googleData.userRatingsTotal
+                        ? `<span>(${place.googleData.userRatingsTotal})</span>`
+                        : ''
+                    }
+                </div>
+            `);
+        }
+        if (place.googleData?.priceLevel) {
+            quickInfo.push(`
+                <div class="mobile-popup-price">
+                    <span>${'$'.repeat(place.googleData.priceLevel)}</span>
+                </div>
+            `);
+        }
+
+        const quickInfoSection = quickInfo.length > 0
+            ? `<div class="mobile-popup-info-section">${quickInfo.join('')}</div>`
+            : '';
+
+        // Address (brief)
+        const addressSection = place.googleData?.formattedAddress
+            ? `<div class="mobile-popup-info-section">
+                   <div class="mobile-popup-info-label"><i class="fas fa-map-marker-alt"></i> Address</div>
+                   <div class="mobile-popup-info-value">${place.googleData.formattedAddress}</div>
+               </div>`
+            : '';
+
+        // Categories badges
+        const categoriesSection = place.categories && place.categories.length > 0
+            ? `<div class="mobile-popup-info-section">
+                   <div class="mobile-popup-info-label"><i class="fas fa-tag"></i> Categories</div>
+                   <div class="mobile-popup-badges">
+                       ${place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')}
+                   </div>
+               </div>`
+            : '';
+
+        // Primary action button only
+        let actionButton = '';
+        if (isNonRoute) {
+            // Non-route place: Show "Add to Route" button
+            actionButton = `
+                <button class="mobile-popup-action-btn btn btn-primary" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                    <i class="fas fa-plus"></i> Add to Route
+                </button>
+            `;
+        } else if (index !== null) {
+            // Route place: Show "Remove from Route" button
+            actionButton = `
+                <button class="mobile-popup-action-btn btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
+                    <i class="fas fa-minus-circle"></i> Remove from Route
+                </button>
+            `;
+        }
+
+        // Assemble mobile popup
+        return `
+            <div class="mobile-popup-content-inner">
+                ${imageCarousel}
+                ${placeHeader}
+                ${quickInfoSection}
+                ${addressSection}
+                ${categoriesSection}
+                ${actionButton}
+            </div>
+        `;
+    }
+
+    /**
      * Update map with filtered places (for category/country filtering)
      * This creates separate markers for all places with visual indicators
      */
@@ -891,6 +1057,73 @@ export class MapService {
                 this.nonRouteMarkers.push(marker);
             });
         }
+    }
+
+    // ============================================
+    // MOBILE DOCKED POPUP METHODS
+    // ============================================
+
+    isMobileView() {
+        return window.innerWidth <= 768;
+    }
+
+    showMobileDockedPopup(content, placeId, placeData) {
+        if (!this.isMobileView()) return;
+
+        const popup = document.getElementById('mobileDockedPopup');
+        const popupContent = document.getElementById('mobilePopupContent');
+
+        if (!popup || !popupContent) return;
+
+        // Store popup data for "View Details" button
+        this.currentMobilePopupData = { placeId, placeData };
+
+        // Close mobile panel if open
+        const mobilePanel = document.querySelector('.mobile-content-panel');
+        if (mobilePanel && mobilePanel.classList.contains('active')) {
+            if (window.closeMobilePanel) {
+                window.closeMobilePanel();
+            }
+        }
+
+        // Set content and show popup
+        popupContent.innerHTML = content;
+        popup.classList.add('show');
+
+        // Add click outside to close
+        setTimeout(() => {
+            document.addEventListener('click', this.handleMobilePopupOutsideClick.bind(this), { once: false });
+        }, 100);
+    }
+
+    hideMobileDockedPopup() {
+        const popup = document.getElementById('mobileDockedPopup');
+        if (!popup) return;
+
+        popup.classList.remove('show');
+        this.currentMobilePopupData = null;
+
+        // Remove click outside listener
+        document.removeEventListener('click', this.handleMobilePopupOutsideClick.bind(this));
+    }
+
+    handleMobilePopupOutsideClick(e) {
+        const popup = document.getElementById('mobileDockedPopup');
+        if (!popup || !popup.classList.contains('show')) return;
+
+        // Don't close if clicking inside the popup or on a marker
+        if (popup.contains(e.target) ||
+            e.target.closest('.leaflet-marker-icon') ||
+            e.target.closest('.leaflet-popup')) {
+            return;
+        }
+
+        // Close popup when clicking outside (on map)
+        this.hideMobileDockedPopup();
+    }
+
+    getCurrentMobilePopupData() {
+        return this.currentMobilePopupData;
     }
 }
 

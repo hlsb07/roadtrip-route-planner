@@ -207,8 +207,15 @@ class App {
             const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
             const hasActiveModal = document.querySelector('.modal.active, .confirm-overlay.show');
 
-            // ESC always works - closes modal or deselects
+            // ESC always works - closes mobile popup, modal, or deselects
             if (e.key === 'Escape') {
+                // Check if mobile docked popup is open
+                const mobilePopup = document.getElementById('mobileDockedPopup');
+                if (mobilePopup && mobilePopup.classList.contains('show')) {
+                    this.mapService.hideMobileDockedPopup();
+                    return;
+                }
+
                 if (hasActiveModal) {
                     this.routeManager.closeRouteModal();
                 } else {
@@ -728,6 +735,108 @@ class App {
         } catch (error) {
             console.error('Failed to delete place:', error);
             showError(error.message || 'Failed to delete place');
+        }
+    }
+
+    // ============================================
+    // MODAL MODE FUNCTIONS (View/Edit Place Details)
+    // ============================================
+
+    /**
+     * Open place details modal in view or edit mode
+     * @param {number} placeId - Place ID
+     * @param {string} mode - 'view' or 'edit'
+     */
+    async showPlaceDetailsModal(placeId, mode = 'view') {
+        // Find the place in current route or all places
+        let place = null;
+        let placeIndex = null;
+
+        // Check if it's in the current route
+        placeIndex = this.placeManager.places.findIndex(p => p.id === placeId);
+        if (placeIndex >= 0) {
+            place = this.placeManager.places[placeIndex];
+        } else {
+            // Check in all places
+            place = this.filterManager.allPlaces.find(p => p.id === placeId);
+        }
+
+        if (!place) {
+            showError('Place not found');
+            return;
+        }
+
+        // Set modal mode
+        const modal = document.getElementById('editPlaceModal');
+        if (modal) {
+            modal.setAttribute('data-mode', mode);
+
+            // Update modal title based on mode
+            const modalTitle = document.getElementById('editPlaceModalTitle');
+            if (modalTitle) {
+                if (mode === 'view') {
+                    modalTitle.innerHTML = '<i class="fas fa-info-circle"></i> Place Details';
+                } else {
+                    modalTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Place';
+                }
+            }
+        }
+
+        // Open the modal using existing showRenamePlaceModal
+        if (placeIndex >= 0) {
+            await this.placeManager.showRenamePlaceModal(placeIndex);
+        } else {
+            // For non-route places, use editNonRoutePlace
+            await this.editNonRoutePlace(placeId);
+        }
+    }
+
+    /**
+     * Switch between view and edit modes in the place modal
+     * @param {string} mode - 'view' or 'edit'
+     */
+    switchPlaceModalMode(mode) {
+        const modal = document.getElementById('editPlaceModal');
+        if (!modal) return;
+
+        modal.setAttribute('data-mode', mode);
+
+        // Update modal title
+        const modalTitle = document.getElementById('editPlaceModalTitle');
+        if (modalTitle) {
+            if (mode === 'view') {
+                modalTitle.innerHTML = '<i class="fas fa-info-circle"></i> Place Details';
+            } else {
+                modalTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Place';
+            }
+        }
+
+        // If switching to edit mode, make sure inputs are editable
+        if (mode === 'edit') {
+            const placeNameInput = document.getElementById('placeName');
+            const notesTextarea = document.getElementById('placeNotes');
+            if (placeNameInput) placeNameInput.removeAttribute('readonly');
+            if (notesTextarea) notesTextarea.removeAttribute('readonly');
+        }
+    }
+
+    /**
+     * Open place details from mobile popup "View Details" button
+     */
+    openPlaceDetailsFromPopup() {
+        const popupData = this.mapService.getCurrentMobilePopupData();
+        if (!popupData) return;
+
+        const { placeId, placeData } = popupData;
+
+        // Hide mobile popup
+        this.mapService.hideMobileDockedPopup();
+
+        // Open details modal in view mode
+        if (placeData?.place?.id) {
+            this.showPlaceDetailsModal(placeData.place.id, 'view');
+        } else if (placeId) {
+            this.showPlaceDetailsModal(placeId, 'view');
         }
     }
 }

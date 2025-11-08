@@ -290,6 +290,15 @@ export class PlaceManager {
 
         if (!modal || !nameInput || !latInput || !lngInput) return;
 
+        // Set to edit mode by default if not already set (preserve existing mode if set externally)
+        if (!modal.getAttribute('data-mode')) {
+            modal.setAttribute('data-mode', 'edit');
+            const modalTitle = document.getElementById('editPlaceModalTitle');
+            if (modalTitle) {
+                modalTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Place';
+            }
+        }
+
         // Set current values
         nameInput.value = place.name;
         latInput.value = place.coords[0];
@@ -438,6 +447,68 @@ export class PlaceManager {
             priceInfo.style.display = 'flex';
         } else if (priceInfo) {
             priceInfo.style.display = 'none';
+        }
+
+        // Display business status
+        const statusInfo = document.getElementById('placeStatusInfo');
+        const statusValue = document.getElementById('placeStatusValue');
+        if (googleData.businessStatus && statusInfo && statusValue) {
+            let statusText = '';
+            let statusColor = '#34a853';
+
+            if (googleData.businessStatus === 'OPERATIONAL') {
+                statusText = '✓ Open';
+                statusColor = '#34a853';
+            } else if (googleData.businessStatus === 'CLOSED_TEMPORARILY') {
+                statusText = '⚠ Temporarily Closed';
+                statusColor = '#fbbc04';
+            } else if (googleData.businessStatus === 'CLOSED_PERMANENTLY') {
+                statusText = '✕ Permanently Closed';
+                statusColor = '#ea4335';
+            } else {
+                statusText = googleData.businessStatus;
+            }
+
+            statusValue.textContent = statusText;
+            statusValue.style.color = statusColor;
+            statusInfo.style.display = 'flex';
+        } else if (statusInfo) {
+            statusInfo.style.display = 'none';
+        }
+
+        // Display address
+        const addressInfo = document.getElementById('placeAddressInfo');
+        const addressValue = document.getElementById('placeAddressValue');
+        if (googleData.formattedAddress && addressInfo && addressValue) {
+            addressValue.textContent = googleData.formattedAddress;
+            addressInfo.style.display = 'block';
+        } else if (addressInfo) {
+            addressInfo.style.display = 'none';
+        }
+
+        // Display opening hours
+        const hoursInfo = document.getElementById('placeHoursInfo');
+        const hoursValue = document.getElementById('placeHoursValue');
+        if (googleData.openingHours && hoursInfo && hoursValue) {
+            try {
+                const hours = typeof googleData.openingHours === 'string'
+                    ? JSON.parse(googleData.openingHours)
+                    : googleData.openingHours;
+
+                if (hours.weekday_text && hours.weekday_text.length > 0) {
+                    hoursValue.innerHTML = hours.weekday_text.map(day =>
+                        `<div class="hours-day">${day}</div>`
+                    ).join('');
+                    hoursInfo.style.display = 'block';
+                } else {
+                    hoursInfo.style.display = 'none';
+                }
+            } catch (e) {
+                console.warn('Failed to parse opening hours:', e);
+                hoursInfo.style.display = 'none';
+            }
+        } else if (hoursInfo) {
+            hoursInfo.style.display = 'none';
         }
 
         infoSection.style.display = 'block';
