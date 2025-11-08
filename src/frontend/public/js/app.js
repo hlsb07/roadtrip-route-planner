@@ -30,6 +30,7 @@ class App {
 
         this.bindEventListeners();
         this.setupKeyboardShortcuts();
+        this.setupMobilePopupSwipe();
     }
 
     async init() {
@@ -735,6 +736,174 @@ class App {
         } catch (error) {
             console.error('Failed to delete place:', error);
             showError(error.message || 'Failed to delete place');
+        }
+    }
+
+    // ============================================
+    // MOBILE POPUP SWIPE NAVIGATION
+    // ============================================
+
+    setupMobilePopupSwipe() {
+        const popup = document.getElementById('mobileDockedPopup');
+        if (!popup) return;
+
+        let startX = 0;
+        let startY = 0;
+
+        popup.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+
+        popup.addEventListener('touchend', (e) => {
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+
+            // Horizontal swipe (min 50px), ignore if vertical swipe is dominant
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    // Swipe left - next place
+                    this.navigateToNextPlace();
+                } else {
+                    // Swipe right - previous place
+                    this.navigateToPreviousPlace();
+                }
+            }
+        }, { passive: true });
+    }
+
+    navigateToNextPlace() {
+        const popupData = this.mapService.getCurrentMobilePopupData();
+        if (!popupData) return;
+
+        const { placeData } = popupData;
+        const context = this.getActiveViewContext();
+
+        if (context.mode === 'places' && context.view === 'places') {
+            // Route Places view
+            const currentIndex = placeData.index;
+            const nextIndex = currentIndex + 1;
+
+            if (nextIndex < this.placeManager.places.length) {
+                this.showPlaceInMobilePopup(nextIndex, false);
+                this.updatePopupPositionIndicator(nextIndex + 1, this.placeManager.places.length);
+            }
+        } else if (context.mode === 'allplaces' && context.view === 'allplaces') {
+            // All Places view
+            const currentIndex = this.allPlacesManager.selectedIndex;
+            const nextIndex = currentIndex !== null ? currentIndex + 1 : 0;
+
+            if (nextIndex < this.allPlacesManager.filteredPlaces.length) {
+                this.allPlacesManager.selectCard(nextIndex);
+                this.mapService.selectAllPlace(nextIndex);
+                this.showAllPlaceInMobilePopup(nextIndex);
+                this.updatePopupPositionIndicator(nextIndex + 1, this.allPlacesManager.filteredPlaces.length);
+            }
+        }
+    }
+
+    navigateToPreviousPlace() {
+        const popupData = this.mapService.getCurrentMobilePopupData();
+        if (!popupData) return;
+
+        const { placeData } = popupData;
+        const context = this.getActiveViewContext();
+
+        if (context.mode === 'places' && context.view === 'places') {
+            // Route Places view
+            const currentIndex = placeData.index;
+            const prevIndex = currentIndex - 1;
+
+            if (prevIndex >= 0) {
+                this.showPlaceInMobilePopup(prevIndex, false);
+                this.updatePopupPositionIndicator(prevIndex + 1, this.placeManager.places.length);
+            }
+        } else if (context.mode === 'allplaces' && context.view === 'allplaces') {
+            // All Places view
+            const currentIndex = this.allPlacesManager.selectedIndex;
+            const prevIndex = currentIndex !== null ? currentIndex - 1 : -1;
+
+            if (prevIndex >= 0) {
+                this.allPlacesManager.selectCard(prevIndex);
+                this.mapService.selectAllPlace(prevIndex);
+                this.showAllPlaceInMobilePopup(prevIndex);
+                this.updatePopupPositionIndicator(prevIndex + 1, this.allPlacesManager.filteredPlaces.length);
+            }
+        }
+    }
+
+    async showPlaceInMobilePopup(index, isNonRoute) {
+        const place = this.placeManager.places[index];
+        if (!place) return;
+
+        // Build mobile popup content
+        let mobileContent = this.mapService.buildPlacePopupContent(place, index, isNonRoute, true);
+
+        // Try to load Google data if available
+        if (place.hasGoogleData && place.id) {
+            try {
+                const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+                if (enrichedPlace && enrichedPlace.googleData) {
+                    const enrichedPlaceWithCoords = {
+                        ...place,
+                        googleData: enrichedPlace.googleData
+                    };
+                    mobileContent = this.mapService.buildPlacePopupContent(enrichedPlaceWithCoords, index, isNonRoute, true);
+                }
+            } catch (error) {
+                console.warn('Failed to load Google data for mobile popup:', error);
+            }
+        }
+
+        // Show docked popup
+        this.mapService.showMobileDockedPopup(mobileContent, place.id, { place, index, isNonRoute });
+
+        // Center map on place
+        this.mapService.map.setView(place.coords, this.mapService.map.getZoom());
+    }
+
+    async showAllPlaceInMobilePopup(index) {
+        const place = this.allPlacesManager.filteredPlaces[index];
+        if (!place) return;
+
+        const placeWithCoords = {
+            ...place,
+            coords: [place.latitude, place.longitude]
+        };
+
+        // Build mobile popup content
+        let mobileContent = this.mapService.buildPlacePopupContent(placeWithCoords, null, true, true);
+
+        // Try to load Google data if available
+        if (place.hasGoogleData && place.id) {
+            try {
+                const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+                if (enrichedPlace && enrichedPlace.googleData) {
+                    const enrichedPlaceWithCoords = {
+                        ...placeWithCoords,
+                        googleData: enrichedPlace.googleData
+                    };
+                    mobileContent = this.mapService.buildPlacePopupContent(enrichedPlaceWithCoords, null, true, true);
+                }
+            } catch (error) {
+                console.warn('Failed to load Google data for mobile popup:', error);
+            }
+        }
+
+        // Show docked popup
+        this.mapService.showMobileDockedPopup(mobileContent, place.id, { place: placeWithCoords, index: null, isNonRoute: true });
+
+        // Center map on place
+        this.mapService.map.setView([place.latitude, place.longitude], this.mapService.map.getZoom());
+    }
+
+    updatePopupPositionIndicator(current, total) {
+        const positionEl = document.getElementById('mobilePopupPosition');
+        if (positionEl) {
+            positionEl.textContent = `${current} of ${total}`;
         }
     }
 

@@ -311,16 +311,34 @@
     <!-- Mobile Docked Popup (Above Navigation Bar) -->
     <div id="mobileDockedPopup" class="mobile-docked-popup">
         <div class="mobile-popup-header">
+            <span class="mobile-popup-position" id="mobilePopupPosition"></span>
             <button class="mobile-popup-close" onclick="window.mapService?.hideMobileDockedPopup()">
                 <i class="fas fa-times"></i>
             </button>
         </div>
         <div class="mobile-popup-content" id="mobilePopupContent">
             <!-- Content will be dynamically injected here -->
+            <!-- Buttons are now part of content, no separate footer -->
         </div>
-        <div class="mobile-popup-footer">
-            <button class="btn btn-primary btn-view-details" onclick="window.app?.openPlaceDetailsFromPopup()">
-                <i class="fas fa-info-circle"></i> View Details
+    </div>
+
+    <!-- Fullscreen Image Gallery Modal -->
+    <div id="fullscreenImageGallery" class="fullscreen-gallery">
+        <div class="gallery-header">
+            <span class="gallery-counter" id="galleryCounter">1 / 1</span>
+            <button class="gallery-close" onclick="window.mapService?.hideFullscreenImageGallery()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="gallery-content" id="galleryContent">
+            <div class="gallery-images" id="galleryImages">
+                <!-- Images will be injected here -->
+            </div>
+            <button class="gallery-nav gallery-prev" id="galleryPrev">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <button class="gallery-nav gallery-next" id="galleryNext">
+                <i class="fas fa-chevron-right"></i>
             </button>
         </div>
     </div>

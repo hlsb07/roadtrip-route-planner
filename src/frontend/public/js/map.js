@@ -769,20 +769,22 @@ export class MapService {
 
     /**
      * Build simplified mobile popup content for docked popup
+     * Compact design: Image + Name + Number + Buttons only (no scrolling)
      */
     buildMobilePlacePopupContent(place, index, isNonRoute, lat, lng) {
-        // Photo carousel (simplified for mobile)
-        const imageCarousel = place.googleData?.photos && place.googleData.photos.length > 0
-            ? `<div class="popup-image-carousel">
+        // Compact carousel (100px height, clickable for fullscreen)
+        const photos = place.googleData?.photos || [];
+        const imageCarousel = photos.length > 0
+            ? `<div class="popup-image-carousel" onclick="window.mapService?. Image + Name + Number + Buttons?(${JSON.stringify(photos).replace(/"/g, '&quot;')}, 0)">
                    <div class="carousel-container" id="mobile-carousel-${place.id || index}">
-                       ${place.googleData.photos.slice(0, 3).map((photo, idx) => `
+                       ${photos.slice(0, 3).map((photo, idx) => `
                            <img src="${photo.photoUrl}"
                                 alt="${place.name}"
                                 class="carousel-image ${idx === 0 ? 'active' : ''}"
                                 data-index="${idx}">
                        `).join('')}
                    </div>
-                   ${place.googleData.photos.length > 1
+                   ${photos.length > 1
                        ? `<button class="carousel-btn prev" onclick="event.stopPropagation(); navigateCarousel('mobile-carousel-${place.id || index}', -1)">
                               <i class="fas fa-chevron-left"></i>
                           </button>
@@ -800,87 +802,47 @@ export class MapService {
                 ${index !== null ? `<div class="mobile-popup-place-number">${index + 1}</div>` : ''}
                 <div class="mobile-popup-place-info">
                     <h3 class="mobile-popup-place-name">${place.name}</h3>
+                    <div class="mobile-popup-badges">
+                        ${place.googleData ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>' : ''}
+                    </div>
                 </div>
             </div>
         `;
-        // <div class="mobile-popup-badges">
-        //                 ${place.googleData ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>' : ''}
-        //                 ${isNonRoute ? '<span class="non-route-badge">Not in Route</span>' : ''}
-        //             </div>
 
-        // Rating and price (brief info)
-        const quickInfo = [];
-        if (place.googleData?.rating) {
-            quickInfo.push(`
-                <div class="mobile-popup-rating">
-                    <span class="stars">⭐</span>
-                    <strong>${place.googleData.rating.toFixed(1)}</strong>
-                    ${place.googleData.userRatingsTotal
-                        ? `<span>(${place.googleData.userRatingsTotal})</span>`
-                        : ''
-                    }
-                </div>
-            `);
-        }
-        if (place.googleData?.priceLevel) {
-            quickInfo.push(`
-                <div class="mobile-popup-price">
-                    <span>${'$'.repeat(place.googleData.priceLevel)}</span>
-                </div>
-            `);
-        }
-
-        const quickInfoSection = quickInfo.length > 0
-            ? `<div class="mobile-popup-info-section">${quickInfo.join('')}</div>`
-            : '';
-
-        // Address (brief)
-        const addressSection = place.googleData?.formattedAddress
-            ? `<div class="mobile-popup-info-section">
-                   <div class="mobile-popup-info-label"><i class="fas fa-map-marker-alt"></i> Address</div>
-                   <div class="mobile-popup-info-value">${place.googleData.formattedAddress}</div>
-               </div>`
-            : '';
-
-        // Categories badges
-        const categoriesSection = place.categories && place.categories.length > 0
-            ? `<div class="mobile-popup-info-section">
-                   <div class="mobile-popup-info-label"><i class="fas fa-tag"></i> Categories</div>
-                   <div class="mobile-popup-badges">
-                       ${place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')}
-                   </div>
-               </div>`
-            : '';
-
-        // Primary action button only
-        let actionButton = '';
+        // Stacked buttons (View Details + primary action)
+        let buttons = '';
         if (isNonRoute) {
-            // Non-route place: Show "Add to Route" button
-            actionButton = `
-                <button class="mobile-popup-action-btn btn btn-primary" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
-                    <i class="fas fa-plus"></i> Add to Route
-                </button>
+            // Non-route place
+            buttons = `
+                <div class="mobile-popup-buttons">
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.app?.openPlaceDetailsFromPopup()">
+                        <i class="fas fa-info-circle"></i> View Details
+                    </button>
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-plus"></i> Add to Route
+                    </button>
+                </div>
             `;
         } else if (index !== null) {
-            // Route place: Show "Remove from Route" button
-            actionButton = `
-                <button class="mobile-popup-action-btn btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
-                    <i class="fas fa-minus-circle"></i> Remove from Route
-                </button>
+            // Route place
+            buttons = `
+                <div class="mobile-popup-buttons">
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.app?.openPlaceDetailsFromPopup()">
+                        <i class="fas fa-info-circle"></i> View Details
+                    </button>
+                    <button class="btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
+                        <i class="fas fa-minus-circle"></i> Remove from Route
+                    </button>
+                </div>
             `;
         }
 
-        // Assemble mobile popup
+        // Assemble compact mobile popup
         return `
-            <div class="mobile-popup-content-inner">
-                ${imageCarousel}
-                ${placeHeader}
-                ${actionButton}
-            </div>
+            ${imageCarousel}
+            ${placeHeader}
+            ${buttons}
         `;
-                // ${quickInfoSection}
-                // ${addressSection}
-                // ${categoriesSection}
     }
 
     /**
@@ -1090,6 +1052,26 @@ export class MapService {
         popupContent.innerHTML = content;
         popup.classList.add('show');
 
+        // Update position indicator (will be set by app.js when navigating)
+        const positionEl = document.getElementById('mobilePopupPosition');
+        if (positionEl && placeData) {
+            // Try to determine position from context
+            if (placeData.index !== null && placeData.index !== undefined) {
+                // Route place
+                const total = window.app?.placeManager?.places?.length || 0;
+                positionEl.textContent = total > 0 ? `${placeData.index + 1} of ${total}` : '';
+            } else {
+                // All place - get from selected index
+                const selectedIndex = window.app?.allPlacesManager?.selectedIndex;
+                const total = window.app?.allPlacesManager?.filteredPlaces?.length || 0;
+                if (selectedIndex !== null && total > 0) {
+                    positionEl.textContent = `${selectedIndex + 1} of ${total}`;
+                } else {
+                    positionEl.textContent = '';
+                }
+            }
+        }
+
         // Add click outside to close
         setTimeout(() => {
             document.addEventListener('click', this.handleMobilePopupOutsideClick.bind(this), { once: false });
@@ -1124,6 +1106,138 @@ export class MapService {
 
     getCurrentMobilePopupData() {
         return this.currentMobilePopupData;
+    }
+
+    // ============================================
+    // FULLSCREEN IMAGE GALLERY
+    // ============================================
+
+    showFullscreenImageGallery(photos, startIndex = 0) {
+        if (!photos || photos.length === 0) return;
+
+        const gallery = document.getElementById('fullscreenImageGallery');
+        const galleryImages = document.getElementById('galleryImages');
+        const galleryCounter = document.getElementById('galleryCounter');
+        const prevBtn = document.getElementById('galleryPrev');
+        const nextBtn = document.getElementById('galleryNext');
+
+        if (!gallery || !galleryImages) return;
+
+        this.galleryPhotos = photos;
+        this.currentGalleryIndex = startIndex;
+
+        // Build gallery images
+        galleryImages.innerHTML = photos.map((photo, idx) => `
+            <div class="gallery-image ${idx === startIndex ? 'active' : ''}" data-index="${idx}">
+                <img src="${photo.photoUrl}" alt="Image ${idx + 1}">
+            </div>
+        `).join('');
+
+        // Update counter
+        if (galleryCounter) {
+            galleryCounter.textContent = `${startIndex + 1} / ${photos.length}`;
+        }
+
+        // Setup navigation
+        this.updateGalleryButtons();
+
+        if (prevBtn) {
+            prevBtn.onclick = () => this.navigateGallery(-1);
+        }
+
+        if (nextBtn) {
+            nextBtn.onclick = () => this.navigateGallery(1);
+        }
+
+        // Setup swipe for gallery
+        this.setupGallerySwipe();
+
+        // Show gallery
+        gallery.classList.add('show');
+
+        // Prevent body scroll
+        document.body.style.overflow = 'hidden';
+    }
+
+    hideFullscreenImageGallery() {
+        const gallery = document.getElementById('fullscreenImageGallery');
+        if (!gallery) return;
+
+        gallery.classList.remove('show');
+
+        // Restore body scroll
+        document.body.style.overflow = '';
+
+        // Clean up
+        this.galleryPhotos = null;
+        this.currentGalleryIndex = 0;
+    }
+
+    navigateGallery(direction) {
+        if (!this.galleryPhotos) return;
+
+        const newIndex = this.currentGalleryIndex + direction;
+
+        if (newIndex < 0 || newIndex >= this.galleryPhotos.length) return;
+
+        const images = document.querySelectorAll('.gallery-image');
+        images[this.currentGalleryIndex]?.classList.remove('active');
+        images[newIndex]?.classList.add('active');
+
+        this.currentGalleryIndex = newIndex;
+
+        // Update counter
+        const galleryCounter = document.getElementById('galleryCounter');
+        if (galleryCounter) {
+            galleryCounter.textContent = `${newIndex + 1} / ${this.galleryPhotos.length}`;
+        }
+
+        this.updateGalleryButtons();
+    }
+
+    updateGalleryButtons() {
+        const prevBtn = document.getElementById('galleryPrev');
+        const nextBtn = document.getElementById('galleryNext');
+
+        if (prevBtn) {
+            prevBtn.disabled = this.currentGalleryIndex === 0;
+        }
+
+        if (nextBtn) {
+            nextBtn.disabled = this.currentGalleryIndex === this.galleryPhotos.length - 1;
+        }
+    }
+
+    setupGallerySwipe() {
+        const gallery = document.getElementById('fullscreenImageGallery');
+        if (!gallery) return;
+
+        let startX = 0;
+        let startY = 0;
+
+        gallery.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+
+        gallery.addEventListener('touchend', (e) => {
+            const endX = e.changedTouches[0].clientX;
+            const endY = e.changedTouches[0].clientY;
+
+            const diffX = startX - endX;
+            const diffY = startY - endY;
+
+            // Horizontal swipe (min 50px)
+            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    // Swipe left - next image
+                    this.navigateGallery(1);
+                } else {
+                    // Swipe right - previous image
+                    this.navigateGallery(-1);
+                }
+            }
+        }, { passive: true });
     }
 }
 
