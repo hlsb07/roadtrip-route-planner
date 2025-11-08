@@ -783,9 +783,9 @@ export class MapService {
         this.currentPopupPhotos = photos;
 
         const imageCarousel = photos.length > 0
-            ? `<div class="popup-image-carousel" onclick="openPhotosGallery(); event.stopPropagation();">
+            ? `<div class="popup-image-carousel unified-carousel" onclick="openPhotosGallery(); event.stopPropagation();">
                    <div class="carousel-container" id="mobile-carousel-${place.id || index}">
-                       ${photos.slice(0, 3).map((photo, idx) => `
+                       ${photos.map((photo, idx) => `
                            <img src="${photo.photoUrl}"
                                 alt="${place.name}"
                                 class="carousel-image ${idx === 0 ? 'active' : ''}"
@@ -798,9 +798,16 @@ export class MapService {
                           </button>
                           <button class="carousel-btn next" onclick="event.stopPropagation(); navigateCarousel('mobile-carousel-${place.id || index}', 1)">
                               <i class="fas fa-chevron-right"></i>
-                          </button>`
+                          </button>
+                          <div class="carousel-indicators">
+                              ${photos.map((_, idx) => `
+                                  <span class="indicator ${idx === 0 ? 'active' : ''}"
+                                        onclick="event.stopPropagation(); goToSlide('mobile-carousel-${place.id || index}', ${idx})"></span>
+                              `).join('')}
+                          </div>`
                        : ''
                    }
+                   <div class="carousel-photo-count">${photos.length} photo${photos.length > 1 ? 's' : ''}</div>
                </div>`
             : '';
 
@@ -820,16 +827,16 @@ export class MapService {
             `;
         } else if (index !== null) {
             // Route place
-            buttons = `
-                <div class="mobile-popup-buttons">
-                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.mapService?.expandMobilePopup()">
-                        <i class="fas fa-info-circle"></i>
-                    </button>
-                    <button class="btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            `;
+            // buttons = `
+            //     <div class="mobile-popup-buttons">
+            //         <button class="btn btn-primary" onclick="event.stopPropagation(); window.mapService?.expandMobilePopup()">
+            //             <i class="fas fa-info-circle"></i>
+            //         </button>
+            //         <button class="btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
+            //             <i class="fas fa-trash"></i>
+            //         </button>
+            //     </div>
+            // `;
         }
 
         // Prepare header data
@@ -838,57 +845,32 @@ export class MapService {
             ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>'
             : '';
 
-        // Return object with header and content
+        // Build expanded view content
+        const expandedView = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
+
+        // Return object with header and unified content (both compact and expanded views)
         return {
             header: {
                 position: position,
                 placeName: place.name,
                 badges: badges
             },
-            content: `${imageCarousel}${buttons}`
+            content: `
+                ${imageCarousel}
+                <div class="compact-view" data-visible-when="compact">
+                    ${buttons}
+                </div>
+                ${expandedView}
+            `
         };
     }
 
     /**
      * Build expanded mobile popup content with full Google Places information
-     * Returns HTML string with all details for scrollable full-height popup
+     * Returns HTML wrapped in expanded-view div
+     * Note: Carousel is built separately in buildMobilePlacePopupContent
      */
     buildExpandedMobileContent(place, index, isNonRoute, lat, lng) {
-        const photos = place.googleData?.photos || [];
-
-        // Store photos for fullscreen gallery
-        this.currentPopupPhotos = photos;
-
-        // Full photo carousel (all photos, not just 3)
-        const imageCarousel = photos.length > 0
-            ? `<div class="popup-image-carousel expanded-carousel" onclick="openPhotosGallery(); event.stopPropagation();">
-                   <div class="carousel-container" id="expanded-carousel-${place.id || index}">
-                       ${photos.map((photo, idx) => `
-                           <img src="${photo.photoUrl}"
-                                alt="${place.name}"
-                                class="carousel-image ${idx === 0 ? 'active' : ''}"
-                                data-index="${idx}">
-                       `).join('')}
-                   </div>
-                   ${photos.length > 1
-                       ? `<button class="carousel-btn prev" onclick="event.stopPropagation(); navigateCarousel('expanded-carousel-${place.id || index}', -1)">
-                              <i class="fas fa-chevron-left"></i>
-                          </button>
-                          <button class="carousel-btn next" onclick="event.stopPropagation(); navigateCarousel('expanded-carousel-${place.id || index}', 1)">
-                              <i class="fas fa-chevron-right"></i>
-                          </button>
-                          <div class="carousel-indicators">
-                              ${photos.map((_, idx) => `
-                                  <span class="indicator ${idx === 0 ? 'active' : ''}"
-                                        onclick="event.stopPropagation(); goToSlide('expanded-carousel-${place.id || index}', ${idx})"></span>
-                              `).join('')}
-                          </div>`
-                       : ''
-                   }
-                   <div class="carousel-photo-count">${photos.length} photo${photos.length > 1 ? 's' : ''}</div>
-               </div>`
-            : '';
-
         // Rating & Reviews
         const ratingSection = place.googleData?.rating
             ? `<div class="expanded-rating-section">
@@ -1027,26 +1009,22 @@ export class MapService {
         let actionButtons = '';
         if (isNonRoute) {
             actionButtons = `
-                <div class="expanded-action-buttons">
-                    <button class="btn btn-primary btn-large" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
-                        <i class="fas fa-plus"></i> Add to Route
-                    </button>
-                </div>
+                <button class="btn btn-primary btn-large" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                    <i class="fas fa-plus"></i> Add to Route
+                </button>
             `;
         } else if (index !== null) {
             actionButtons = `
-                <div class="expanded-action-buttons">
-                    <button class="btn btn-danger btn-large" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
-                        <i class="fas fa-trash"></i> Remove from Route
-                    </button>
-                </div>
+                <button class="btn btn-danger btn-large" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
+                    <i class="fas fa-trash"></i> Remove from Route
+                </button>
             `;
         }
 
-        // Assemble expanded content
+        // Assemble expanded view (carousel is now in unified structure, don't include it here)
+        // All content scrolls together - no separate scroll wrapper
         return `
-            ${imageCarousel}
-            <div class="expanded-content-scroll">
+            <div class="expanded-view" data-visible-when="expanded">
                 ${ratingSection}
                 ${statusSection}
                 ${addressSection}
@@ -1055,8 +1033,8 @@ export class MapService {
                 ${metadataSection.join('')}
                 ${coordsSection}
                 ${externalLinks}
+                ${actionButtons}
             </div>
-            ${actionButtons}
         `;
     }
 
@@ -1368,53 +1346,14 @@ export class MapService {
     }
 
     /**
-     * Expand mobile popup to full height with all Google Places information
+     * Expand mobile popup to full height
+     * Simply toggles state - no innerHTML replacement for smooth animation
      */
     async expandMobilePopup() {
         const popup = document.getElementById('mobileDockedPopup');
-        const popupContent = document.getElementById('mobilePopupContent');
+        if (!popup) return;
 
-        if (!popup || !popupContent || !this.currentMobilePopupData) return;
-
-        const { placeData } = this.currentMobilePopupData;
-        if (!placeData || !placeData.place) return;
-
-        const place = placeData.place;
-        const index = placeData.index;
-        const isNonRoute = placeData.isNonRoute;
-        const lat = place.coords ? place.coords[0] : place.latitude;
-        const lng = place.coords ? place.coords[1] : place.longitude;
-
-        // Build expanded content with all Google data
-        let expandedContent;
-        if (place.hasGoogleData && place.id && !place.googleData) {
-            // Try to load Google data if not already loaded
-            try {
-                const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
-                if (enrichedPlace && enrichedPlace.googleData) {
-                    const enrichedPlaceWithCoords = {
-                        ...place,
-                        googleData: enrichedPlace.googleData
-                    };
-                    expandedContent = this.buildExpandedMobileContent(enrichedPlaceWithCoords, index, isNonRoute, lat, lng);
-
-                    // Update the stored place data with Google data
-                    this.currentMobilePopupData.placeData.place = enrichedPlaceWithCoords;
-                } else {
-                    expandedContent = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
-                }
-            } catch (error) {
-                console.warn('Failed to load Google data for expanded popup:', error);
-                expandedContent = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
-            }
-        } else {
-            expandedContent = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
-        }
-
-        // Update content
-        popupContent.innerHTML = expandedContent;
-
-        // Change state to expanded
+        // Just change state - CSS handles the visual transition
         popup.setAttribute('data-state', 'expanded');
 
         console.log('Mobile popup expanded');
@@ -1422,31 +1361,20 @@ export class MapService {
 
     /**
      * Collapse mobile popup back to compact state
+     * Simply toggles state - no innerHTML replacement for smooth animation
      */
     collapseMobilePopup() {
         const popup = document.getElementById('mobileDockedPopup');
-        const popupContent = document.getElementById('mobilePopupContent');
+        if (!popup) return;
 
-        if (!popup || !popupContent || !this.currentMobilePopupData) return;
-
-        const { placeData } = this.currentMobilePopupData;
-        if (!placeData || !placeData.place) return;
-
-        const place = placeData.place;
-        const index = placeData.index;
-        const isNonRoute = placeData.isNonRoute;
-
-        // Build compact content
-        const compactData = this.buildMobilePlacePopupContent(place, index, isNonRoute, 0, 0);
-
-        // Update content (just the content part, not the header)
-        popupContent.innerHTML = compactData.content;
-
-        // Change state to compact
+        // Just change state - CSS handles the visual transition
         popup.setAttribute('data-state', 'compact');
 
-        // Scroll content back to top
-        popupContent.scrollTop = 0;
+        // Scroll content back to top for next time
+        const popupContent = document.getElementById('mobilePopupContent');
+        if (popupContent) {
+            popupContent.scrollTop = 0;
+        }
 
         console.log('Mobile popup collapsed');
     }
@@ -1458,15 +1386,15 @@ export class MapService {
     isPopupScrolledToTop() {
         const popup = document.getElementById('mobileDockedPopup');
         const state = popup?.getAttribute('data-state');
+        const popupContent = document.getElementById('mobilePopupContent');
 
         if (state === 'expanded') {
-            // In expanded mode, check the expanded-content-scroll element
-            const expandedScroll = document.querySelector('.expanded-content-scroll');
-            return expandedScroll && expandedScroll.scrollTop === 0;
-        } else {
-            // In compact mode, check the mobile-popup-content
-            const popupContent = document.getElementById('mobilePopupContent');
+            // In expanded mode, mobile-popup-content is scrollable
             return popupContent && popupContent.scrollTop === 0;
+        } else {
+            // In compact mode, mobile-popup-content should not be scrollable (overflow: hidden)
+            // Always return true to allow swipe-down gestures
+            return true;
         }
     }
 

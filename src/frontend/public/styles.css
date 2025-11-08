@@ -1221,9 +1221,11 @@ textarea.form-input {
     z-index: 1600; /* Above mobile nav (1500) and panel (1400) */
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55),
-                box-shadow 0.3s ease;
+    /* Spring-like animation with smooth easing */
+    transition: max-height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.4s ease;
     border-radius: 16px 16px 0 0;
+    will-change: max-height; /* Optimize for animations */
 }
 
 .mobile-docked-popup.show {
@@ -1232,13 +1234,16 @@ textarea.form-input {
     flex-direction: column;
 }
 
-/* Expanded state - full height with scrolling */
+/* Expanded state - full height with spring animation */
 .mobile-docked-popup[data-state="expanded"].show {
     max-height: 85vh;
-    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Smooth spring transition for expansion */
+    transition: max-height 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.45s ease;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.25); /* Deeper shadow when expanded */
 }
 
-/* Swipe handle */
+/* Swipe handle with transition */
 .mobile-popup-swipe-handle {
     width: 40px;
     height: 4px;
@@ -1247,6 +1252,12 @@ textarea.form-input {
     margin: 8px auto 4px;
     flex-shrink: 0;
     cursor: grab;
+    transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.mobile-popup-swipe-handle:active {
+    cursor: grabbing;
+    background: #b0b0b0;
 }
 
 .mobile-popup-header {
@@ -1320,45 +1331,80 @@ textarea.form-input {
 
 .mobile-popup-content {
     flex: 1;
-    overflow: hidden;
+    overflow: hidden; /* No scrolling in compact mode */
     padding: 12px 16px 16px;
     display: flex;
     flex-direction: column;
 }
 
-/* Compact state - horizontal layout for carousel + buttons */
-.mobile-docked-popup[data-state="compact"] .mobile-popup-content {
-    flex-direction: row;
-    align-items: center;
-}
-
-/* Expanded state - vertical layout, carousel stays at top */
+/* Enable scrolling in expanded mode */
 .mobile-docked-popup[data-state="expanded"] .mobile-popup-content {
-    flex-direction: column;
-    overflow: hidden; /* No scrolling on container itself */
-    padding-bottom: 20px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-/* Mobile popup compact carousel */
-.mobile-popup-content .popup-image-carousel {
-    margin-right: 12px;
+/* Unified carousel - smooth height transition */
+.unified-carousel {
+    height: 100px; /* Compact height */
+    margin-bottom: 12px;
+    margin-right: 0;
     border-radius: 10px;
     overflow: hidden;
+    flex-shrink: 0;
+    position: relative;
+    transition: height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.mobile-popup-content .carousel-container {
+/* Expanded carousel height */
+.mobile-docked-popup[data-state="expanded"] .unified-carousel {
+    height: 250px;
+}
+
+.unified-carousel .carousel-container {
     height: 100%;
 }
 
-.mobile-popup-content .carousel-image {
+.unified-carousel .carousel-image {
     height: 100%;
+    width: 100%;
     object-fit: cover;
 }
 
-.mobile-popup-content .carousel-btn {
+.unified-carousel .carousel-btn {
     width: 30px;
     height: 30px;
     font-size: 0.9rem;
+}
+
+/* Compact view - visible in compact state */
+.compact-view {
+    opacity: 1;
+    max-height: 200px;
+    transition: opacity 0.3s ease, max-height 0.3s ease;
+    overflow: hidden;
+}
+
+.mobile-docked-popup[data-state="expanded"] .compact-view {
+    opacity: 0;
+    max-height: 0;
+    pointer-events: none;
+}
+
+/* Expanded view - visible in expanded state */
+.expanded-view {
+    opacity: 0;
+    max-height: 0;
+    transition: opacity 0.3s ease, max-height 0.3s ease;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.mobile-docked-popup[data-state="expanded"] .expanded-view {
+    opacity: 1;
+    max-height: none;
+    pointer-events: auto;
+    /* No flex container needed - content flows naturally */
+    overflow: visible; /* Let parent handle scrolling */
 }
 
 /* Mobile popup content styling */
@@ -1496,22 +1542,6 @@ textarea.form-input {
    EXPANDED MOBILE POPUP STYLES
    ============================================ */
 
-/* Expanded carousel (taller, all photos) */
-.expanded-carousel {
-    height: 250px !important;
-    margin-bottom: 16px;
-    margin-right: 0 !important;
-    position: relative;
-}
-
-.expanded-carousel .carousel-container {
-    height: 250px;
-}
-
-.expanded-carousel .carousel-image {
-    height: 250px;
-}
-
 .carousel-photo-count {
     position: absolute;
     bottom: 8px;
@@ -1524,15 +1554,7 @@ textarea.form-input {
     font-weight: 500;
 }
 
-/* Scrollable content area in expanded mode */
-.expanded-content-scroll {
-    flex: 1;
-    padding: 0;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    /* Add some margin to create space between carousel and scrollable content */
-    margin-top: 0;
-}
+/* Removed .expanded-content-scroll - content now scrolls as a whole */
 
 /* Rating section */
 .expanded-rating-section {
@@ -1678,17 +1700,8 @@ textarea.form-input {
     color: white;
 }
 
-/* Action buttons (sticky at bottom) */
-.expanded-action-buttons {
-    position: sticky;
-    bottom: 0;
-    background: white;
-    padding: 12px 0 0;
-    margin-top: 12px;
-    border-top: 1px solid #e0e0e0;
-}
-
-.expanded-action-buttons .btn-large {
+/* Action buttons - now part of scrollable content */
+.expanded-view .btn-large {
     width: 100%;
     padding: 14px;
     font-size: 1rem;
@@ -1701,19 +1714,20 @@ textarea.form-input {
     border: none;
     cursor: pointer;
     transition: all 0.2s;
+    margin-top: 16px;
 }
 
-.expanded-action-buttons .btn-primary {
+.expanded-view .btn-primary {
     background: linear-gradient(135deg, #2A9D8F 0%, #3EBBA5 100%);
     color: white;
 }
 
-.expanded-action-buttons .btn-danger {
+.expanded-view .btn-danger {
     background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
     color: white;
 }
 
-.expanded-action-buttons .btn-large:active {
+.expanded-view .btn-large:active {
     transform: scale(0.98);
 }
 

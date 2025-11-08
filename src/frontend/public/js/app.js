@@ -761,63 +761,160 @@ class App {
 
         let startX = 0;
         let startY = 0;
+        let startTime = 0;
+        let currentY = 0;
+        let isDragging = false;
+        let swipeDirection = null; // 'horizontal' or 'vertical'
+        let initialHeight = 0;
+        const compactHeight = 320; // px
+        const expandedHeight = window.innerHeight * 0.85; // 85vh
 
         popup.addEventListener('touchstart', (e) => {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            console.log('Touch start:', startX, startY);
+            currentY = startY;
+            startTime = Date.now();
+            isDragging = false;
+            swipeDirection = null;
+
+            // Get current height
+            const currentState = popup.getAttribute('data-state');
+            initialHeight = currentState === 'expanded' ? expandedHeight : compactHeight;
+
+            console.log('Touch start:', startX, startY, 'Initial height:', initialHeight);
+        }, { passive: true });
+
+        popup.addEventListener('touchmove', (e) => {
+            if (!isDragging && !swipeDirection) {
+                // Determine swipe direction on first move
+                const diffX = Math.abs(e.touches[0].clientX - startX);
+                const diffY = Math.abs(e.touches[0].clientY - startY);
+
+                if (diffX > 10 || diffY > 10) {
+                    swipeDirection = diffX > diffY ? 'horizontal' : 'vertical';
+                }
+            }
+
+            currentY = e.touches[0].clientY;
+            const deltaY = currentY - startY;
+
+            // Only handle vertical swipes with follow-finger animation
+            if (swipeDirection === 'vertical') {
+                const currentState = popup.getAttribute('data-state');
+
+                // Check if we should allow vertical dragging
+                const canDrag = currentState === 'compact' ||
+                               (currentState === 'expanded' && this.mapService.isPopupScrolledToTop());
+
+                if (canDrag) {
+                    isDragging = true;
+
+                    // Calculate new height (inverted: dragging down = taller, dragging up = shorter)
+                    let newHeight = initialHeight - deltaY;
+
+                    // Apply resistance at boundaries (rubber-banding effect)
+                    if (newHeight < compactHeight) {
+                        const overflow = compactHeight - newHeight;
+                        newHeight = compactHeight - (overflow * 0.3); // 30% resistance
+                    } else if (newHeight > expandedHeight) {
+                        const overflow = newHeight - expandedHeight;
+                        newHeight = expandedHeight + (overflow * 0.3); // 30% resistance
+                    }
+
+                    // Clamp to absolute min/max
+                    newHeight = Math.max(compactHeight * 0.7, Math.min(expandedHeight * 1.1, newHeight));
+
+                    // Update height in real-time with transform for performance
+                    popup.style.maxHeight = `${newHeight}px`;
+                    popup.style.transition = 'none'; // Disable transition during drag
+
+                    // Update swipe handle opacity for visual feedback
+                    const swipeHandle = popup.querySelector('.mobile-popup-swipe-handle');
+                    if (swipeHandle) {
+                        const progress = (newHeight - compactHeight) / (expandedHeight - compactHeight);
+                        swipeHandle.style.opacity = 0.3 + (progress * 0.4); // 0.3 to 0.7
+                    }
+                }
+            }
         }, { passive: true });
 
         popup.addEventListener('touchend', (e) => {
             const endX = e.changedTouches[0].clientX;
             const endY = e.changedTouches[0].clientY;
+            const endTime = Date.now();
 
             const diffX = startX - endX;
             const diffY = startY - endY;
+            const deltaTime = endTime - startTime;
+            const velocity = Math.abs(diffY) / deltaTime; // pixels per ms
 
-            console.log('Touch end - diffX:', diffX, 'diffY:', diffY);
+            console.log('Touch end - diffX:', diffX, 'diffY:', diffY, 'velocity:', velocity);
 
             const absX = Math.abs(diffX);
             const absY = Math.abs(diffY);
 
-            // Determine if swipe is more horizontal or vertical
-            if (absX > absY && absX > 50) {
+            // Re-enable transitions
+            popup.style.transition = '';
+
+            // Reset swipe handle
+            const swipeHandle = popup.querySelector('.mobile-popup-swipe-handle');
+            if (swipeHandle) {
+                swipeHandle.style.opacity = '';
+            }
+
+            if (swipeDirection === 'horizontal' && absX > 50) {
                 // Horizontal swipe - navigate between places
                 console.log('Horizontal swipe detected:', diffX > 0 ? 'left (next)' : 'right (previous)');
                 if (diffX > 0) {
-                    // Swipe left - next place
                     this.navigateToNextPlace();
                 } else {
-                    // Swipe right - previous place
                     this.navigateToPreviousPlace();
                 }
-            } else if (absY > absX && absY > 50) {
-                // Vertical swipe - expand or collapse popup
+            } else if (swipeDirection === 'vertical' && isDragging) {
+                // Vertical swipe - determine expand or collapse based on position & velocity
+                const currentState = popup.getAttribute('data-state');
+                const currentHeight = parseInt(popup.style.maxHeight) || initialHeight;
+                const midPoint = (compactHeight + expandedHeight) / 2;
+
+                // Decision: expand or collapse?
+                let shouldExpand;
+                if (velocity > 1.5) {
+                    // Fast swipe - use direction
+                    shouldExpand = diffY > 0; // Swipe up = expand
+                } else {
+                    // Slow swipe - use position threshold
+                    shouldExpand = currentHeight > midPoint;
+                }
+
+                console.log('Vertical swipe - shouldExpand:', shouldExpand, 'velocity:', velocity, 'height:', currentHeight);
+
+                if (shouldExpand && currentState === 'compact') {
+                    this.mapService.expandMobilePopup();
+                } else if (!shouldExpand && currentState === 'expanded') {
+                    this.mapService.collapseMobilePopup();
+                } else {
+                    // Snap back to current state
+                    popup.style.maxHeight = currentState === 'expanded' ? '85vh' : '320px';
+                }
+            } else if (swipeDirection === 'vertical' && absY > 50) {
+                // Simple vertical swipe without dragging (fallback)
                 const currentState = popup.getAttribute('data-state');
 
-                if (diffY > 0) {
-                    // Swipe up - expand
-                    if (currentState === 'compact') {
-                        console.log('Swipe up detected - expanding popup');
-                        this.mapService.expandMobilePopup();
-                    } else {
-                        console.log('Popup already expanded');
-                    }
-                } else {
-                    // Swipe down - collapse (only if at top of scroll)
-                    if (currentState === 'expanded' && this.mapService.isPopupScrolledToTop()) {
-                        console.log('Swipe down detected - collapsing popup');
-                        this.mapService.collapseMobilePopup();
-                    } else if (currentState === 'expanded') {
-                        console.log('Cannot collapse - not scrolled to top');
-                    }
+                if (diffY > 0 && currentState === 'compact') {
+                    console.log('Swipe up detected - expanding popup');
+                    this.mapService.expandMobilePopup();
+                } else if (diffY < 0 && currentState === 'expanded' && this.mapService.isPopupScrolledToTop()) {
+                    console.log('Swipe down detected - collapsing popup');
+                    this.mapService.collapseMobilePopup();
                 }
-            } else {
-                console.log('Swipe threshold not met - absX:', absX, 'absY:', absY);
             }
+
+            // Reset state
+            isDragging = false;
+            swipeDirection = null;
         }, { passive: true });
 
-        console.log('Mobile popup swipe listeners attached');
+        console.log('Mobile popup swipe listeners attached with animations');
     }
 
     navigateToNextPlace() {
