@@ -1378,33 +1378,29 @@ textarea.form-input {
 
 /* Compact view - visible in compact state */
 .compact-view {
+    display: block;
     opacity: 1;
-    max-height: 200px;
-    transition: opacity 0.3s ease, max-height 0.3s ease;
-    overflow: hidden;
+    transition: opacity 0.25s ease;
 }
 
 .mobile-docked-popup[data-state="expanded"] .compact-view {
+    display: none; /* Completely hide - no space taken */
     opacity: 0;
-    max-height: 0;
     pointer-events: none;
 }
 
 /* Expanded view - visible in expanded state */
 .expanded-view {
+    display: none; /* Completely hidden in compact mode */
     opacity: 0;
-    max-height: 0;
-    transition: opacity 0.3s ease, max-height 0.3s ease;
-    overflow: hidden;
     pointer-events: none;
 }
 
 .mobile-docked-popup[data-state="expanded"] .expanded-view {
+    display: block; /* Show in expanded mode */
     opacity: 1;
-    max-height: none;
     pointer-events: auto;
-    /* No flex container needed - content flows naturally */
-    overflow: visible; /* Let parent handle scrolling */
+    transition: opacity 0.25s ease;
 }
 
 /* Mobile popup content styling */

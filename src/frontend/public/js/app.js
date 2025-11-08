@@ -792,6 +792,18 @@ class App {
 
                 if (diffX > 10 || diffY > 10) {
                     swipeDirection = diffX > diffY ? 'horizontal' : 'vertical';
+
+                    // If vertical swipe down detected and near top, auto-scroll to top
+                    if (swipeDirection === 'vertical') {
+                        const currentState = popup.getAttribute('data-state');
+                        const deltaY = currentY - startY;
+                        const isSwipingDown = deltaY < 0; // Negative = down
+
+                        if (currentState === 'expanded' && isSwipingDown) {
+                            // Auto-scroll to top if near the top (makes collapse easier)
+                            this.mapService.autoScrollToTopIfNear();
+                        }
+                    }
                 }
             }
 
@@ -802,9 +814,9 @@ class App {
             if (swipeDirection === 'vertical') {
                 const currentState = popup.getAttribute('data-state');
 
-                // Check if we should allow vertical dragging
+                // Check if we should allow vertical dragging (now with threshold)
                 const canDrag = currentState === 'compact' ||
-                               (currentState === 'expanded' && this.mapService.isPopupScrolledToTop());
+                               (currentState === 'expanded' && this.mapService.isPopupScrolledToTop(50));
 
                 if (canDrag) {
                     isDragging = true;
@@ -853,9 +865,6 @@ class App {
             const absX = Math.abs(diffX);
             const absY = Math.abs(diffY);
 
-            // Re-enable transitions
-            popup.style.transition = '';
-
             // Reset swipe handle
             const swipeHandle = popup.querySelector('.mobile-popup-swipe-handle');
             if (swipeHandle) {
@@ -865,6 +874,10 @@ class App {
             if (swipeDirection === 'horizontal' && absX > 50) {
                 // Horizontal swipe - navigate between places
                 console.log('Horizontal swipe detected:', diffX > 0 ? 'left (next)' : 'right (previous)');
+
+                // Re-enable transitions before navigation
+                popup.style.transition = '';
+
                 if (diffX > 0) {
                     this.navigateToNextPlace();
                 } else {
@@ -888,17 +901,31 @@ class App {
 
                 console.log('Vertical swipe - shouldExpand:', shouldExpand, 'velocity:', velocity, 'height:', currentHeight);
 
-                if (shouldExpand && currentState === 'compact') {
-                    this.mapService.expandMobilePopup();
-                } else if (!shouldExpand && currentState === 'expanded') {
-                    this.mapService.collapseMobilePopup();
-                } else {
-                    // Snap back to current state
-                    popup.style.maxHeight = currentState === 'expanded' ? '85vh' : '320px';
-                }
+                // Clear inline maxHeight FIRST, then set state for immediate transition
+                popup.style.maxHeight = '';
+
+                // Use requestAnimationFrame to ensure state change happens after style clear
+                requestAnimationFrame(() => {
+                    // Re-enable transitions
+                    popup.style.transition = '';
+
+                    if (shouldExpand && currentState === 'compact') {
+                        popup.setAttribute('data-state', 'expanded');
+                        console.log('Mobile popup expanded');
+                    } else if (!shouldExpand && currentState === 'expanded') {
+                        popup.setAttribute('data-state', 'compact');
+                        // Scroll content back to top
+                        const popupContent = document.getElementById('mobilePopupContent');
+                        if (popupContent) popupContent.scrollTop = 0;
+                        console.log('Mobile popup collapsed');
+                    }
+                });
             } else if (swipeDirection === 'vertical' && absY > 50) {
                 // Simple vertical swipe without dragging (fallback)
                 const currentState = popup.getAttribute('data-state');
+
+                // Re-enable transitions
+                popup.style.transition = '';
 
                 if (diffY > 0 && currentState === 'compact') {
                     console.log('Swipe up detected - expanding popup');
@@ -907,6 +934,9 @@ class App {
                     console.log('Swipe down detected - collapsing popup');
                     this.mapService.collapseMobilePopup();
                 }
+            } else {
+                // No action needed - just re-enable transitions
+                popup.style.transition = '';
             }
 
             // Reset state

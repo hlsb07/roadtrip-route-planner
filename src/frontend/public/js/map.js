@@ -1353,7 +1353,10 @@ export class MapService {
         const popup = document.getElementById('mobileDockedPopup');
         if (!popup) return;
 
-        // Just change state - CSS handles the visual transition
+        // Clear any inline maxHeight from swipe gestures
+        popup.style.maxHeight = '';
+
+        // Just change state - CSS handles the visual transition to 85vh
         popup.setAttribute('data-state', 'expanded');
 
         console.log('Mobile popup expanded');
@@ -1367,7 +1370,10 @@ export class MapService {
         const popup = document.getElementById('mobileDockedPopup');
         if (!popup) return;
 
-        // Just change state - CSS handles the visual transition
+        // Clear any inline maxHeight from swipe gestures
+        popup.style.maxHeight = '';
+
+        // Just change state - CSS handles the visual transition to 320px
         popup.setAttribute('data-state', 'compact');
 
         // Scroll content back to top for next time
@@ -1380,22 +1386,40 @@ export class MapService {
     }
 
     /**
-     * Check if popup content is scrolled to the top
+     * Check if popup content is scrolled to the top (or near the top)
      * Used to determine if swipe-down should collapse
+     * @param {number} threshold - How many pixels from top to consider "at top" (default: 30)
      */
-    isPopupScrolledToTop() {
+    isPopupScrolledToTop(threshold = 30) {
         const popup = document.getElementById('mobileDockedPopup');
         const state = popup?.getAttribute('data-state');
         const popupContent = document.getElementById('mobilePopupContent');
 
         if (state === 'expanded') {
-            // In expanded mode, mobile-popup-content is scrollable
-            return popupContent && popupContent.scrollTop === 0;
+            // In expanded mode, allow collapse when near the top (within threshold)
+            return popupContent && popupContent.scrollTop <= threshold;
         } else {
             // In compact mode, mobile-popup-content should not be scrollable (overflow: hidden)
             // Always return true to allow swipe-down gestures
             return true;
         }
+    }
+
+    /**
+     * Auto-scroll content to top if near the top
+     * Makes it easier to collapse the popup
+     */
+    autoScrollToTopIfNear() {
+        const popup = document.getElementById('mobileDockedPopup');
+        const state = popup?.getAttribute('data-state');
+        const popupContent = document.getElementById('mobilePopupContent');
+
+        if (state === 'expanded' && popupContent && popupContent.scrollTop > 0 && popupContent.scrollTop <= 50) {
+            // Instantly scroll to top for immediate collapse gesture
+            popupContent.scrollTop = 0;
+            return true;
+        }
+        return false;
     }
 
     // ============================================
