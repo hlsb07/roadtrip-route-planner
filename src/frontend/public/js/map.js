@@ -800,13 +800,13 @@ export class MapService {
                 ${index !== null ? `<div class="mobile-popup-place-number">${index + 1}</div>` : ''}
                 <div class="mobile-popup-place-info">
                     <h3 class="mobile-popup-place-name">${place.name}</h3>
-                    <div class="mobile-popup-badges">
-                        ${place.googleData ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>' : ''}
-                        ${isNonRoute ? '<span class="non-route-badge">Not in Route</span>' : ''}
-                    </div>
                 </div>
             </div>
         `;
+        // <div class="mobile-popup-badges">
+        //                 ${place.googleData ? '<span class="google-place-badge"><i class="fab fa-google"></i> Google</span>' : ''}
+        //                 ${isNonRoute ? '<span class="non-route-badge">Not in Route</span>' : ''}
+        //             </div>
 
         // Rating and price (brief info)
         const quickInfo = [];
@@ -875,12 +875,12 @@ export class MapService {
             <div class="mobile-popup-content-inner">
                 ${imageCarousel}
                 ${placeHeader}
-                ${quickInfoSection}
-                ${addressSection}
-                ${categoriesSection}
                 ${actionButton}
             </div>
         `;
+                // ${quickInfoSection}
+                // ${addressSection}
+                // ${categoriesSection}
     }
 
     /**
