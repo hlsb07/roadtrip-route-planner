@@ -777,9 +777,13 @@ class App {
 
             console.log('Touch end - diffX:', diffX, 'diffY:', diffY);
 
-            // Horizontal swipe (min 50px), ignore if vertical swipe is dominant
-            if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-                console.log('Swipe detected:', diffX > 0 ? 'left (next)' : 'right (previous)');
+            const absX = Math.abs(diffX);
+            const absY = Math.abs(diffY);
+
+            // Determine if swipe is more horizontal or vertical
+            if (absX > absY && absX > 50) {
+                // Horizontal swipe - navigate between places
+                console.log('Horizontal swipe detected:', diffX > 0 ? 'left (next)' : 'right (previous)');
                 if (diffX > 0) {
                     // Swipe left - next place
                     this.navigateToNextPlace();
@@ -787,8 +791,29 @@ class App {
                     // Swipe right - previous place
                     this.navigateToPreviousPlace();
                 }
+            } else if (absY > absX && absY > 50) {
+                // Vertical swipe - expand or collapse popup
+                const currentState = popup.getAttribute('data-state');
+
+                if (diffY < 0) {
+                    // Swipe up - expand
+                    if (currentState === 'compact') {
+                        console.log('Swipe up detected - expanding popup');
+                        this.mapService.expandMobilePopup();
+                    } else {
+                        console.log('Popup already expanded');
+                    }
+                } else {
+                    // Swipe down - collapse (only if at top of scroll)
+                    if (currentState === 'expanded' && this.mapService.isPopupScrolledToTop()) {
+                        console.log('Swipe down detected - collapsing popup');
+                        this.mapService.collapseMobilePopup();
+                    } else if (currentState === 'expanded') {
+                        console.log('Cannot collapse - not scrolled to top');
+                    }
+                }
             } else {
-                console.log('Swipe threshold not met');
+                console.log('Swipe threshold not met - absX:', absX, 'absY:', absY);
             }
         }, { passive: true });
 
@@ -1069,6 +1094,7 @@ class App {
 // Initialize app when DOM is loaded
 window.addEventListener('load', async () => {
     window.app = new App();
+    window.mapService = window.app.mapService; // Expose for onclick handlers
     await window.app.init();
 });
 

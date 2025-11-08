@@ -309,11 +309,13 @@
     </div>
 
     <!-- Mobile Docked Popup (Above Navigation Bar) -->
-    <div id="mobileDockedPopup" class="mobile-docked-popup">
+    <div id="mobileDockedPopup" class="mobile-docked-popup" data-state="compact">
+        <div class="mobile-popup-swipe-handle"></div>
         <div class="mobile-popup-header">
             <div class="mobile-popup-title-section">
                 <span class="mobile-popup-position" id="mobilePopupPosition"></span>
                 <h3 class="mobile-popup-place-name" id="mobilePopupPlaceName"></h3>
+                <div class="mobile-popup-badges" id="mobilePopupBadges"></div>
             </div>
             <button class="mobile-popup-close" onclick="window.mapService?.hideMobileDockedPopup()">
                 <i class="fas fa-times"></i>
@@ -321,7 +323,8 @@
         </div>
         <div class="mobile-popup-content" id="mobilePopupContent">
             <!-- Content will be dynamically injected here -->
-            <!-- Carousel and buttons only -->
+            <!-- Compact: Carousel and buttons only -->
+            <!-- Expanded: Full Google Places information -->
         </div>
     </div>
 

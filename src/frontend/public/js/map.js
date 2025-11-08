@@ -804,14 +804,14 @@ export class MapService {
                </div>`
             : '';
 
-        // Stacked buttons (View Details + primary action)
+        // Stacked buttons (Expand/Details + primary action)
         let buttons = '';
         if (isNonRoute) {
             // Non-route place
             buttons = `
                 <div class="mobile-popup-buttons">
-                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.app?.openPlaceDetailsFromPopup()">
-                        <i class="fas fa-info-circle"></i>
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.mapService?.expandMobilePopup()">
+                        <i class="fas fa-info-circle"></i> More Info
                     </button>
                     <button class="btn btn-primary" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
                         <i class="fas fa-plus"></i> Add to Route
@@ -822,11 +822,11 @@ export class MapService {
             // Route place
             buttons = `
                 <div class="mobile-popup-buttons">
-                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.app?.openPlaceDetailsFromPopup()">
-                        <i class="fas fa-info-circle"></i>
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); window.mapService?.expandMobilePopup()">
+                        <i class="fas fa-info-circle"></i> More Info
                     </button>
                     <button class="btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
-                        <i class="fas fa-trash"></i>
+                        <i class="fas fa-trash"></i> Remove
                     </button>
                 </div>
             `;
@@ -847,6 +847,217 @@ export class MapService {
             },
             content: `${imageCarousel}${buttons}`
         };
+    }
+
+    /**
+     * Build expanded mobile popup content with full Google Places information
+     * Returns HTML string with all details for scrollable full-height popup
+     */
+    buildExpandedMobileContent(place, index, isNonRoute, lat, lng) {
+        const photos = place.googleData?.photos || [];
+
+        // Store photos for fullscreen gallery
+        this.currentPopupPhotos = photos;
+
+        // Full photo carousel (all photos, not just 3)
+        const imageCarousel = photos.length > 0
+            ? `<div class="popup-image-carousel expanded-carousel" onclick="openPhotosGallery(); event.stopPropagation();">
+                   <div class="carousel-container" id="expanded-carousel-${place.id || index}">
+                       ${photos.map((photo, idx) => `
+                           <img src="${photo.photoUrl}"
+                                alt="${place.name}"
+                                class="carousel-image ${idx === 0 ? 'active' : ''}"
+                                data-index="${idx}">
+                       `).join('')}
+                   </div>
+                   ${photos.length > 1
+                       ? `<button class="carousel-btn prev" onclick="event.stopPropagation(); navigateCarousel('expanded-carousel-${place.id || index}', -1)">
+                              <i class="fas fa-chevron-left"></i>
+                          </button>
+                          <button class="carousel-btn next" onclick="event.stopPropagation(); navigateCarousel('expanded-carousel-${place.id || index}', 1)">
+                              <i class="fas fa-chevron-right"></i>
+                          </button>
+                          <div class="carousel-indicators">
+                              ${photos.map((_, idx) => `
+                                  <span class="indicator ${idx === 0 ? 'active' : ''}"
+                                        onclick="event.stopPropagation(); goToSlide('expanded-carousel-${place.id || index}', ${idx})"></span>
+                              `).join('')}
+                          </div>`
+                       : ''
+                   }
+                   <div class="carousel-photo-count">${photos.length} photo${photos.length > 1 ? 's' : ''}</div>
+               </div>`
+            : '';
+
+        // Rating & Reviews
+        const ratingSection = place.googleData?.rating
+            ? `<div class="expanded-rating-section">
+                   <div class="rating-display">
+                       <span class="rating-stars">⭐</span>
+                       <span class="rating-value">${place.googleData.rating.toFixed(1)}</span>
+                       ${place.googleData.userRatingsTotal
+                           ? `<span class="rating-count">(${place.googleData.userRatingsTotal.toLocaleString()} reviews)</span>`
+                           : ''
+                       }
+                   </div>
+                   ${place.googleData.priceLevel
+                       ? `<div class="price-display">
+                              <span class="price-symbols">${'$'.repeat(place.googleData.priceLevel)}</span>
+                          </div>`
+                       : ''
+                   }
+               </div>`
+            : '';
+
+        // Business Status
+        const statusSection = place.googleData?.businessStatus
+            ? `<div class="expanded-status-section">
+                   ${place.googleData.businessStatus === 'OPERATIONAL'
+                       ? '<span class="status-badge operational"><i class="fas fa-check-circle"></i> Open</span>'
+                       : place.googleData.businessStatus === 'CLOSED_TEMPORARILY'
+                       ? '<span class="status-badge closed-temp"><i class="fas fa-exclamation-circle"></i> Temporarily Closed</span>'
+                       : '<span class="status-badge closed-perm"><i class="fas fa-times-circle"></i> Permanently Closed</span>'
+                   }
+               </div>`
+            : '';
+
+        // Address
+        const addressSection = place.googleData?.formattedAddress
+            ? `<div class="expanded-info-section">
+                   <div class="info-section-title"><i class="fas fa-map-marker-alt"></i> Address</div>
+                   <div class="info-section-content">${place.googleData.formattedAddress}</div>
+               </div>`
+            : '';
+
+        // Contact Information
+        const contactSection = [];
+        if (place.googleData?.phoneNumber) {
+            contactSection.push(`
+                <div class="expanded-info-section">
+                    <div class="info-section-title"><i class="fas fa-phone"></i> Phone</div>
+                    <a href="tel:${place.googleData.phoneNumber}" class="info-section-link">
+                        ${place.googleData.phoneNumber}
+                    </a>
+                </div>
+            `);
+        }
+        if (place.googleData?.website) {
+            contactSection.push(`
+                <div class="expanded-info-section">
+                    <div class="info-section-title"><i class="fas fa-globe"></i> Website</div>
+                    <a href="${place.googleData.website}" target="_blank" class="info-section-link" onclick="event.stopPropagation()">
+                        Visit Website <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+            `);
+        }
+
+        // Opening Hours
+        let hoursSection = '';
+        if (place.googleData?.openingHours) {
+            try {
+                const hours = typeof place.googleData.openingHours === 'string'
+                    ? JSON.parse(place.googleData.openingHours)
+                    : place.googleData.openingHours;
+
+                if (hours.weekday_text && hours.weekday_text.length > 0) {
+                    hoursSection = `
+                        <div class="expanded-info-section">
+                            <div class="info-section-title"><i class="fas fa-clock"></i> Opening Hours</div>
+                            <div class="hours-list">
+                                ${hours.weekday_text.map(day => `<div class="hours-day">${day}</div>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.warn('Failed to parse opening hours:', e);
+            }
+        }
+
+        // Categories & Countries
+        const metadataSection = [];
+        if (place.categories && place.categories.length > 0) {
+            metadataSection.push(`
+                <div class="expanded-info-section">
+                    <div class="info-section-title"><i class="fas fa-tag"></i> Categories</div>
+                    <div class="badges-row">
+                        ${place.categories.map(c => `<span class="category-badge">${c.icon || '📍'} ${c.name}</span>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+        if (place.countries && place.countries.length > 0) {
+            metadataSection.push(`
+                <div class="expanded-info-section">
+                    <div class="info-section-title"><i class="fas fa-flag"></i> Countries</div>
+                    <div class="badges-row">
+                        ${place.countries.map(c => `<span class="country-badge">${c.icon || '🌍'} ${c.name}</span>`).join('')}
+                    </div>
+                </div>
+            `);
+        }
+
+        // Coordinates
+        const coordsSection = `
+            <div class="expanded-info-section">
+                <div class="info-section-title"><i class="fas fa-map-pin"></i> Coordinates</div>
+                <div class="info-section-content">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+            </div>
+        `;
+
+        // Action buttons (sticky at bottom)
+        const externalLinks = `
+            <div class="expanded-external-links">
+                <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}"
+                   target="_blank"
+                   class="link-btn google-maps"
+                   onclick="event.stopPropagation()">
+                    <i class="fas fa-map"></i> Google Maps
+                </a>
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"
+                   target="_blank"
+                   class="link-btn google-nav"
+                   onclick="event.stopPropagation()">
+                    <i class="fas fa-directions"></i> Navigate
+                </a>
+            </div>
+        `;
+
+        let actionButtons = '';
+        if (isNonRoute) {
+            actionButtons = `
+                <div class="expanded-action-buttons">
+                    <button class="btn btn-primary btn-large" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-plus"></i> Add to Route
+                    </button>
+                </div>
+            `;
+        } else if (index !== null) {
+            actionButtons = `
+                <div class="expanded-action-buttons">
+                    <button class="btn btn-danger btn-large" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
+                        <i class="fas fa-trash"></i> Remove from Route
+                    </button>
+                </div>
+            `;
+        }
+
+        // Assemble expanded content
+        return `
+            ${imageCarousel}
+            <div class="expanded-content-scroll">
+                ${ratingSection}
+                ${statusSection}
+                ${addressSection}
+                ${contactSection.join('')}
+                ${hoursSection}
+                ${metadataSection.join('')}
+                ${coordsSection}
+                ${externalLinks}
+            </div>
+            ${actionButtons}
+        `;
     }
 
     /**
@@ -1112,6 +1323,9 @@ export class MapService {
             if (popupBadges) popupBadges.innerHTML = '';
         }
 
+        // Reset to compact state when showing popup
+        popup.setAttribute('data-state', 'compact');
+
         // Show popup
         popup.classList.add('show');
 
@@ -1149,6 +1363,99 @@ export class MapService {
 
     getCurrentMobilePopupData() {
         return this.currentMobilePopupData;
+    }
+
+    /**
+     * Expand mobile popup to full height with all Google Places information
+     */
+    async expandMobilePopup() {
+        const popup = document.getElementById('mobileDockedPopup');
+        const popupContent = document.getElementById('mobilePopupContent');
+
+        if (!popup || !popupContent || !this.currentMobilePopupData) return;
+
+        const { placeData } = this.currentMobilePopupData;
+        if (!placeData || !placeData.place) return;
+
+        const place = placeData.place;
+        const index = placeData.index;
+        const isNonRoute = placeData.isNonRoute;
+        const lat = place.coords ? place.coords[0] : place.latitude;
+        const lng = place.coords ? place.coords[1] : place.longitude;
+
+        // Build expanded content with all Google data
+        let expandedContent;
+        if (place.hasGoogleData && place.id && !place.googleData) {
+            // Try to load Google data if not already loaded
+            try {
+                const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+                if (enrichedPlace && enrichedPlace.googleData) {
+                    const enrichedPlaceWithCoords = {
+                        ...place,
+                        googleData: enrichedPlace.googleData
+                    };
+                    expandedContent = this.buildExpandedMobileContent(enrichedPlaceWithCoords, index, isNonRoute, lat, lng);
+
+                    // Update the stored place data with Google data
+                    this.currentMobilePopupData.placeData.place = enrichedPlaceWithCoords;
+                } else {
+                    expandedContent = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
+                }
+            } catch (error) {
+                console.warn('Failed to load Google data for expanded popup:', error);
+                expandedContent = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
+            }
+        } else {
+            expandedContent = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
+        }
+
+        // Update content
+        popupContent.innerHTML = expandedContent;
+
+        // Change state to expanded
+        popup.setAttribute('data-state', 'expanded');
+
+        console.log('Mobile popup expanded');
+    }
+
+    /**
+     * Collapse mobile popup back to compact state
+     */
+    collapseMobilePopup() {
+        const popup = document.getElementById('mobileDockedPopup');
+        const popupContent = document.getElementById('mobilePopupContent');
+
+        if (!popup || !popupContent || !this.currentMobilePopupData) return;
+
+        const { placeData } = this.currentMobilePopupData;
+        if (!placeData || !placeData.place) return;
+
+        const place = placeData.place;
+        const index = placeData.index;
+        const isNonRoute = placeData.isNonRoute;
+
+        // Build compact content
+        const compactData = this.buildMobilePlacePopupContent(place, index, isNonRoute, 0, 0);
+
+        // Update content (just the content part, not the header)
+        popupContent.innerHTML = compactData.content;
+
+        // Change state to compact
+        popup.setAttribute('data-state', 'compact');
+
+        // Scroll content back to top
+        popupContent.scrollTop = 0;
+
+        console.log('Mobile popup collapsed');
+    }
+
+    /**
+     * Check if popup content is scrolled to the top
+     * Used to determine if swipe-down should collapse
+     */
+    isPopupScrolledToTop() {
+        const popupContent = document.getElementById('mobilePopupContent');
+        return popupContent && popupContent.scrollTop === 0;
     }
 
     // ============================================
