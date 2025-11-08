@@ -811,10 +811,10 @@ export class MapService {
             buttons = `
                 <div class="mobile-popup-buttons">
                     <button class="btn btn-primary" onclick="event.stopPropagation(); window.mapService?.expandMobilePopup()">
-                        <i class="fas fa-info-circle"></i> More Info
+                        <i class="fas fa-info-circle"></i>
                     </button>
                     <button class="btn btn-primary" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
-                        <i class="fas fa-plus"></i> Add to Route
+                        <i class="fas fa-plus"></i>
                     </button>
                 </div>
             `;
@@ -823,10 +823,10 @@ export class MapService {
             buttons = `
                 <div class="mobile-popup-buttons">
                     <button class="btn btn-primary" onclick="event.stopPropagation(); window.mapService?.expandMobilePopup()">
-                        <i class="fas fa-info-circle"></i> More Info
+                        <i class="fas fa-info-circle"></i>
                     </button>
                     <button class="btn btn-danger" onclick="event.stopPropagation(); window.app?.placeManager?.removePlace(${index})">
-                        <i class="fas fa-trash"></i> Remove
+                        <i class="fas fa-trash"></i>
                     </button>
                 </div>
             `;
@@ -1350,8 +1350,10 @@ export class MapService {
         const popup = document.getElementById('mobileDockedPopup');
         if (!popup || !popup.classList.contains('show')) return;
 
-        // Don't close if clicking inside the popup or on a marker
+        // Don't close if clicking inside the popup, fullscreen gallery, or on a marker
+        const fullscreenGallery = document.getElementById('fullscreenImageGallery');
         if (popup.contains(e.target) ||
+            (fullscreenGallery && fullscreenGallery.contains(e.target)) ||
             e.target.closest('.leaflet-marker-icon') ||
             e.target.closest('.leaflet-popup')) {
             return;
@@ -1454,8 +1456,18 @@ export class MapService {
      * Used to determine if swipe-down should collapse
      */
     isPopupScrolledToTop() {
-        const popupContent = document.getElementById('mobilePopupContent');
-        return popupContent && popupContent.scrollTop === 0;
+        const popup = document.getElementById('mobileDockedPopup');
+        const state = popup?.getAttribute('data-state');
+
+        if (state === 'expanded') {
+            // In expanded mode, check the expanded-content-scroll element
+            const expandedScroll = document.querySelector('.expanded-content-scroll');
+            return expandedScroll && expandedScroll.scrollTop === 0;
+        } else {
+            // In compact mode, check the mobile-popup-content
+            const popupContent = document.getElementById('mobilePopupContent');
+            return popupContent && popupContent.scrollTop === 0;
+        }
     }
 
     // ============================================
@@ -1607,6 +1619,12 @@ export class MapService {
                 } else {
                     // Swipe right - previous image
                     this.navigateGallery(-1);
+                }
+            } else if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 50) {
+                // Vertical swipe (min 50px)
+                if (diffY < 0) {
+                    // Swipe down - close fullscreen gallery
+                    this.hideFullscreenImageGallery();
                 }
             }
         }, { passive: true });

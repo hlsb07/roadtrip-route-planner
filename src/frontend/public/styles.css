@@ -1332,11 +1332,10 @@ textarea.form-input {
     align-items: center;
 }
 
-/* Expanded state - vertical layout with scrolling */
+/* Expanded state - vertical layout, carousel stays at top */
 .mobile-docked-popup[data-state="expanded"] .mobile-popup-content {
     flex-direction: column;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden; /* No scrolling on container itself */
     padding-bottom: 20px;
 }
 
@@ -1529,6 +1528,10 @@ textarea.form-input {
 .expanded-content-scroll {
     flex: 1;
     padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Add some margin to create space between carousel and scrollable content */
+    margin-top: 0;
 }
 
 /* Rating section */

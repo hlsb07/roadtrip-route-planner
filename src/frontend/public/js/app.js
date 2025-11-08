@@ -795,7 +795,7 @@ class App {
                 // Vertical swipe - expand or collapse popup
                 const currentState = popup.getAttribute('data-state');
 
-                if (diffY < 0) {
+                if (diffY > 0) {
                     // Swipe up - expand
                     if (currentState === 'compact') {
                         console.log('Swipe up detected - expanding popup');
