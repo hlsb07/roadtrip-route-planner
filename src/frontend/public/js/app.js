@@ -797,7 +797,7 @@ class App {
                     if (swipeDirection === 'vertical') {
                         const currentState = popup.getAttribute('data-state');
                         const deltaY = currentY - startY;
-                        const isSwipingDown = deltaY < 0; // Negative = down
+                        const isSwipingDown = deltaY > 0; // Positive = finger moving down = collapse gesture
 
                         if (currentState === 'expanded' && isSwipingDown) {
                             // Auto-scroll to top if near the top (makes collapse easier)
@@ -814,12 +814,25 @@ class App {
             if (swipeDirection === 'vertical') {
                 const currentState = popup.getAttribute('data-state');
 
-                // Check if we should allow vertical dragging (now with threshold)
-                const canDrag = currentState === 'compact' ||
-                               (currentState === 'expanded' && this.mapService.isPopupScrolledToTop(50));
+                // More precise drag detection to avoid conflicts with content scrolling
+                let canDrag = false;
+                if (currentState === 'compact') {
+                    // In compact mode, always allow dragging (up to expand, down to hide)
+                    canDrag = true;
+                } else if (currentState === 'expanded') {
+                    // In expanded mode, only allow dragging when:
+                    // 1. Content is at exact top (scrollTop <= 3px, not 50px)
+                    // 2. AND user is swiping DOWN to collapse (deltaY > 0)
+                    const isAtTop = this.mapService.isPopupScrolledToTop(3);
+                    const isSwipingDown = deltaY > 0; // Finger moving down = collapse gesture
+                    canDrag = isAtTop && isSwipingDown;
+                }
 
                 if (canDrag) {
                     isDragging = true;
+
+                    // IMPORTANT: Prevent iOS Safari pull-to-refresh and default scroll behavior
+                    e.preventDefault();
 
                     // Calculate new height (inverted: dragging down = taller, dragging up = shorter)
                     let newHeight = initialHeight - deltaY;
@@ -862,9 +875,12 @@ class App {
                             swipeHandle.style.opacity = 0.3 + (progress * 0.4); // 0.3 to 0.7
                         }
                     }
+                } else if (swipeDirection === 'horizontal') {
+                    // Prevent default behavior during horizontal swipes (place navigation)
+                    e.preventDefault();
                 }
             }
-        }, { passive: true });
+        }, { passive: false }); // CHANGED: passive: false to allow preventDefault()
 
         popup.addEventListener('touchend', (e) => {
             const endX = e.changedTouches[0].clientX;

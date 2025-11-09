@@ -1226,6 +1226,9 @@ textarea.form-input {
                 box-shadow 0.4s ease;
     border-radius: 16px 16px 0 0;
     will-change: max-height; /* Optimize for animations */
+    /* Prevent iOS Safari pull-to-refresh */
+    overscroll-behavior: contain;
+    touch-action: pan-y; /* Allow vertical panning but prevent browser gestures */
 }
 
 .mobile-docked-popup.show {
@@ -1335,6 +1338,8 @@ textarea.form-input {
     padding: 12px 16px 16px;
     display: flex;
     flex-direction: column;
+    /* Prevent iOS Safari pull-to-refresh when scrolling content */
+    overscroll-behavior-y: contain;
 }
 
 /* Enable scrolling in expanded mode */

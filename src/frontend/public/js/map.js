@@ -1389,6 +1389,8 @@ export class MapService {
      * Check if popup content is scrolled to the top (or near the top)
      * Used to determine if swipe-down should collapse
      * @param {number} threshold - How many pixels from top to consider "at top" (default: 30)
+     *                             Use small values (3-5px) for drag detection to avoid scroll conflicts
+     *                             Use larger values (20-30px) for simple swipe detection
      */
     isPopupScrolledToTop(threshold = 30) {
         const popup = document.getElementById('mobileDockedPopup');
@@ -1396,7 +1398,8 @@ export class MapService {
         const popupContent = document.getElementById('mobilePopupContent');
 
         if (state === 'expanded') {
-            // In expanded mode, allow collapse when near the top (within threshold)
+            // In expanded mode, check if within threshold of top
+            // Tight threshold (3px) prevents conflicts with content scrolling on mobile
             return popupContent && popupContent.scrollTop <= threshold;
         } else {
             // In compact mode, mobile-popup-content should not be scrollable (overflow: hidden)
@@ -1414,7 +1417,7 @@ export class MapService {
         const state = popup?.getAttribute('data-state');
         const popupContent = document.getElementById('mobilePopupContent');
 
-        if (state === 'expanded' && popupContent && popupContent.scrollTop > 0 && popupContent.scrollTop <= 50) {
+        if (state === 'expanded' && popupContent && popupContent.scrollTop > 0 && popupContent.scrollTop <= 20) {
             // Instantly scroll to top for immediate collapse gesture
             popupContent.scrollTop = 0;
             return true;
