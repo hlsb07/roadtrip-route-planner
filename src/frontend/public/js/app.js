@@ -824,27 +824,43 @@ class App {
                     // Calculate new height (inverted: dragging down = taller, dragging up = shorter)
                     let newHeight = initialHeight - deltaY;
 
-                    // Apply resistance at boundaries (rubber-banding effect)
-                    if (newHeight < compactHeight) {
-                        const overflow = compactHeight - newHeight;
-                        newHeight = compactHeight - (overflow * 0.3); // 30% resistance
-                    } else if (newHeight > expandedHeight) {
-                        const overflow = newHeight - expandedHeight;
-                        newHeight = expandedHeight + (overflow * 0.3); // 30% resistance
-                    }
+                    // Special handling for compact mode swipe down (to hide)
+                    if (currentState === 'compact' && newHeight < compactHeight) {
+                        // Swiping down from compact - slide the popup down to hide
+                        const slideDistance = compactHeight - newHeight;
+                        popup.style.maxHeight = `${compactHeight}px`;
+                        popup.style.transform = `translateY(${slideDistance}px)`;
+                        popup.style.transition = 'none'; // Disable transition during drag
 
-                    // Clamp to absolute min/max
-                    newHeight = Math.max(compactHeight * 0.7, Math.min(expandedHeight * 1.1, newHeight));
+                        // Fade out as it slides down
+                        const fadeProgress = Math.min(slideDistance / 150, 1); // Fade over 150px
+                        popup.style.opacity = 1 - (fadeProgress * 0.5); // Fade to 50% opacity
+                    } else {
+                        // Normal expand/collapse behavior
+                        // Apply resistance at boundaries (rubber-banding effect)
+                        if (newHeight < compactHeight) {
+                            const overflow = compactHeight - newHeight;
+                            newHeight = compactHeight - (overflow * 0.3); // 30% resistance
+                        } else if (newHeight > expandedHeight) {
+                            const overflow = newHeight - expandedHeight;
+                            newHeight = expandedHeight + (overflow * 0.3); // 30% resistance
+                        }
 
-                    // Update height in real-time with transform for performance
-                    popup.style.maxHeight = `${newHeight}px`;
-                    popup.style.transition = 'none'; // Disable transition during drag
+                        // Clamp to absolute min/max
+                        newHeight = Math.max(compactHeight * 0.7, Math.min(expandedHeight * 1.1, newHeight));
 
-                    // Update swipe handle opacity for visual feedback
-                    const swipeHandle = popup.querySelector('.mobile-popup-swipe-handle');
-                    if (swipeHandle) {
-                        const progress = (newHeight - compactHeight) / (expandedHeight - compactHeight);
-                        swipeHandle.style.opacity = 0.3 + (progress * 0.4); // 0.3 to 0.7
+                        // Update height in real-time
+                        popup.style.maxHeight = `${newHeight}px`;
+                        popup.style.transform = ''; // Clear any transform
+                        popup.style.opacity = ''; // Clear any opacity change
+                        popup.style.transition = 'none'; // Disable transition during drag
+
+                        // Update swipe handle opacity for visual feedback
+                        const swipeHandle = popup.querySelector('.mobile-popup-swipe-handle');
+                        if (swipeHandle) {
+                            const progress = (newHeight - compactHeight) / (expandedHeight - compactHeight);
+                            swipeHandle.style.opacity = 0.3 + (progress * 0.4); // 0.3 to 0.7
+                        }
                     }
                 }
             }
@@ -884,45 +900,87 @@ class App {
                     this.navigateToPreviousPlace();
                 }
             } else if (swipeDirection === 'vertical' && isDragging) {
-                // Vertical swipe - determine expand or collapse based on position & velocity
+                // Vertical swipe - determine expand/collapse/hide based on position & velocity
                 const currentState = popup.getAttribute('data-state');
                 const currentHeight = parseInt(popup.style.maxHeight) || initialHeight;
-                const midPoint = (compactHeight + expandedHeight) / 2;
 
-                // Decision: expand or collapse?
-                let shouldExpand;
-                if (velocity > 1.5) {
-                    // Fast swipe - use direction
-                    shouldExpand = diffY > 0; // Swipe up = expand
-                } else {
-                    // Slow swipe - use position threshold
-                    shouldExpand = currentHeight > midPoint;
-                }
+                // Check if we're trying to hide from compact mode
+                const transformMatch = popup.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
+                const slideDistance = transformMatch ? parseFloat(transformMatch[1]) : 0;
 
-                console.log('Vertical swipe - shouldExpand:', shouldExpand, 'velocity:', velocity, 'height:', currentHeight);
+                if (currentState === 'compact' && slideDistance > 0) {
+                    // Swiping down from compact - decide whether to hide or snap back
+                    const shouldHide = velocity > 1.0 || slideDistance > 80; // Fast swipe or dragged far enough
 
-                // Clear inline maxHeight FIRST, then set state for immediate transition
-                popup.style.maxHeight = '';
+                    if (shouldHide) {
+                        // Hide the popup with slide-down animation
+                        console.log('Hiding mobile popup - slide distance:', slideDistance, 'velocity:', velocity);
+                        popup.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
+                        popup.style.transform = `translateY(${compactHeight + 50}px)`; // Slide fully down
+                        popup.style.opacity = '0';
 
-                // Use requestAnimationFrame to ensure state change happens after style clear
-                requestAnimationFrame(() => {
-                    // Re-enable transitions
-                    popup.style.transition = '';
-
-                    if (shouldExpand && currentState === 'compact') {
-                        popup.setAttribute('data-state', 'expanded');
-                        console.log('Mobile popup expanded');
-                    } else if (!shouldExpand && currentState === 'expanded') {
-                        popup.setAttribute('data-state', 'compact');
-                        // Scroll content back to top
-                        const popupContent = document.getElementById('mobilePopupContent');
-                        if (popupContent) popupContent.scrollTop = 0;
-                        console.log('Mobile popup collapsed');
+                        // Actually hide after animation
+                        setTimeout(() => {
+                            this.mapService.hideMobileDockedPopup();
+                            // Reset styles
+                            popup.style.transform = '';
+                            popup.style.opacity = '';
+                            popup.style.transition = '';
+                        }, 300);
+                    } else {
+                        // Snap back to compact
+                        popup.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease';
+                        popup.style.transform = '';
+                        popup.style.opacity = '';
+                        popup.style.maxHeight = '';
+                        console.log('Snapping back to compact');
                     }
-                });
+                } else {
+                    // Normal expand/collapse behavior
+                    const midPoint = (compactHeight + expandedHeight) / 2;
+
+                    // Decision: expand or collapse?
+                    let shouldExpand;
+                    if (velocity > 1.5) {
+                        // Fast swipe - use direction
+                        shouldExpand = diffY > 0; // Swipe up = expand
+                    } else {
+                        // Slow swipe - use position threshold
+                        shouldExpand = currentHeight > midPoint;
+                    }
+
+                    console.log('Vertical swipe - shouldExpand:', shouldExpand, 'velocity:', velocity, 'height:', currentHeight);
+
+                    // Clear inline styles FIRST, then set state for immediate transition
+                    popup.style.maxHeight = '';
+                    popup.style.transform = '';
+                    popup.style.opacity = '';
+
+                    // Use requestAnimationFrame to ensure state change happens after style clear
+                    requestAnimationFrame(() => {
+                        // Re-enable transitions
+                        popup.style.transition = '';
+
+                        if (shouldExpand && currentState === 'compact') {
+                            popup.setAttribute('data-state', 'expanded');
+                            console.log('Mobile popup expanded');
+                        } else if (!shouldExpand && currentState === 'expanded') {
+                            popup.setAttribute('data-state', 'compact');
+                            // Scroll content back to top
+                            const popupContent = document.getElementById('mobilePopupContent');
+                            if (popupContent) popupContent.scrollTop = 0;
+                            console.log('Mobile popup collapsed');
+                        }
+                    });
+                }
             } else if (swipeDirection === 'vertical' && absY > 50) {
                 // Simple vertical swipe without dragging (fallback)
                 const currentState = popup.getAttribute('data-state');
+
+                // Clear any inline styles
+                popup.style.transform = '';
+                popup.style.opacity = '';
+                popup.style.maxHeight = '';
 
                 // Re-enable transitions
                 popup.style.transition = '';
@@ -930,12 +988,18 @@ class App {
                 if (diffY > 0 && currentState === 'compact') {
                     console.log('Swipe up detected - expanding popup');
                     this.mapService.expandMobilePopup();
+                } else if (diffY < 0 && currentState === 'compact') {
+                    console.log('Swipe down detected - hiding popup');
+                    this.mapService.hideMobileDockedPopup();
                 } else if (diffY < 0 && currentState === 'expanded' && this.mapService.isPopupScrolledToTop()) {
                     console.log('Swipe down detected - collapsing popup');
                     this.mapService.collapseMobilePopup();
                 }
             } else {
-                // No action needed - just re-enable transitions
+                // No action needed - just clean up and re-enable transitions
+                popup.style.transform = '';
+                popup.style.opacity = '';
+                popup.style.maxHeight = '';
                 popup.style.transition = '';
             }
 
