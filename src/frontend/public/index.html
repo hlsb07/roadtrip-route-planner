@@ -201,11 +201,8 @@
 
         <!-- Mobile Content Panel -->
         <div class="mobile-content-panel active" id="mobilePanel" data-mode="routes">
-            <div class="mobile-panel-header" onclick="handleMobilePanelHeaderClick()">
+            <div class="mobile-panel-header">
                 <div class="mobile-panel-title" id="mobilePanelTitle">Route Selection</div>
-                <button class="mobile-panel-expand" onclick="event.stopPropagation(); toggleMobilePanelExpand()">
-                    <i class="fas fa-chevron-up"></i>
-                </button>
             </div>
             <div class="mobile-panel-content" id="mobilePanelContent">
                 <!-- Routes Section -->
@@ -861,7 +858,16 @@
             const content = document.getElementById('mobilePanelContent');
 
             panel.dataset.mode = mode;
+
+            // Show panel in 'active' state when navigation item is clicked
+            // Remove hidden/expanded and set to active
+            panel.classList.remove('hidden', 'expanded');
             panel.classList.add('active');
+
+            // Update SwipeHandler state if available
+            if (window.app && window.app.panelSwipeHandler) {
+                window.app.panelSwipeHandler.currentState = 'active';
+            }
 
             // Set title and show appropriate section
             const modes = {
@@ -887,39 +893,16 @@
             }
         };
 
-        window.handleMobilePanelHeaderClick = function() {
-            const panel = document.getElementById('mobilePanel');
-
-            // If expanded, just collapse
-            if (panel.classList.contains('expanded')) {
-                panel.classList.remove('expanded');
-                const expandBtn = panel.querySelector('.mobile-panel-expand i');
-                if (expandBtn) {
-                    expandBtn.className = 'fas fa-chevron-up';
-                }
-            } else {
-                // If not expanded, close completely
-                panel.classList.remove('active');
-            }
-        };
-
+        // Panel functions now handled by SwipeHandler in app.js
+        // Keep stub for backwards compatibility
         window.closeMobilePanel = function() {
-            const panel = document.getElementById('mobilePanel');
-            panel.classList.remove('active', 'expanded');
-        };
-
-        window.toggleMobilePanelExpand = function() {
-            const panel = document.getElementById('mobilePanel');
-            panel.classList.toggle('expanded');
-
-            // Update icon
-            const expandBtn = panel.querySelector('.mobile-panel-expand i');
-            if (expandBtn) {
-                if (panel.classList.contains('expanded')) {
-                    expandBtn.className = 'fas fa-chevron-down';
-                } else {
-                    expandBtn.className = 'fas fa-chevron-up';
-                }
+            // Use SwipeHandler if available, otherwise fall back to direct class manipulation
+            if (window.app && window.app.panelSwipeHandler) {
+                window.app.panelSwipeHandler.changeState('hidden');
+            } else {
+                const panel = document.getElementById('mobilePanel');
+                panel.classList.remove('active', 'expanded');
+                panel.classList.add('hidden');
             }
         };
 

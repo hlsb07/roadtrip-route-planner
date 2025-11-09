@@ -9,6 +9,7 @@ import { TagManager } from './tagManager.js';
 import { ApiService } from './api.js';
 import { showError, showSuccess, showConfirm } from './utils.js';
 import { CONFIG } from './config.js';
+import { SwipeHandler } from './swipeHandler.js';
 
 class App {
     constructor() {
@@ -32,6 +33,7 @@ class App {
         this.bindEventListeners();
         this.setupKeyboardShortcuts();
         this.setupMobilePopupSwipe();
+        this.setupMobilePanelSwipe();
     }
 
     async init() {
@@ -753,278 +755,72 @@ class App {
 
     setupMobilePopupSwipe() {
         const popup = document.getElementById('mobileDockedPopup');
-        console.log('setupMobilePopupSwipe - popup element:', popup);
         if (!popup) {
             console.warn('Mobile popup element not found during setup');
             return;
         }
 
-        let startX = 0;
-        let startY = 0;
-        let startTime = 0;
-        let currentY = 0;
-        let isDragging = false;
-        let swipeDirection = null; // 'horizontal' or 'vertical'
-        let initialHeight = 0;
-        const compactHeight = 320; // px
-        const expandedHeight = window.innerHeight * 0.85; // 85vh
-
-        popup.addEventListener('touchstart', (e) => {
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-            currentY = startY;
-            startTime = Date.now();
-            isDragging = false;
-            swipeDirection = null;
-
-            // Get current height
-            const currentState = popup.getAttribute('data-state');
-            initialHeight = currentState === 'expanded' ? expandedHeight : compactHeight;
-
-            console.log('Touch start:', startX, startY, 'Initial height:', initialHeight);
-        }, { passive: true });
-
-        popup.addEventListener('touchmove', (e) => {
-            if (!isDragging && !swipeDirection) {
-                // Determine swipe direction on first move
-                const diffX = Math.abs(e.touches[0].clientX - startX);
-                const diffY = Math.abs(e.touches[0].clientY - startY);
-
-                if (diffX > 10 || diffY > 10) {
-                    swipeDirection = diffX > diffY ? 'horizontal' : 'vertical';
-
-                    // If vertical swipe down detected and near top, auto-scroll to top
-                    if (swipeDirection === 'vertical') {
-                        const currentState = popup.getAttribute('data-state');
-                        const deltaY = currentY - startY;
-                        const isSwipingDown = deltaY > 0; // Positive = finger moving down = collapse gesture
-
-                        if (currentState === 'expanded' && isSwipingDown) {
-                            // Auto-scroll to top if near the top (makes collapse easier)
-                            this.mapService.autoScrollToTopIfNear();
-                        }
-                    }
-                }
-            }
-
-            currentY = e.touches[0].clientY;
-            const deltaY = currentY - startY;
-
-            // Only handle vertical swipes with follow-finger animation
-            if (swipeDirection === 'vertical') {
-                const currentState = popup.getAttribute('data-state');
-
-                // More precise drag detection to avoid conflicts with content scrolling
-                let canDrag = false;
-                if (currentState === 'compact') {
-                    // In compact mode, always allow dragging (up to expand, down to hide)
-                    canDrag = true;
-                } else if (currentState === 'expanded') {
-                    // In expanded mode, only allow dragging when:
-                    // 1. Content is at exact top (scrollTop <= 3px, not 50px)
-                    // 2. AND user is swiping DOWN to collapse (deltaY > 0)
-                    const isAtTop = this.mapService.isPopupScrolledToTop(3);
-                    const isSwipingDown = deltaY > 0; // Finger moving down = collapse gesture
-                    canDrag = isAtTop && isSwipingDown;
-                }
-
-                if (canDrag) {
-                    isDragging = true;
-
-                    // IMPORTANT: Prevent iOS Safari pull-to-refresh and default scroll behavior
-                    e.preventDefault();
-
-                    // Calculate new height (inverted: dragging down = taller, dragging up = shorter)
-                    let newHeight = initialHeight - deltaY;
-
-                    // Special handling for compact mode swipe down (to hide)
-                    if (currentState === 'compact' && newHeight < compactHeight) {
-                        // Swiping down from compact - slide the popup down to hide
-                        const slideDistance = compactHeight - newHeight;
-                        popup.style.maxHeight = `${compactHeight}px`;
-                        popup.style.transform = `translateY(${slideDistance}px)`;
-                        popup.style.transition = 'none'; // Disable transition during drag
-
-                        // Fade out as it slides down
-                        const fadeProgress = Math.min(slideDistance / 150, 1); // Fade over 150px
-                        popup.style.opacity = 1 - (fadeProgress * 0.5); // Fade to 50% opacity
-                    } else {
-                        // Normal expand/collapse behavior
-                        // Apply resistance at boundaries (rubber-banding effect)
-                        if (newHeight < compactHeight) {
-                            const overflow = compactHeight - newHeight;
-                            newHeight = compactHeight - (overflow * 0.3); // 30% resistance
-                        } else if (newHeight > expandedHeight) {
-                            const overflow = newHeight - expandedHeight;
-                            newHeight = expandedHeight + (overflow * 0.3); // 30% resistance
-                        }
-
-                        // Clamp to absolute min/max
-                        newHeight = Math.max(compactHeight * 0.7, Math.min(expandedHeight * 1.1, newHeight));
-
-                        // Update height in real-time
-                        popup.style.maxHeight = `${newHeight}px`;
-                        popup.style.transform = ''; // Clear any transform
-                        popup.style.opacity = ''; // Clear any opacity change
-                        popup.style.transition = 'none'; // Disable transition during drag
-
-                        // Update swipe handle opacity for visual feedback
-                        const swipeHandle = popup.querySelector('.mobile-popup-swipe-handle');
-                        if (swipeHandle) {
-                            const progress = (newHeight - compactHeight) / (expandedHeight - compactHeight);
-                            swipeHandle.style.opacity = 0.3 + (progress * 0.4); // 0.3 to 0.7
-                        }
-                    }
-                } else if (swipeDirection === 'horizontal') {
-                    // Prevent default behavior during horizontal swipes (place navigation)
-                    e.preventDefault();
-                }
-            }
-        }, { passive: false }); // CHANGED: passive: false to allow preventDefault()
-
-        popup.addEventListener('touchend', (e) => {
-            const endX = e.changedTouches[0].clientX;
-            const endY = e.changedTouches[0].clientY;
-            const endTime = Date.now();
-
-            const diffX = startX - endX;
-            const diffY = startY - endY;
-            const deltaTime = endTime - startTime;
-            const velocity = Math.abs(diffY) / deltaTime; // pixels per ms
-
-            console.log('Touch end - diffX:', diffX, 'diffY:', diffY, 'velocity:', velocity);
-
-            const absX = Math.abs(diffX);
-            const absY = Math.abs(diffY);
-
-            // Reset swipe handle
-            const swipeHandle = popup.querySelector('.mobile-popup-swipe-handle');
-            if (swipeHandle) {
-                swipeHandle.style.opacity = '';
-            }
-
-            if (swipeDirection === 'horizontal' && absX > 50) {
-                // Horizontal swipe - navigate between places
-                console.log('Horizontal swipe detected:', diffX > 0 ? 'left (next)' : 'right (previous)');
-
-                // Re-enable transitions before navigation
-                popup.style.transition = '';
-
-                if (diffX > 0) {
+        // Initialize SwipeHandler for mobile popup
+        this.popupSwipeHandler = new SwipeHandler({
+            element: popup,
+            states: [
+                { name: 'hidden', height: 0 },
+                { name: 'compact', height: 320 },
+                { name: 'expanded', height: () => window.innerHeight * 0.85 }
+            ],
+            initialState: 'compact',
+            scrollElement: document.getElementById('mobilePopupContent'),
+            enableHorizontalSwipe: true,
+            onHorizontalSwipe: (direction) => {
+                if (direction === 'left') {
                     this.navigateToNextPlace();
                 } else {
                     this.navigateToPreviousPlace();
                 }
-            } else if (swipeDirection === 'vertical' && isDragging) {
-                // Vertical swipe - determine expand/collapse/hide based on position & velocity
-                const currentState = popup.getAttribute('data-state');
-                const currentHeight = parseInt(popup.style.maxHeight) || initialHeight;
+            },
+            onStateChange: (newState, oldState) => {
+                console.log(`Mobile popup state changed: ${oldState} → ${newState}`);
 
-                // Check if we're trying to hide from compact mode
-                const transformMatch = popup.style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
-                const slideDistance = transformMatch ? parseFloat(transformMatch[1]) : 0;
-
-                if (currentState === 'compact' && slideDistance > 0) {
-                    // Swiping down from compact - decide whether to hide or snap back
-                    const shouldHide = velocity > 1.0 || slideDistance > 80; // Fast swipe or dragged far enough
-
-                    if (shouldHide) {
-                        // Hide the popup with slide-down animation
-                        console.log('Hiding mobile popup - slide distance:', slideDistance, 'velocity:', velocity);
-                        popup.style.transition = 'transform 0.3s ease-out, opacity 0.3s ease-out';
-                        popup.style.transform = `translateY(${compactHeight + 50}px)`; // Slide fully down
-                        popup.style.opacity = '0';
-
-                        // Actually hide after animation
-                        setTimeout(() => {
-                            this.mapService.hideMobileDockedPopup();
-                            // Reset styles
-                            popup.style.transform = '';
-                            popup.style.opacity = '';
-                            popup.style.transition = '';
-                        }, 300);
-                    } else {
-                        // Snap back to compact
-                        popup.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease';
-                        popup.style.transform = '';
-                        popup.style.opacity = '';
-                        popup.style.maxHeight = '';
-                        console.log('Snapping back to compact');
-                    }
-                } else {
-                    // Normal expand/collapse behavior
-                    const midPoint = (compactHeight + expandedHeight) / 2;
-
-                    // Decision: expand or collapse?
-                    let shouldExpand;
-                    if (velocity > 1.5) {
-                        // Fast swipe - use direction
-                        shouldExpand = diffY > 0; // Swipe up = expand
-                    } else {
-                        // Slow swipe - use position threshold
-                        shouldExpand = currentHeight > midPoint;
-                    }
-
-                    console.log('Vertical swipe - shouldExpand:', shouldExpand, 'velocity:', velocity, 'height:', currentHeight);
-
-                    // Clear inline styles FIRST, then set state for immediate transition
-                    popup.style.maxHeight = '';
-                    popup.style.transform = '';
-                    popup.style.opacity = '';
-
-                    // Use requestAnimationFrame to ensure state change happens after style clear
-                    requestAnimationFrame(() => {
-                        // Re-enable transitions
-                        popup.style.transition = '';
-
-                        if (shouldExpand && currentState === 'compact') {
-                            popup.setAttribute('data-state', 'expanded');
-                            console.log('Mobile popup expanded');
-                        } else if (!shouldExpand && currentState === 'expanded') {
-                            popup.setAttribute('data-state', 'compact');
-                            // Scroll content back to top
-                            const popupContent = document.getElementById('mobilePopupContent');
-                            if (popupContent) popupContent.scrollTop = 0;
-                            console.log('Mobile popup collapsed');
-                        }
-                    });
-                }
-            } else if (swipeDirection === 'vertical' && absY > 50) {
-                // Simple vertical swipe without dragging (fallback)
-                const currentState = popup.getAttribute('data-state');
-
-                // Clear any inline styles
-                popup.style.transform = '';
-                popup.style.opacity = '';
-                popup.style.maxHeight = '';
-
-                // Re-enable transitions
-                popup.style.transition = '';
-
-                if (diffY > 0 && currentState === 'compact') {
-                    console.log('Swipe up detected - expanding popup');
-                    this.mapService.expandMobilePopup();
-                } else if (diffY < 0 && currentState === 'compact') {
-                    console.log('Swipe down detected - hiding popup');
+                // Handle hide state
+                if (newState === 'hidden') {
                     this.mapService.hideMobileDockedPopup();
-                } else if (diffY < 0 && currentState === 'expanded' && this.mapService.isPopupScrolledToTop()) {
-                    console.log('Swipe down detected - collapsing popup');
-                    this.mapService.collapseMobilePopup();
                 }
-            } else {
-                // No action needed - just clean up and re-enable transitions
-                popup.style.transform = '';
-                popup.style.opacity = '';
-                popup.style.maxHeight = '';
-                popup.style.transition = '';
-            }
+            },
+            dataStateAttribute: 'data-state',
+            scrollThreshold: 3,
+            autoScrollThreshold: 20
+        });
 
-            // Reset state
-            isDragging = false;
-            swipeDirection = null;
-        }, { passive: true });
+        console.log('Mobile popup swipe handler initialized');
+    }
 
-        console.log('Mobile popup swipe listeners attached with animations');
+    setupMobilePanelSwipe() {
+        const panel = document.getElementById('mobilePanel');
+        if (!panel) {
+            console.warn('Mobile panel element not found during setup');
+            return;
+        }
+
+        // Initialize SwipeHandler for mobile panel
+        this.panelSwipeHandler = new SwipeHandler({
+            element: panel,
+            states: [
+                { name: 'hidden', height: 0 },
+                { name: 'active', height: '40vh' }, // replaces 'compact' for panel
+                { name: 'expanded', height: '80vh' }
+            ],
+            initialState: 'active',
+            scrollElement: document.querySelector('.mobile-panel-content'),
+            enableHorizontalSwipe: false, // Panel doesn't need horizontal swipes
+            onStateChange: (newState, oldState) => {
+                console.log(`Mobile panel state changed: ${oldState} → ${newState}`);
+            },
+            useClasses: true, // Panel uses CSS classes (.active, .expanded, .hidden)
+            scrollThreshold: 3,
+            autoScrollThreshold: 20
+        });
+
+        console.log('Mobile panel swipe handler initialized');
     }
 
     navigateToNextPlace() {

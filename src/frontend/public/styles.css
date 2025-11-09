@@ -1091,15 +1091,27 @@ textarea.form-input {
     z-index: 1400;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.3s ease-in-out;
+    /* Spring animation matching popup */
+    /* transition: max-height 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                box-shadow 0.4s ease; */
+    /* Prevent iOS Safari pull-to-refresh */
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    will-change: max-height;
+}
+
+.mobile-content-panel.hidden {
+    max-height: 0;
 }
 
 .mobile-content-panel.active {
-    max-height: 35vh;
+    max-height: 40vh;
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.15);
 }
 
 .mobile-content-panel.expanded {
     max-height: 80vh;
+    box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
 }
 
 .mobile-panel-header {
@@ -1150,9 +1162,12 @@ textarea.form-input {
 
 .mobile-panel-content {
     overflow-y: auto;
-    max-height: calc(35vh - 56px); /* 35vh panel - 56px header (12px*2 padding + 8px margin-top + 24px title height) */
+    max-height: calc(40vh - 56px); /* 40vh panel - 56px header */
     background: #fafafa;
     position: relative;
+    /* Prevent iOS Safari pull-to-refresh when scrolling content */
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
 }
 
 .mobile-content-panel.expanded .mobile-panel-content {
