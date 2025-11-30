@@ -1009,9 +1009,19 @@ export class MapService {
         let actionButtons = '';
         if (isNonRoute) {
             actionButtons = `
-                <button class="btn btn-primary btn-large" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
-                    <i class="fas fa-plus"></i> Add to Route
-                </button>
+                <div class="expanded-action-buttons">
+                    <button class="btn btn-primary btn-large" onclick="event.stopPropagation(); window.app.showAddPlacePositionModal(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-plus"></i> Add to Route
+                    </button>
+                    <div class="expanded-action-group">
+                        <button class="btn btn-secondary" onclick="event.stopPropagation(); window.app.editNonRoutePlace(${place.id})" title="Edit place">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); window.app.deleteNonRoutePlace(${place.id}, '${place.name.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
             `;
         } else if (index !== null) {
             actionButtons = `

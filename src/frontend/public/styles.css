@@ -1716,6 +1716,23 @@ textarea.form-input {
     color: white;
 }
 
+/* Expanded action buttons for non-route places */
+.expanded-action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0 0 0;
+}
+
+.expanded-action-group {
+    display: flex;
+    gap: 8px;
+}
+
+.expanded-action-group .btn {
+    flex: 1;
+}
+
 /* Action buttons - now part of scrollable content */
 .expanded-view .btn-large {
     width: 100%;
