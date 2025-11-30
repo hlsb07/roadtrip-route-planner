@@ -29,6 +29,10 @@ export class SwipeHandler {
             throw new Error('SwipeHandler: element is required');
         }
 
+        // Optional: Separate handle element for touch events
+        // If not provided, touch events are attached to the main element
+        this.handleElement = config.handleElement || this.element;
+
         // State configuration
         this.states = config.states || [
             { name: 'hidden', height: 0 },
@@ -62,7 +66,8 @@ export class SwipeHandler {
 
         // Initialize
         this.setupEventListeners();
-        console.log('SwipeHandler initialized for element:', this.element.id);
+        console.log('SwipeHandler initialized for element:', this.element.id,
+                    this.handleElement !== this.element ? `(handle: ${this.handleElement.className})` : '');
     }
 
     /**
@@ -171,9 +176,9 @@ export class SwipeHandler {
      * Setup touch event listeners
      */
     setupEventListeners() {
-        this.element.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
-        this.element.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
-        this.element.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: true });
+        this.handleElement.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
+        this.handleElement.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+        this.handleElement.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: true });
     }
 
     /**
@@ -199,97 +204,94 @@ export class SwipeHandler {
      * Handle touch move
      */
     handleTouchMove(e) {
-        if (!this.isDragging && !this.swipeDirection) {
-            // Determine swipe direction on first move
-            const diffX = Math.abs(e.touches[0].clientX - this.startX);
-            const diffY = Math.abs(e.touches[0].clientY - this.startY);
+        this.currentY = e.touches[0].clientY;
+        const deltaY = this.currentY - this.startY;
+        const deltaX = e.touches[0].clientX - this.startX;
 
-            if (diffX > 10 || diffY > 10) {
+        const currentStateIndex = this.getCurrentStateIndex();
+
+        // Determine if we can drag vertically
+        let canDragVertically = false;
+        if (currentStateIndex === 0) {
+            // Hidden state - only allow swipe up
+            canDragVertically = deltaY < 0;
+        } else if (currentStateIndex === this.states.length - 1) {
+            // Expanded state - only allow swipe down when at top
+            const isAtTop = this.isScrolledToTop();
+            const isSwipingDown = deltaY > 0;
+            canDragVertically = isAtTop && isSwipingDown;
+        } else {
+            // Middle states - allow both directions
+            canDragVertically = true;
+        }
+
+        // Determine swipe direction if not yet determined
+        if (!this.swipeDirection) {
+            const diffX = Math.abs(deltaX);
+            const diffY = Math.abs(deltaY);
+
+            // Determine direction as soon as there's any movement
+            if (diffX > 2 || diffY > 2) {
                 this.swipeDirection = diffX > diffY ? 'horizontal' : 'vertical';
 
                 // Auto-scroll to top if swiping down in expanded state
-                if (this.swipeDirection === 'vertical') {
-                    const deltaY = this.currentY - this.startY;
-                    const isSwipingDown = deltaY > 0;
-
-                    if (this.getCurrentStateIndex() === this.states.length - 1 && isSwipingDown) {
+                if (this.swipeDirection === 'vertical' && deltaY > 0) {
+                    if (currentStateIndex === this.states.length - 1) {
                         this.autoScrollToTopIfNear();
                     }
                 }
             }
         }
 
-        this.currentY = e.touches[0].clientY;
-        const deltaY = this.currentY - this.startY;
+        // Apply visual feedback immediately for vertical drags (even before direction is locked)
+        if (canDragVertically && (!this.swipeDirection || this.swipeDirection === 'vertical')) {
+            this.isDragging = true;
 
-        // Handle vertical swipes
-        if (this.swipeDirection === 'vertical') {
-            const currentStateIndex = this.getCurrentStateIndex();
+            // Prevent iOS Safari pull-to-refresh
+            e.preventDefault();
 
-            // Determine if we can drag
-            let canDrag = false;
-            if (currentStateIndex === 0) {
-                // Hidden state - only allow swipe up
-                canDrag = deltaY < 0;
-            } else if (currentStateIndex === this.states.length - 1) {
-                // Expanded state - only allow swipe down when at top
-                const isAtTop = this.isScrolledToTop();
-                const isSwipingDown = deltaY > 0;
-                canDrag = isAtTop && isSwipingDown;
+            // Calculate new height (inverted: dragging down = smaller, dragging up = taller)
+            let newHeight = this.initialHeight - deltaY;
+
+            // Get boundary heights
+            const minHeight = this.getHeightValue(this.states[0]);
+            const maxHeight = this.getHeightValue(this.states[this.states.length - 1]);
+            const currentHeight = this.getHeightValue(this.states[currentStateIndex]);
+
+            // Special handling for swiping down from lowest non-hidden state (to hide)
+            if (currentStateIndex === 1 && newHeight < currentHeight) {
+                // Slide down animation to hide
+                const slideDistance = currentHeight - newHeight;
+                this.element.style.maxHeight = `${currentHeight}px`;
+                this.element.style.transform = `translateY(${slideDistance}px)`;
+                this.element.style.transition = 'none';
+
+                const fadeProgress = Math.min(slideDistance / 150, 1);
+                this.element.style.opacity = 1 - (fadeProgress * 0.5);
             } else {
-                // Middle states - allow both directions
-                canDrag = true;
-            }
+                // Normal expand/collapse with rubber-banding
+                if (newHeight < minHeight) {
+                    const overflow = minHeight - newHeight;
+                    newHeight = minHeight - (overflow * 0.3);
+                } else if (newHeight > maxHeight) {
+                    const overflow = newHeight - maxHeight;
+                    newHeight = maxHeight + (overflow * 0.3);
+                }
 
-            if (canDrag) {
-                this.isDragging = true;
+                // Clamp
+                newHeight = Math.max(minHeight * 0.7, Math.min(maxHeight * 1.1, newHeight));
 
-                // Prevent iOS Safari pull-to-refresh
-                e.preventDefault();
+                // Update height
+                this.element.style.maxHeight = `${newHeight}px`;
+                this.element.style.transform = '';
+                this.element.style.opacity = '';
+                this.element.style.transition = 'none';
 
-                // Calculate new height (inverted: dragging down = smaller, dragging up = taller)
-                let newHeight = this.initialHeight - deltaY;
-
-                // Get boundary heights
-                const minHeight = this.getHeightValue(this.states[0]);
-                const maxHeight = this.getHeightValue(this.states[this.states.length - 1]);
-                const currentHeight = this.getHeightValue(this.states[currentStateIndex]);
-
-                // Special handling for swiping down from lowest non-hidden state (to hide)
-                if (currentStateIndex === 1 && newHeight < currentHeight) {
-                    // Slide down animation to hide
-                    const slideDistance = currentHeight - newHeight;
-                    this.element.style.maxHeight = `${currentHeight}px`;
-                    this.element.style.transform = `translateY(${slideDistance}px)`;
-                    this.element.style.transition = 'none';
-
-                    const fadeProgress = Math.min(slideDistance / 150, 1);
-                    this.element.style.opacity = 1 - (fadeProgress * 0.5);
-                } else {
-                    // Normal expand/collapse with rubber-banding
-                    if (newHeight < minHeight) {
-                        const overflow = minHeight - newHeight;
-                        newHeight = minHeight - (overflow * 0.3);
-                    } else if (newHeight > maxHeight) {
-                        const overflow = newHeight - maxHeight;
-                        newHeight = maxHeight + (overflow * 0.3);
-                    }
-
-                    // Clamp
-                    newHeight = Math.max(minHeight * 0.7, Math.min(maxHeight * 1.1, newHeight));
-
-                    // Update height
-                    this.element.style.maxHeight = `${newHeight}px`;
-                    this.element.style.transform = '';
-                    this.element.style.opacity = '';
-                    this.element.style.transition = 'none';
-
-                    // Update swipe handle opacity
-                    const swipeHandle = this.element.querySelector('.mobile-popup-swipe-handle, .mobile-panel-header::before');
-                    if (swipeHandle) {
-                        const progress = (newHeight - currentHeight) / (maxHeight - currentHeight);
-                        swipeHandle.style.opacity = 0.3 + (progress * 0.4);
-                    }
+                // Update swipe handle opacity
+                const swipeHandle = this.element.querySelector('.mobile-popup-swipe-handle, .mobile-panel-header::before');
+                if (swipeHandle) {
+                    const progress = (newHeight - currentHeight) / (maxHeight - currentHeight);
+                    swipeHandle.style.opacity = 0.3 + (progress * 0.4);
                 }
             }
         } else if (this.swipeDirection === 'horizontal' && this.enableHorizontalSwipe) {
@@ -498,9 +500,9 @@ export class SwipeHandler {
      * Destroy handler and remove event listeners
      */
     destroy() {
-        this.element.removeEventListener('touchstart', this.handleTouchStart);
-        this.element.removeEventListener('touchmove', this.handleTouchMove);
-        this.element.removeEventListener('touchend', this.handleTouchEnd);
+        this.handleElement.removeEventListener('touchstart', this.handleTouchStart);
+        this.handleElement.removeEventListener('touchmove', this.handleTouchMove);
+        this.handleElement.removeEventListener('touchend', this.handleTouchEnd);
         console.log('SwipeHandler destroyed for element:', this.element.id);
     }
 }

@@ -720,19 +720,41 @@ class App {
         }
 
         try {
-            // Check if place is used in any routes
-            const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`);
-            if (!response.ok) {
-                throw new Error('Failed to check place usage');
-            }
-
             // Delete the place
             const deleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
                 method: 'DELETE'
             });
 
             if (!deleteResponse.ok) {
-                throw new Error('Failed to delete place');
+                // Parse error response for detailed information
+                const errorData = await deleteResponse.json().catch(() => null);
+
+                if (deleteResponse.status === 400 && errorData?.usedInRoutes) {
+                    // Place is used in routes - ask if user wants to force delete
+                    const routeList = errorData.usedInRoutes.join(', ');
+                    const forceDelete = await showConfirm({
+                        title: 'Place In Use',
+                        message: `"${placeName}" is used in the following route(s): ${routeList}\n\nDo you want to remove it from these routes and delete it?`,
+                        type: 'danger',
+                        confirmText: 'Force Delete',
+                        cancelText: 'Cancel'
+                    });
+
+                    if (!forceDelete) {
+                        return;
+                    }
+
+                    // Force delete the place
+                    const forceDeleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}/force`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!forceDeleteResponse.ok) {
+                        throw new Error('Failed to force delete place');
+                    }
+                } else {
+                    throw new Error(errorData?.message || 'Failed to delete place');
+                }
             }
 
             showSuccess(`Deleted "${placeName}"`);
@@ -796,14 +818,23 @@ class App {
 
     setupMobilePanelSwipe() {
         const panel = document.getElementById('mobilePanel');
+        const panelHeader = document.querySelector('.mobile-panel-header');
+
         if (!panel) {
             console.warn('Mobile panel element not found during setup');
             return;
         }
 
+        if (!panelHeader) {
+            console.warn('Mobile panel header element not found during setup');
+            return;
+        }
+
         // Initialize SwipeHandler for mobile panel
+        // Attach touch events to header, but apply height changes to panel
         this.panelSwipeHandler = new SwipeHandler({
-            element: panel,
+            element: panel,              // The element whose height/state changes
+            handleElement: panelHeader,  // The element that receives touch events
             states: [
                 { name: 'hidden', height: 0 },
                 { name: 'active', height: '40vh' }, // replaces 'compact' for panel
@@ -820,7 +851,7 @@ class App {
             autoScrollThreshold: 20
         });
 
-        console.log('Mobile panel swipe handler initialized');
+        console.log('Mobile panel swipe handler initialized (header handle, panel target)');
     }
 
     navigateToNextPlace() {
