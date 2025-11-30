@@ -157,7 +157,24 @@
         </div>
 
         <div id="map"></div>
-        
+
+        <!-- Place Details Sidebar (Desktop only) -->
+        <div class="place-details-sidebar" id="placeDetailsSidebar">
+            <div class="place-details-header">
+                <h3 id="placeDetailsTitle">Place Details</h3>
+                <button class="close-btn" onclick="closePlaceDetails()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="place-details-content" id="placeDetailsContent">
+                <!-- Content will be populated by JavaScript -->
+                <div class="place-details-empty">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <p>Click on a place marker to see details</p>
+                </div>
+            </div>
+        </div>
+
         <div class="map-controls">
             <button class="map-btn" id="filterMapBtn" onclick="toggleFilterPanel()" title="Filters">
                 <i class="fas fa-filter"></i>

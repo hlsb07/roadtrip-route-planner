@@ -721,6 +721,12 @@ class App {
         this.updateUI();
         this.mapService.selectPlace(index);
 
+        // Show place details in sidebar (desktop only)
+        const place = this.placeManager.getPlaces()[index];
+        if (place && window.innerWidth > 768) {
+            this.mapService.showPlaceDetailsInSidebar(place, index, false);
+        }
+
         // Collapse mobile panel if it's expanded
         if (window.innerWidth <= 768) {
             const panel = document.getElementById('mobilePanel');

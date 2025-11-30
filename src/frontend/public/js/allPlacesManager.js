@@ -165,11 +165,21 @@ export class AllPlacesManager {
             if (window.app?.mapService) {
                 window.app.mapService.deselectAllPlace();
             }
+            // Close sidebar (desktop only)
+            if (window.innerWidth > 768 && window.closePlaceDetails) {
+                window.closePlaceDetails();
+            }
         } else {
             this.selectedIndex = index; // Select the card
             // Select map marker if app is available
             if (window.app?.mapService) {
                 window.app.mapService.selectAllPlace(index);
+            }
+
+            // Show place details in sidebar (desktop only)
+            const place = this.filteredPlaces[index];
+            if (place && window.innerWidth > 768 && window.app?.mapService) {
+                window.app.mapService.showPlaceDetailsInSidebar(place, null, true);
             }
         }
         this.updateAllPlacesList(); // Re-render to show selection
@@ -189,6 +199,10 @@ export class AllPlacesManager {
         // Deselect map marker if app is available
         if (window.app?.mapService) {
             window.app.mapService.deselectAllPlace();
+        }
+        // Close sidebar (desktop only)
+        if (window.innerWidth > 768 && window.closePlaceDetails) {
+            window.closePlaceDetails();
         }
         this.updateAllPlacesList();
     }

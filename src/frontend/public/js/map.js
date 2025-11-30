@@ -476,44 +476,36 @@ export class MapService {
             return; // Skip Leaflet popup setup on mobile
         }
 
-        // Desktop: Use Leaflet popup
-        const initialContent = this.buildPlacePopupContent(place, index, isNonRoute);
+        // Desktop: Use minimal Leaflet popup
+        const minimalContent = this.buildMinimalPopup(place, index, isNonRoute);
 
         const popup = L.popup({
-            maxWidth: 350,
-            className: 'place-popup-container'
-        }).setContent(initialContent);
+            maxWidth: 300,
+            className: 'place-popup-minimal-container'
+        }).setContent(minimalContent);
 
         marker.bindPopup(popup);
 
-        // If place has Google data, lazy load it when popup opens
+        // Open details sidebar when marker is clicked
+        marker.on('click', () => {
+            this.showPlaceDetailsInSidebar(place, index, isNonRoute);
+        });
+
+        // If place has Google data, lazy load it for sidebar
         if (place.hasGoogleData && place.id) {
-            let isLoading = false;
             let googleDataCache = null;
 
-            marker.on('popupopen', async () => {
-                // If already loaded, use cached data
+            marker.on('click', async () => {
+                // If already loaded, use cached data for sidebar
                 if (googleDataCache) {
                     const enrichedPlaceWithCoords = {
                         ...place,
                         googleData: googleDataCache
                     };
-                    const enrichedContent = this.buildPlacePopupContent(enrichedPlaceWithCoords, index, isNonRoute);
-                    popup.setContent(enrichedContent);
+                    // Update sidebar with cached data
+                    this.showPlaceDetailsInSidebar(enrichedPlaceWithCoords, index, isNonRoute);
                     return;
                 }
-
-                // If already loading, don't trigger again
-                if (isLoading) return;
-
-                isLoading = true;
-
-                // Add loading indicator
-                const loadingContent = initialContent.replace(
-                    '</div>',
-                    '<div class="google-data-loading"><i class="fas fa-spinner fa-spin"></i> Loading Google Places info...</div></div>'
-                );
-                popup.setContent(loadingContent);
 
                 try {
                     // Fetch enriched place data with Google info
@@ -529,20 +521,12 @@ export class MapService {
                             googleData: googleDataCache
                         };
 
-                        // Update popup content with Google data
-                        const enrichedContent = this.buildPlacePopupContent(enrichedPlaceWithCoords, index, isNonRoute);
-                        popup.setContent(enrichedContent);
+                        // Update sidebar content with Google data
+                        this.showPlaceDetailsInSidebar(enrichedPlaceWithCoords, index, isNonRoute);
                     }
                 } catch (error) {
                     console.error('Failed to load Google data for place:', error);
-                    // Show error message
-                    const errorContent = initialContent.replace(
-                        '</div>',
-                        '<div class="google-data-error"><i class="fas fa-exclamation-triangle"></i> Failed to load Google Places info</div></div>'
-                    );
-                    popup.setContent(errorContent);
-                } finally {
-                    isLoading = false;
+                    // Sidebar will show basic info even if Google data fails to load
                 }
             });
         }
@@ -1619,7 +1603,66 @@ export class MapService {
             }
         }, { passive: true });
     }
+
+    /**
+     * Show place details in sidebar (desktop only)
+     */
+    showPlaceDetailsInSidebar(place, index, isNonRoute) {
+        // Only for desktop
+        if (this.isMobileView()) return;
+
+        const sidebar = document.getElementById('placeDetailsSidebar');
+        const content = document.getElementById('placeDetailsContent');
+        if (!sidebar || !content) return;
+
+        // Build detailed content (reuse existing function logic)
+        const detailsHTML = this.buildPlaceDetailsForSidebar(place, index, isNonRoute);
+        content.innerHTML = detailsHTML;
+
+        // Show sidebar
+        sidebar.classList.add('active');
+    }
+
+    /**
+     * Build minimal popup content (just name) for desktop Leaflet popups
+     */
+    buildMinimalPopup(place, index, isNonRoute) {
+        const googleBadge = place.googleData || place.googlePlaceId
+            ? '<i class="fab fa-google" style="color: #4285f4; margin-left: 4px;"></i>'
+            : '';
+
+        return `
+            <div class="map-popup-minimal">
+                ${index !== null ? `<span class="place-number-badge">${index + 1}</span>` : ''}
+                <span class="place-name-text">${place.name}</span>
+                ${googleBadge}
+                ${isNonRoute ? '<span class="non-route-mini">⭘</span>' : ''}
+            </div>
+        `;
+    }
+
+    /**
+     * Build detailed place content for sidebar
+     */
+    buildPlaceDetailsForSidebar(place, index = null, isNonRoute = false) {
+        // This is essentially the same as the old buildPlacePopupContent
+        // but returns the content for the sidebar instead
+        const lat = place.coords ? place.coords[0] : place.latitude;
+        const lng = place.coords ? place.coords[1] : place.longitude;
+
+        // Reuse all the existing building blocks from buildPlacePopupContent
+        // For now, let's just call the existing function and use its output
+        return this.buildPlacePopupContent(place, index, isNonRoute, false);
+    }
 }
+
+// Global function to close place details sidebar
+window.closePlaceDetails = function() {
+    const sidebar = document.getElementById('placeDetailsSidebar');
+    if (sidebar) {
+        sidebar.classList.remove('active');
+    }
+};
 
 // Carousel navigation functions
 window.navigateCarousel = function(carouselId, direction) {
