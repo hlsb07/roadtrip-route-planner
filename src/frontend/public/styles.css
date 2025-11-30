@@ -141,6 +141,27 @@ body {
     border-bottom: none;
 }
 
+/* Campsite Input Section */
+.campsite-input-section {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.campsite-input-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.campsite-input-label i {
+    color: #28a745;
+}
+
 /* Place Photo Thumbnail */
 .place-photo {
     flex-shrink: 0;
@@ -563,6 +584,42 @@ body {
     font-size: 0.75rem;
     color: #707070;
     margin-bottom: 10px;
+}
+
+/* Notes section in popup */
+.map-popup-notes {
+    margin: 12px 0;
+    padding: 10px;
+    background: #f8f9fa;
+    border-left: 3px solid #6366f1;
+    border-radius: 4px;
+}
+
+.map-popup-notes .notes-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    color: #495057;
+}
+
+.map-popup-notes .notes-header i {
+    color: #6366f1;
+}
+
+.map-popup-notes .notes-content {
+    color: #212529;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Notes in expanded mobile view */
+.notes-text {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.6;
 }
 
 .map-popup-links {

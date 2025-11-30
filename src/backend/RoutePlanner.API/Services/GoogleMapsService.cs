@@ -290,15 +290,21 @@ namespace RoutePlanner.API.Services
 
             if (!data.TryGetProperty("result", out var result)) return null;
 
-            var geometry = result.GetProperty("geometry").GetProperty("location");
+            // Safely extract geometry
+            if (!result.TryGetProperty("geometry", out var geometryProp) ||
+                !geometryProp.TryGetProperty("location", out var location))
+            {
+                _logger.LogWarning($"Place {placeId} is missing geometry or location data");
+                return null;
+            }
 
             var placeResult = new PlaceSearchResult
             {
-                PlaceId = result.GetProperty("place_id").GetString() ?? "",
-                Name = result.GetProperty("name").GetString() ?? "",
-                FormattedAddress = result.GetProperty("formatted_address").GetString() ?? "",
-                Latitude = geometry.GetProperty("lat").GetDouble(),
-                Longitude = geometry.GetProperty("lng").GetDouble(),
+                PlaceId = result.TryGetProperty("place_id", out var placeIdProp) ? placeIdProp.GetString() ?? "" : "",
+                Name = result.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "",
+                FormattedAddress = result.TryGetProperty("formatted_address", out var addressProp) ? addressProp.GetString() ?? "" : "",
+                Latitude = location.TryGetProperty("lat", out var latProp) ? latProp.GetDouble() : 0,
+                Longitude = location.TryGetProperty("lng", out var lngProp) ? lngProp.GetDouble() : 0,
                 Types = result.TryGetProperty("types", out var types)
                     ? types.EnumerateArray().Select(t => t.GetString() ?? "").ToList()
                     : new List<string>(),

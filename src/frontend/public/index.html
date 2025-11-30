@@ -96,8 +96,27 @@
                 <div id="loading" class="loading">
                     <i class="fas fa-spinner fa-spin"></i> Searching...
                 </div>
+
+                <!-- Campsite URL Input -->
+                <div class="campsite-input-section">
+                    <div class="campsite-input-label">
+                        <i class="fas fa-campground"></i> Add Campsite from Park4Night
+                    </div>
+                    <div class="search-input-group">
+                        <input type="text"
+                               id="campsiteUrlInput"
+                               class="search-input"
+                               placeholder="Paste Park4Night URL...">
+                        <button class="search-btn" onclick="handleAddCampsite()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div id="campsiteLoading" class="loading">
+                        <i class="fas fa-spinner fa-spin"></i> Loading campsite...
+                    </div>
+                </div>
             </div>
-            
+
             <div class="controls">
                 <button class="btn btn-primary" onclick="window.app?.showKeyboardShortcutsModal()" title="Keyboard Shortcuts (?)">
                     <i class="fas fa-keyboard"></i> Shortcuts
@@ -253,6 +272,25 @@
                     <div id="mobileSearchResults" class="search-results"></div>
                     <div id="mobileLoading" class="loading">
                         <i class="fas fa-spinner fa-spin"></i> Searching...
+                    </div>
+
+                    <!-- Campsite URL Input -->
+                    <div class="campsite-input-section">
+                        <div class="campsite-input-label">
+                            <i class="fas fa-campground"></i> Add Campsite from Park4Night
+                        </div>
+                        <div class="search-input-group">
+                            <input type="text"
+                                   id="mobileCampsiteUrlInput"
+                                   class="search-input"
+                                   placeholder="Paste Park4Night URL...">
+                            <button class="search-btn" onclick="handleAddCampsite()">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div id="mobileCampsiteLoading" class="loading">
+                            <i class="fas fa-spinner fa-spin"></i> Loading campsite...
+                        </div>
                     </div>
                 </div>
 

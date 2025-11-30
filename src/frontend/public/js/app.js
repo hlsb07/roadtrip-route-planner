@@ -106,6 +106,26 @@ class App {
             });
         }
 
+        // Campsite URL input (desktop)
+        const campsiteUrlInput = document.getElementById('campsiteUrlInput');
+        if (campsiteUrlInput) {
+            campsiteUrlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleAddCampsite();
+                }
+            });
+        }
+
+        // Campsite URL input (mobile)
+        const mobileCampsiteUrlInput = document.getElementById('mobileCampsiteUrlInput');
+        if (mobileCampsiteUrlInput) {
+            mobileCampsiteUrlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleAddCampsite();
+                }
+            });
+        }
+
         // Import file
         const importFile = document.getElementById('importFile');
         if (importFile) {
@@ -450,6 +470,88 @@ class App {
                 await this.addPlace(result);
                 this.mapService.clearClickMarker();
             }
+        }
+    }
+
+    async handleAddCampsite() {
+        // Get input from either desktop or mobile
+        const desktopInput = document.getElementById('campsiteUrlInput');
+        const mobileInput = document.getElementById('mobileCampsiteUrlInput');
+        const input = desktopInput?.offsetParent ? desktopInput : mobileInput;
+
+        const url = input?.value.trim();
+        if (!url) {
+            showError('Please enter a Park4Night URL');
+            return;
+        }
+
+        // Get loading element
+        const desktopLoading = document.getElementById('campsiteLoading');
+        const mobileLoading = document.getElementById('mobileCampsiteLoading');
+        const loading = desktopLoading?.offsetParent ? desktopLoading : mobileLoading;
+
+        try {
+            if (loading) loading.classList.add('active');
+
+            const response = await fetch(`${CONFIG.API_BASE}/campsites?url=${encodeURIComponent(url)}`);
+            const data = await response.json();
+
+            if (loading) loading.classList.remove('active');
+
+            if (response.ok && data.success) {
+                showSuccess(data.message || 'Campsite added successfully!');
+                input.value = '';
+
+                // Refresh the map to show the new campsite
+                await this.campsiteManager.loadCampsites();
+                this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
+            } else if (response.status === 409) {
+                // Campsite already exists
+                showError(data.message || 'This campsite already exists');
+            } else {
+                showError(data.message || 'Failed to add campsite');
+            }
+        } catch (error) {
+            if (loading) loading.classList.remove('active');
+            console.error('Error adding campsite:', error);
+            showError('Failed to add campsite. Please check the URL and try again.');
+        }
+    }
+
+    async deleteCampsite(campsiteId, campsiteName) {
+        const confirmed = await showConfirm({
+            title: 'Delete Campsite',
+            message: `Delete "${campsiteName}" permanently? This cannot be undone.`,
+            type: 'danger',
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete campsite');
+            }
+
+            showSuccess(`Deleted "${campsiteName}"`);
+
+            // Refresh the map to remove the campsite marker
+            await this.campsiteManager.loadCampsites();
+            this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
+
+            // Close any open popups
+            this.mapService.hideMobileDockedPopup();
+
+        } catch (error) {
+            console.error('Failed to delete campsite:', error);
+            showError(error.message || 'Failed to delete campsite');
         }
     }
 
@@ -1134,6 +1236,7 @@ window.addEventListener('load', async () => {
 
 // Export for global access (for inline event handlers)
 window.handleSearch = () => window.app?.handleSearch();
+window.handleAddCampsite = () => window.app?.handleAddCampsite();
 window.switchTab = (tab) => window.app?.switchTab(tab);
 window.showCreateRouteModal = () => window.app?.showCreateRouteModal();
 window.showRenameRouteModal = () => window.app?.showRenameRouteModal();

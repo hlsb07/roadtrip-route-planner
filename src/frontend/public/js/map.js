@@ -371,6 +371,13 @@ export class MapService {
                             </a>
                         ` : ''}
                     </div>
+                    <div class="map-popup-actions">
+                        <button class="popup-action-btn delete-btn"
+                                onclick="event.stopPropagation(); window.app.deleteCampsite(${campsite.id}, '${(campsite.name || 'Unnamed Campsite').replace(/'/g, "\\'")}')"
+                                title="Delete campsite">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
                 </div>
             `;
 
@@ -761,6 +768,15 @@ export class MapService {
                 ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
                 ${contactSection}
                 ${openingHoursSection}
+                ${place.notes ? `
+                    <div class="map-popup-notes">
+                        <div class="notes-header">
+                            <i class="fas fa-sticky-note"></i>
+                            <strong>Notes</strong>
+                        </div>
+                        <div class="notes-content">${place.notes.replace(/\n/g, '<br>')}</div>
+                    </div>
+                ` : ''}
                 <div class="map-popup-coords">
                     <i class="fas fa-map-pin"></i> ${lat.toFixed(6)}, ${lng.toFixed(6)}
                 </div>
@@ -1031,6 +1047,14 @@ export class MapService {
             `;
         }
 
+        // Notes section
+        const notesSection = place.notes
+            ? `<div class="expanded-info-section">
+                   <div class="info-section-title"><i class="fas fa-sticky-note"></i> Notes</div>
+                   <div class="info-section-content notes-text">${place.notes.replace(/\n/g, '<br>')}</div>
+               </div>`
+            : '';
+
         // Assemble expanded view (carousel is now in unified structure, don't include it here)
         // All content scrolls together - no separate scroll wrapper
         return `
@@ -1041,6 +1065,7 @@ export class MapService {
                 ${contactSection.join('')}
                 ${hoursSection}
                 ${metadataSection.join('')}
+                ${notesSection}
                 ${coordsSection}
                 ${externalLinks}
                 ${actionButtons}

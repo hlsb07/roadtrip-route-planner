@@ -99,7 +99,10 @@ export class ApiService {
             method: 'DELETE'
         });
         if (!response.ok) {
-            throw new Error('Failed to remove place from route');
+            const errorText = await response.text().catch(() => '');
+            const error = new Error(errorText || 'Failed to remove place from route');
+            error.status = response.status;
+            throw error;
         }
     }
 
@@ -359,6 +362,7 @@ export class ApiService {
      * @returns {Promise<Object>} Created place
      */
     static async createPlaceFromGoogle(googlePlaceId, notes = null) {
+        console.log('Creating place from Google:', { googlePlaceId, notes });
         const response = await fetch(`${CONFIG.API_BASE}/places/from-google`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -366,7 +370,11 @@ export class ApiService {
         });
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || 'Failed to create place from Google');
+            console.error('Error creating place from Google:', errorData);
+            const errorMsg = errorData.error
+                ? `${errorData.message}: ${errorData.error}`
+                : (errorData.message || 'Failed to create place from Google');
+            throw new Error(errorMsg);
         }
         return await response.json();
     }

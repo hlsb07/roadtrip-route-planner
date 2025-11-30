@@ -43,6 +43,12 @@ namespace RoutePlanner.API.Controllers
             var route = await _context.Routes
                 .Include(r => r.Places)
                     .ThenInclude(rp => rp.Place)
+                        .ThenInclude(p => p.PlaceCategories)
+                            .ThenInclude(pc => pc.Category)
+                .Include(r => r.Places)
+                    .ThenInclude(rp => rp.Place)
+                        .ThenInclude(p => p.PlaceCountries)
+                            .ThenInclude(pc => pc.Country)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
             if (route == null)
@@ -58,11 +64,30 @@ namespace RoutePlanner.API.Controllers
                 PlaceCount = route.Places.Count,
                 Places = route.Places
                     .OrderBy(rp => rp.OrderIndex)
-                    .Select(rp => new MinimalPlaceDto
+                    .Select(rp => new RoutePlaceDto
                     {
                         Id = rp.Place.Id,
                         Name = rp.Place.Name,
-                        OrderIndex = rp.OrderIndex
+                        Latitude = rp.Place.Location.Y,
+                        Longitude = rp.Place.Location.X,
+                        Notes = rp.Place.Notes,
+                        OrderIndex = rp.OrderIndex,
+                        GooglePlaceId = rp.Place.GooglePlaceId,
+                        Categories = rp.Place.PlaceCategories.Select(pc => new CategoryDto
+                        {
+                            Id = pc.Category.Id,
+                            Name = pc.Category.Name,
+                            Icon = pc.Category.Icon,
+                            Description = pc.Category.Description
+                        }).ToList(),
+                        Countries = rp.Place.PlaceCountries.Select(pc => new CountryDto
+                        {
+                            Id = pc.Country.Id,
+                            Name = pc.Country.Name,
+                            Code = pc.Country.Code,
+                            Icon = pc.Country.Icon,
+                            Description = pc.Country.Description
+                        }).ToList()
                     })
                     .ToList()
             };
@@ -92,7 +117,7 @@ namespace RoutePlanner.API.Controllers
                 Description = route.Description,
                 CreatedAt = route.CreatedAt,
                 UpdatedAt = route.UpdatedAt,
-                Places = new List<MinimalPlaceDto>(),
+                Places = new List<RoutePlaceDto>(),
                 PlaceCount = 0
             };
 

@@ -80,33 +80,38 @@ export class RouteManager {
                             name: fullPlace.name,
                             coords: [fullPlace.latitude, fullPlace.longitude],
                             id: fullPlace.id,
+                            notes: fullPlace.notes || minimalPlace.notes || null,
                             categories: fullPlace.categories || [],
                             countries: fullPlace.countries || [],
                             googlePlaceId: fullPlace.googlePlaceId || null,
                             hasGoogleData: fullPlace.hasGoogleData || false
                         };
                     } else {
-                        // Fallback if place not found (shouldn't happen)
+                        // Fallback if place not found (shouldn't happen) - use data from minimalPlace
                         console.warn(`Place ${minimalPlace.id} not found in filterManager.allPlaces`);
                         return {
                             name: minimalPlace.name,
-                            coords: [0, 0],  // Fallback coordinates
+                            coords: [minimalPlace.latitude || 0, minimalPlace.longitude || 0],
                             id: minimalPlace.id,
-                            categories: [],
-                            countries: []
+                            notes: minimalPlace.notes || null,
+                            categories: minimalPlace.categories || [],
+                            countries: minimalPlace.countries || []
                         };
                     }
                 });
             }
 
-            // Fallback if filterManager not available
-            console.warn('FilterManager not available, returning minimal place data');
+            // Fallback if filterManager not available - use RoutePlaceDto data directly
+            console.warn('FilterManager not available, using RoutePlaceDto data');
             return route.places.map(p => ({
                 name: p.name,
-                coords: [0, 0],  // No coordinates available in minimal DTO
+                coords: [p.latitude || 0, p.longitude || 0],
                 id: p.id,
-                categories: [],
-                countries: []
+                notes: p.notes || null,
+                categories: p.categories || [],
+                countries: p.countries || [],
+                googlePlaceId: p.googlePlaceId || null,
+                hasGoogleData: p.hasGoogleData || false
             }));
 
         } catch (error) {

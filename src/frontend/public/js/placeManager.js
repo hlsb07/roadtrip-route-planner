@@ -249,7 +249,22 @@ export class PlaceManager {
 
         } catch (error) {
             console.error('Failed to remove place:', error);
-            showError('Failed to remove place');
+
+            // Handle 404 - place not found in route
+            if (error.status === 404) {
+                showError(`This place is not in the current route. Refreshing...`);
+
+                // Reload the route to sync the UI
+                this.places = await this.routeManager.loadCurrentRoute();
+                await this.routeManager.loadRoutes();
+
+                // Update the UI
+                this.updatePlacesList();
+
+                return false;
+            }
+
+            showError(error.message || 'Failed to remove place');
             return false;
         }
     }

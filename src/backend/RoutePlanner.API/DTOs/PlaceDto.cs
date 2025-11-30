@@ -32,6 +32,25 @@ namespace RoutePlanner.API.DTOs
         public int OrderIndex { get; set; }
     }
 
+    /// <summary>
+    /// Place DTO for route display - includes essential fields but not full Google data
+    /// </summary>
+    public class RoutePlaceDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public string? Notes { get; set; }
+        public int OrderIndex { get; set; }
+        public string? GooglePlaceId { get; set; }
+        public bool HasGoogleData => !string.IsNullOrEmpty(GooglePlaceId);
+
+        // User's custom organization
+        public List<CategoryDto> Categories { get; set; } = new();
+        public List<CountryDto> Countries { get; set; } = new();
+    }
+
     public class CreatePlaceDto
     {
         public string Name { get; set; } = string.Empty;
@@ -60,7 +79,7 @@ namespace RoutePlanner.API.DTOs
         public string? Description { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
-        public List<MinimalPlaceDto> Places { get; set; } = new();
+        public List<RoutePlaceDto> Places { get; set; } = new();
         public int PlaceCount { get; set; }
         public double EstimatedDistance { get; set; } // km
     }
