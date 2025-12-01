@@ -62,6 +62,11 @@ class App {
                 this.allPlacesManager.selectCard(index);
             });
 
+            // Setup route calculation callback to update route info panel
+            this.mapService.setRouteCalculatedCallback((routeInfo) => {
+                this.updateRouteInfoPanel(routeInfo);
+            });
+
             // Initialize filters FIRST (fetches all places with full data)
             await this.filterManager.init();
 
@@ -712,6 +717,41 @@ class App {
         // Re-center map to show all visible places
         if (routePlaces.length > 0 || filtered.nonRoutePlaces.length > 0) {
             this.mapService.centerMap(routePlaces);
+        }
+    }
+
+    /**
+     * Update the route info panel with calculated route data
+     * @param {Object} routeInfo - Object containing distance, duration, and formatted values
+     */
+    updateRouteInfoPanel(routeInfo) {
+        const panel = document.getElementById('routeInfoPanel');
+        const distanceSpan = document.getElementById('routeDistance');
+        const durationSpan = document.getElementById('routeDuration');
+
+        if (!panel || !distanceSpan || !durationSpan) return;
+
+        // Update distance
+        distanceSpan.textContent = `${routeInfo.distanceKm} km`;
+
+        // Update duration
+        if (routeInfo.durationHours > 0) {
+            durationSpan.textContent = `${routeInfo.durationHours}h ${routeInfo.durationMinutes}min`;
+        } else {
+            durationSpan.textContent = `${routeInfo.durationMinutes}min`;
+        }
+
+        // Show the panel
+        panel.style.display = 'block';
+    }
+
+    /**
+     * Hide the route info panel
+     */
+    hideRouteInfoPanel() {
+        const panel = document.getElementById('routeInfoPanel');
+        if (panel) {
+            panel.style.display = 'none';
         }
     }
 

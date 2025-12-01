@@ -7,7 +7,7 @@ export class MapService {
         this.markers = [];
         this.nonRouteMarkers = []; // Gray markers for places not in route
         this.campsiteMarkers = [];
-        this.routePolyline = null;
+        this.routingControl = null; // Leaflet Routing Machine control
         this.showRoute = true;
         this.clickMarker = null;
         this.selectedMarkerIndex = null;
@@ -23,6 +23,9 @@ export class MapService {
         this.currentPopupPhotos = null; // Store photos for fullscreen gallery
         this.galleryPhotos = null; // Current photos in fullscreen gallery
         this.currentGalleryIndex = 0; // Current image index in gallery
+        this.routeDistance = 0; // Total route distance in meters
+        this.routeDuration = 0; // Total route duration in seconds
+        this.onRouteCalculated = null; // Callback when route is calculated
     }
 
     init() {
@@ -114,9 +117,10 @@ export class MapService {
         this.markers.forEach(marker => this.map.removeLayer(marker));
         this.markers = [];
 
-        // Clear existing route
-        if (this.routePolyline) {
-            this.map.removeLayer(this.routePolyline);
+        // Clear existing routing control
+        if (this.routingControl) {
+            this.map.removeControl(this.routingControl);
+            this.routingControl = null;
         }
 
         if (places.length === 0) return;
@@ -152,16 +156,95 @@ export class MapService {
             this.markers.push(marker);
         });
 
-        // Add route line if enabled
+        // Add routing if enabled and we have at least 2 places
         if (this.showRoute && places.length > 1) {
-            const coords = places.map(place => place.coords);
-            this.routePolyline = L.polyline(coords, {
-                color: '#667eea',
-                weight: 4,
-                opacity: 0.7,
-                smoothFactor: 1
-            }).addTo(this.map);
+            this.calculateRoute(places);
+        } else {
+            // Hide route info panel if routing is disabled
+            const panel = document.getElementById('routeInfoPanel');
+            if (panel) panel.style.display = 'none';
         }
+    }
+
+    /**
+     * Calculate real route between places using OSRM
+     * @param {Array} places - Array of place objects with coords
+     */
+    calculateRoute(places) {
+        if (!places || places.length < 2) {
+            // Hide route info panel if there's no route
+            const panel = document.getElementById('routeInfoPanel');
+            if (panel) panel.style.display = 'none';
+            return;
+        }
+
+        // Convert places to waypoints
+        const waypoints = places.map(place => L.latLng(place.coords[0], place.coords[1]));
+
+        // Create routing control with OSRM
+        this.routingControl = L.Routing.control({
+            waypoints: waypoints,
+            router: L.Routing.osrmv1({
+                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                profile: 'driving' // car routing
+            }),
+            routeWhileDragging: false,
+            showAlternatives: false,
+            addWaypoints: false,
+            draggableWaypoints: false,
+            fitSelectedRoutes: false,
+            show: false, // Hide the instruction panel
+            lineOptions: {
+                styles: [{
+                    color: '#667eea',
+                    weight: 5,
+                    opacity: 0.7
+                }]
+            },
+            createMarker: function() { return null; }, // Don't create route markers (we have our own)
+        }).addTo(this.map);
+
+        // Listen for route calculation
+        this.routingControl.on('routesfound', (e) => {
+            const routes = e.routes;
+            if (routes && routes.length > 0) {
+                const route = routes[0];
+
+                // Store distance (in meters) and duration (in seconds)
+                this.routeDistance = route.summary.totalDistance;
+                this.routeDuration = route.summary.totalTime;
+
+                // Call callback if set
+                if (this.onRouteCalculated) {
+                    this.onRouteCalculated({
+                        distance: this.routeDistance,
+                        duration: this.routeDuration,
+                        distanceKm: (this.routeDistance / 1000).toFixed(1),
+                        durationHours: Math.floor(this.routeDuration / 3600),
+                        durationMinutes: Math.floor((this.routeDuration % 3600) / 60)
+                    });
+                }
+
+                console.log('Route calculated:', {
+                    distance: `${(this.routeDistance / 1000).toFixed(1)} km`,
+                    duration: `${Math.floor(this.routeDuration / 3600)}h ${Math.floor((this.routeDuration % 3600) / 60)}min`
+                });
+            }
+        });
+
+        // Handle routing errors
+        this.routingControl.on('routingerror', (e) => {
+            console.error('Routing error:', e);
+            alert('Could not calculate route. Please check your internet connection or try again later.');
+        });
+    }
+
+    /**
+     * Set callback for when route is calculated
+     * @param {Function} callback - Function to call with route info
+     */
+    setRouteCalculatedCallback(callback) {
+        this.onRouteCalculated = callback;
     }
 
     centerMap(places) {
@@ -1153,12 +1236,13 @@ export class MapService {
         this.nonRouteMarkers.forEach(marker => this.map.removeLayer(marker));
         this.nonRouteMarkers = [];
 
-        // Clear existing route polyline
-        if (this.routePolyline) {
-            this.map.removeLayer(this.routePolyline);
+        // Clear existing routing control
+        if (this.routingControl) {
+            this.map.removeControl(this.routingControl);
+            this.routingControl = null;
         }
 
-        // Add blue markers for route places (with numbers and polyline)
+        // Add blue markers for route places (with numbers and routing)
         if (routePlaces && routePlaces.length > 0) {
             routePlaces.forEach((place, index) => {
                 const isSelected = this.selectedMarkerIndex === index;
@@ -1190,15 +1274,13 @@ export class MapService {
                 this.markers.push(marker);
             });
 
-            // Add route polyline if enabled
+            // Add routing if enabled and we have at least 2 places
             if (this.showRoute && routePlaces.length > 1) {
-                const coords = routePlaces.map(place => place.coords);
-                this.routePolyline = L.polyline(coords, {
-                    color: '#667eea',
-                    weight: 4,
-                    opacity: 0.7,
-                    smoothFactor: 1
-                }).addTo(this.map);
+                this.calculateRoute(routePlaces);
+            } else {
+                // Hide route info panel if routing is disabled
+                const panel = document.getElementById('routeInfoPanel');
+                if (panel) panel.style.display = 'none';
             }
         }
 

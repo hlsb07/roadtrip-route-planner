@@ -5747,3 +5747,97 @@ textarea.form-input {
     margin: 0;
     min-width: 150px;
 }
+
+/* ============================================
+   ROUTING & ROUTE INFO PANEL
+   ============================================ */
+
+/* Hide Leaflet Routing Machine instruction panel */
+.leaflet-routing-container {
+    display: none !important;
+}
+
+/* Route Info Panel - Floating panel showing distance and duration */
+.route-info-panel {
+    position: absolute;
+    bottom: 30px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.98);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    padding: 15px;
+    z-index: 1000;
+    min-width: 200px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(42, 157, 143, 0.2);
+}
+
+.route-info-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #2A9D8F;
+    font-size: 0.95rem;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(42, 157, 143, 0.2);
+}
+
+.route-info-header i {
+    font-size: 1rem;
+}
+
+.route-info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.route-info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9rem;
+    color: #333;
+}
+
+.route-info-item i {
+    width: 20px;
+    text-align: center;
+    color: #2A9D8F;
+    font-size: 0.95rem;
+}
+
+.route-info-item span {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* Mobile adjustments for route info panel */
+@media (max-width: 768px) {
+    .route-info-panel {
+        top: 10px;
+        right: 10px;
+        left: auto;
+        min-width: 160px;
+        padding: 12px;
+        font-size: 0.85rem;
+    }
+
+    .route-info-header {
+        font-size: 0.85rem;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+    }
+
+    .route-info-item {
+        font-size: 0.8rem;
+        gap: 8px;
+    }
+
+    .route-info-item i {
+        width: 18px;
+        font-size: 0.85rem;
+    }
+}
