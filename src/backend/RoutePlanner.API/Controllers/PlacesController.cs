@@ -15,13 +15,15 @@ namespace RoutePlanner.API.Controllers
         private readonly AppDbContext _context;
         private readonly IPlaceService _placeService;
         private readonly GeometryFactory _geometryFactory;
+        private readonly ILogger<PlacesController> _logger;
         private const int CurrentUserId = 1; // Hardcoded until authentication is implemented
 
-        public PlacesController(AppDbContext context, IPlaceService placeService)
+        public PlacesController(AppDbContext context, IPlaceService placeService, ILogger<PlacesController> logger)
         {
             _context = context;
             _placeService = placeService;
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+            _logger = logger;
         }
 
         // GET: api/places
@@ -510,7 +512,18 @@ namespace RoutePlanner.API.Controllers
             }
             catch (Exception ex)
             {
-                return BadRequest(new { message = "Error creating place from Google", error = ex.Message });
+                // Log the full exception including inner exceptions
+                var errorMessage = ex.Message;
+                var innerError = ex.InnerException?.Message;
+
+                _logger.LogError(ex, "Error creating place from Google. GooglePlaceId: {GooglePlaceId}, UserId: {UserId}",
+                    createDto.GooglePlaceId, CurrentUserId);
+
+                return BadRequest(new {
+                    message = "Error creating place from Google",
+                    error = errorMessage,
+                    innerError = innerError
+                });
             }
         }
 

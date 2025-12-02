@@ -26,6 +26,8 @@ export class MapService {
         this.routeDistance = 0; // Total route distance in meters
         this.routeDuration = 0; // Total route duration in seconds
         this.onRouteCalculated = null; // Callback when route is calculated
+        this.routeSegments = []; // Array to store individual segment data
+        this.segmentPolylines = []; // Array of polyline objects for each segment
     }
 
     init() {
@@ -129,17 +131,15 @@ export class MapService {
         places.forEach((place, index) => {
             const isSelected = this.selectedMarkerIndex === index;
 
-            // Create custom icon with size based on selection
-            const iconSize = isSelected ? [35, 50] : [25, 41];
-            const iconAnchor = isSelected ? [17, 50] : [12, 41];
-
-            const customIcon = L.icon({
-                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: iconSize,
-                iconAnchor: iconAnchor,
-                popupAnchor: [1, -34],
-                shadowSize: isSelected ? [50, 50] : [41, 41]
+            // Create custom numbered icon
+            const customIcon = L.divIcon({
+                html: `<div class="route-marker-numbered ${isSelected ? 'selected' : ''}">
+                        <div class="marker-number">${index + 1}</div>
+                       </div>`,
+                className: 'route-marker-container',
+                iconSize: isSelected ? [40, 40] : [32, 32],
+                iconAnchor: isSelected ? [20, 20] : [16, 16],
+                popupAnchor: [0, -20]
             });
 
             const marker = L.marker(place.coords, { icon: customIcon })
@@ -178,6 +178,9 @@ export class MapService {
             return;
         }
 
+        // Clear existing segment polylines
+        this.clearSegmentPolylines();
+
         // Convert places to waypoints
         const waypoints = places.map(place => L.latLng(place.coords[0], place.coords[1]));
 
@@ -197,8 +200,8 @@ export class MapService {
             lineOptions: {
                 styles: [{
                     color: '#667eea',
-                    weight: 5,
-                    opacity: 0.7
+                    weight: 0,
+                    opacity: 0
                 }]
             },
             createMarker: function() { return null; }, // Don't create route markers (we have our own)
@@ -225,6 +228,9 @@ export class MapService {
                     });
                 }
 
+                // Create clickable segment polylines
+                this.createRouteSegments(route, places);
+
                 console.log('Route calculated:', {
                     distance: `${(this.routeDistance / 1000).toFixed(1)} km`,
                     duration: `${Math.floor(this.routeDuration / 3600)}h ${Math.floor((this.routeDuration % 3600) / 60)}min`
@@ -245,6 +251,191 @@ export class MapService {
      */
     setRouteCalculatedCallback(callback) {
         this.onRouteCalculated = callback;
+    }
+
+    /**
+     * Clear existing segment polylines from the map
+     */
+    clearSegmentPolylines() {
+        this.segmentPolylines.forEach(polyline => {
+            this.map.removeLayer(polyline);
+        });
+        this.segmentPolylines = [];
+        this.routeSegments = [];
+    }
+
+    /**
+     * Create clickable route segments between consecutive places
+     * @param {Object} route - OSRM route object with coordinates and instructions
+     * @param {Array} places - Array of place objects
+     */
+    createRouteSegments(route, places) {
+        if (!route || !route.coordinates || places.length < 2) return;
+
+        // Get waypoint indices from route instructions
+        const waypointIndices = this.getWaypointIndices(route);
+
+        // Create a segment for each pair of consecutive waypoints
+        for (let i = 0; i < places.length - 1; i++) {
+            const startPlace = places[i];
+            const endPlace = places[i + 1];
+
+            // Get the coordinates for this segment
+            const startIdx = waypointIndices[i] || 0;
+            const endIdx = waypointIndices[i + 1] || route.coordinates.length - 1;
+            const segmentCoords = route.coordinates.slice(startIdx, endIdx + 1);
+
+            // Calculate segment distance and duration
+            const segmentDistance = this.calculateSegmentDistance(segmentCoords);
+            const segmentDuration = this.calculateSegmentDuration(route, startIdx, endIdx);
+
+            // Create clickable polyline for this segment
+            const polyline = L.polyline(segmentCoords, {
+                color: '#667eea',
+                weight: 6,
+                opacity: 0.7,
+                className: 'route-segment'
+            }).addTo(this.map);
+
+            // Add hover effect
+            polyline.on('mouseover', function() {
+                this.setStyle({ weight: 8, opacity: 0.9 });
+            });
+
+            polyline.on('mouseout', function() {
+                this.setStyle({ weight: 6, opacity: 0.7 });
+            });
+
+            // Add click handler with popup
+            polyline.on('click', (e) => {
+                const popupContent = this.createSegmentPopup(
+                    startPlace.name,
+                    endPlace.name,
+                    segmentDistance,
+                    segmentDuration,
+                    i
+                );
+
+                L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent(popupContent)
+                    .openOn(this.map);
+            });
+
+            // Store segment data
+            this.routeSegments.push({
+                startPlace: startPlace.name,
+                endPlace: endPlace.name,
+                distance: segmentDistance,
+                duration: segmentDuration,
+                coordinates: segmentCoords
+            });
+
+            this.segmentPolylines.push(polyline);
+        }
+
+        console.log('Route segments created:', this.routeSegments.length);
+    }
+
+    /**
+     * Get waypoint indices from route instructions
+     * @param {Object} route - OSRM route object
+     * @returns {Array} Array of indices where waypoints are located
+     */
+    getWaypointIndices(route) {
+        const indices = [0]; // First waypoint is always at index 0
+
+        if (route.instructions) {
+            route.instructions.forEach((instruction, idx) => {
+                // Waypoint instructions have a specific type
+                if (instruction.type === 'WaypointReached' || instruction.text?.includes('Waypoint')) {
+                    indices.push(instruction.index || idx);
+                }
+            });
+        }
+
+        // Add last coordinate index
+        indices.push(route.coordinates.length - 1);
+
+        return indices;
+    }
+
+    /**
+     * Calculate distance for a segment
+     * @param {Array} coordinates - Array of [lat, lng] coordinates
+     * @returns {number} Distance in meters
+     */
+    calculateSegmentDistance(coordinates) {
+        let distance = 0;
+        for (let i = 0; i < coordinates.length - 1; i++) {
+            const from = L.latLng(coordinates[i]);
+            const to = L.latLng(coordinates[i + 1]);
+            distance += from.distanceTo(to);
+        }
+        return distance;
+    }
+
+    /**
+     * Calculate duration for a segment (proportional estimate)
+     * @param {Object} route - OSRM route object
+     * @param {number} startIdx - Start coordinate index
+     * @param {number} endIdx - End coordinate index
+     * @returns {number} Duration in seconds
+     */
+    calculateSegmentDuration(route, startIdx, endIdx) {
+        // Estimate duration proportional to segment distance vs total distance
+        const segmentCoords = route.coordinates.slice(startIdx, endIdx + 1);
+        const segmentDistance = this.calculateSegmentDistance(segmentCoords);
+        const proportion = segmentDistance / route.summary.totalDistance;
+        return Math.round(route.summary.totalTime * proportion);
+    }
+
+    /**
+     * Create popup content for a route segment
+     * @param {string} startName - Start place name
+     * @param {string} endName - End place name
+     * @param {number} distance - Segment distance in meters
+     * @param {number} duration - Segment duration in seconds
+     * @param {number} segmentIndex - Index of the segment
+     * @returns {string} HTML content for popup
+     */
+    createSegmentPopup(startName, endName, distance, duration, segmentIndex) {
+        const distanceKm = (distance / 1000).toFixed(1);
+        const durationHours = Math.floor(duration / 3600);
+        const durationMinutes = Math.floor((duration % 3600) / 60);
+
+        let durationText = '';
+        if (durationHours > 0) {
+            durationText = `${durationHours}h ${durationMinutes}min`;
+        } else {
+            durationText = `${durationMinutes}min`;
+        }
+
+        return `
+            <div class="route-segment-popup">
+                <div class="segment-popup-header">
+                    <i class="fas fa-route"></i>
+                    <span>Segment ${segmentIndex + 1}</span>
+                </div>
+                <div class="segment-popup-content">
+                    <div class="segment-places">
+                        <span class="segment-start">${startName}</span>
+                        <i class="fas fa-arrow-right"></i>
+                        <span class="segment-end">${endName}</span>
+                    </div>
+                    <div class="segment-stats">
+                        <div class="segment-stat">
+                            <i class="fas fa-road"></i>
+                            <span>${distanceKm} km</span>
+                        </div>
+                        <div class="segment-stat">
+                            <i class="fas fa-clock"></i>
+                            <span>${durationText}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     centerMap(places) {
@@ -293,9 +484,13 @@ export class MapService {
         this.selectedMarkerIndex = index;
         const marker = this.markers[index];
 
-        // Open popup
+        // Open popup and center on selected place
         marker.openPopup();
-        //this.map.setView(marker.getLatLng(), this.map.getZoom() < 13 ? 13 : this.map.getZoom());
+        // Zoom to configured level if current zoom is less, otherwise maintain current zoom
+        const targetZoom = this.map.getZoom() < CONFIG.PLACE_SELECTION_ZOOM
+            ? CONFIG.PLACE_SELECTION_ZOOM
+            : this.map.getZoom();
+        this.map.setView(marker.getLatLng(), targetZoom);
     }
 
     deselectPlace() {
@@ -1247,17 +1442,15 @@ export class MapService {
             routePlaces.forEach((place, index) => {
                 const isSelected = this.selectedMarkerIndex === index;
 
-                // Create custom icon with size based on selection
-                const iconSize = isSelected ? [35, 50] : [25, 41];
-                const iconAnchor = isSelected ? [17, 50] : [12, 41];
-
-                const customIcon = L.icon({
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                    iconSize: iconSize,
-                    iconAnchor: iconAnchor,
-                    popupAnchor: [1, -34],
-                    shadowSize: isSelected ? [50, 50] : [41, 41]
+                // Create custom numbered icon
+                const customIcon = L.divIcon({
+                    html: `<div class="route-marker-numbered ${isSelected ? 'selected' : ''}">
+                            <div class="marker-number">${index + 1}</div>
+                           </div>`,
+                    className: 'route-marker-container',
+                    iconSize: isSelected ? [40, 40] : [32, 32],
+                    iconAnchor: isSelected ? [20, 20] : [16, 16],
+                    popupAnchor: [0, -20]
                 });
 
                 const marker = L.marker(place.coords, { icon: customIcon })

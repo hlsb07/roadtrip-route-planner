@@ -48,14 +48,14 @@ namespace RoutePlanner.API.Data
             {
                 // GooglePlaceId is the primary key (string from Google)
                 entity.HasKey(e => e.GooglePlaceId);
-                entity.Property(e => e.GooglePlaceId).HasMaxLength(500).IsRequired();
+                entity.Property(e => e.GooglePlaceId).HasMaxLength(1000).IsRequired(); // Increased from 500 to handle long IDs
 
-                entity.Property(e => e.Name).HasMaxLength(500).IsRequired();
+                entity.Property(e => e.Name).HasMaxLength(1000).IsRequired(); // Increased from 500 for long place names
                 entity.Property(e => e.FormattedAddress).HasMaxLength(1000);
                 entity.Property(e => e.Types).HasColumnType("text"); // JSON
                 entity.Property(e => e.OpeningHours).HasColumnType("text"); // JSON
                 entity.Property(e => e.BusinessStatus).HasMaxLength(50);
-                entity.Property(e => e.Website).HasMaxLength(500);
+                entity.Property(e => e.Website).HasMaxLength(1000); // Increased from 500 for long URLs
                 entity.Property(e => e.PhoneNumber).HasMaxLength(50);
 
                 // PostGIS Point for location
@@ -80,8 +80,8 @@ namespace RoutePlanner.API.Data
                       .HasForeignKey(e => e.GooglePlaceId)
                       .OnDelete(DeleteBehavior.Cascade);
 
-                entity.Property(e => e.PhotoReference).HasMaxLength(500);
-                entity.Property(e => e.PhotoUrl).HasMaxLength(1000).IsRequired();
+                entity.Property(e => e.PhotoReference).HasMaxLength(1000); // Increased from 500 for long references
+                entity.Property(e => e.PhotoUrl).HasMaxLength(2000).IsRequired(); // Increased from 1000 for long URLs
                 entity.Property(e => e.Source).HasMaxLength(50).IsRequired().HasDefaultValue("google");
 
                 // Indexes
@@ -96,7 +96,7 @@ namespace RoutePlanner.API.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.Notes).HasMaxLength(5000); // User notes can be longer
-                entity.Property(e => e.GooglePlaceId).HasMaxLength(500);
+                entity.Property(e => e.GooglePlaceId).HasMaxLength(1000); // Increased from 500 to match GooglePlaceData
 
                 // GEOMETRY statt geography für einfachere Koordinaten-Zugriffe
                 entity.Property(e => e.Location)

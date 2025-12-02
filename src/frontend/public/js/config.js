@@ -11,6 +11,7 @@ export const CONFIG = {
 
     MAP_CENTER: [-41.2865, 174.7762], // New Zealand
     MAP_ZOOM: 6,
+    PLACE_SELECTION_ZOOM:10, // Zoom level when selecting a place (higher = more zoomed in)
     SEARCH_LIMIT: 5,
     NOMINATIM_URL: 'https://nominatim.openstreetmap.org/search',
     LEAFLET_TILE_URL: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',

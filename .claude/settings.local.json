@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(dotnet run)",
+      "Bash(taskkill:*)",
+      "Bash(dotnet build:*)",
+      "Bash(dotnet ef migrations add:*)",
+      "Bash(tasklist:*)",
+      "Bash(dotnet ef database:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

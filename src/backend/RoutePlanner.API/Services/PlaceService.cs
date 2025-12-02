@@ -27,7 +27,7 @@ namespace RoutePlanner.API.Services
 
         public async Task<Place> CreatePlaceFromGoogle(string googlePlaceId, int userId, string? notes = null)
         {
-            _logger.LogInformation($"Creating place from Google Place ID: {googlePlaceId} for user {userId}");
+            _logger.LogInformation($"Creating place from Google Place ID: {googlePlaceId} (length: {googlePlaceId.Length}) for user {userId}");
 
             // Step 1: Check if GooglePlaceData already exists
             var googleData = await _context.GooglePlaceData
@@ -44,6 +44,10 @@ namespace RoutePlanner.API.Services
                 {
                     throw new InvalidOperationException($"Could not fetch place details for Google Place ID: {googlePlaceId}");
                 }
+
+                // Log field lengths for debugging
+                _logger.LogInformation($"GooglePlaceData field lengths - GooglePlaceId: {googlePlaceId.Length}, Name: {placeDetails.Name?.Length ?? 0}, " +
+                    $"FormattedAddress: {placeDetails.FormattedAddress?.Length ?? 0}, Website: {placeDetails.Website?.Length ?? 0}");
 
                 // Create GooglePlaceData
                 googleData = new GooglePlaceData
@@ -75,6 +79,9 @@ namespace RoutePlanner.API.Services
                         {
                             _logger.LogWarning($"Photo DTO has empty PhotoUrl! PhotoReference: {photoDto.PhotoReference}, Width: {photoDto.Width}");
                         }
+
+                        // Log photo field lengths
+                        _logger.LogDebug($"Photo field lengths - PhotoReference: {photoDto.PhotoReference?.Length ?? 0}, PhotoUrl: {photoDto.PhotoUrl?.Length ?? 0}");
 
                         var photo = new PlacePhoto
                         {

@@ -689,7 +689,7 @@ class App {
     }
 
     // UI Updates
-    updateUI() {
+    updateUI(centerMap = true) {
         this.placeManager.updatePlacesList();
 
         // Update All Places list
@@ -714,8 +714,8 @@ class App {
             this.mapService.updateMapWithBothPlaceTypes(routePlaces, filtered.nonRoutePlaces);
         }
 
-        // Re-center map to show all visible places
-        if (routePlaces.length > 0 || filtered.nonRoutePlaces.length > 0) {
+        // Re-center map to show all visible places (optional based on parameter)
+        if (centerMap && (routePlaces.length > 0 || filtered.nonRoutePlaces.length > 0)) {
             this.mapService.centerMap(routePlaces);
         }
     }
@@ -758,8 +758,8 @@ class App {
     selectPlace(index) {
         this.placeManager.selectPlace(index);
         this.mapService.selectedMarkerIndex = index;
-        this.updateUI();
-        this.mapService.selectPlace(index);
+        this.updateUI(false); // Don't re-center map when selecting a place
+        this.mapService.selectPlace(index); // This will center on the selected place
 
         // Show place details in sidebar (desktop only)
         const place = this.placeManager.getPlaces()[index];
