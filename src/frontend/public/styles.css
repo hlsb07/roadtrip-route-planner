@@ -982,7 +982,7 @@ textarea.form-input {
     width: 35px !important;
     height: 35px !important;
     padding: 4px !important;
-    color: #707070 !important;
+    color: #ffffff !important;
     border-radius: 20%;
 }
 
@@ -5857,7 +5857,7 @@ textarea.form-input {
 /* Mobile adjustments for route info panel */
 @media (max-width: 768px) {
     .route-info-panel {
-        bottom: 10px;
+        bottom: 80px;
         right: 10px;
         left: auto;
         min-width: 160px;
@@ -5907,7 +5907,7 @@ textarea.form-input {
     font-weight: 600;
     font-size: 0.9rem;
     border-radius: 8px 8px 0 0;
-    margin: -20px -20px 0 -20px;
+    margin: -1px -1px 0 -1px;
 }
 
 .segment-popup-header i {

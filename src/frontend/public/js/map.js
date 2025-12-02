@@ -291,7 +291,7 @@ export class MapService {
 
             // Create clickable polyline for this segment
             const polyline = L.polyline(segmentCoords, {
-                color: '#667eea',
+                color: '#0E54F9',
                 weight: 6,
                 opacity: 0.7,
                 className: 'route-segment'
@@ -299,11 +299,11 @@ export class MapService {
 
             // Add hover effect
             polyline.on('mouseover', function() {
-                this.setStyle({ weight: 8, opacity: 0.9 });
+                this.setStyle({ weight: 8, opacity: 0.9 , color: '#f90e0eff'});
             });
 
             polyline.on('mouseout', function() {
-                this.setStyle({ weight: 6, opacity: 0.7 });
+                this.setStyle({ weight: 6, opacity: 0.7 , color: '#0E54F9'});
             });
 
             // Add click handler with popup
