@@ -2695,6 +2695,46 @@ textarea.form-input {
     box-shadow: 0 5px 15px rgba(42, 157, 143, 0.4);
 }
 
+/* Numbered Route Markers */
+.route-marker-numbered {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #2A9D8F 0%, #3EBBA5 100%);
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.route-marker-numbered.selected {
+    width: 40px;
+    height: 40px;
+    border-width: 4px;
+    box-shadow: 0 5px 15px rgba(42, 157, 143, 0.5);
+}
+
+.route-marker-numbered .marker-number {
+    color: white;
+    font-weight: bold;
+    font-size: 14px;
+    line-height: 1;
+    text-align: center;
+    user-select: none;
+}
+
+.route-marker-numbered.selected .marker-number {
+    font-size: 16px;
+}
+
+.route-marker-numbered:hover {
+    transform: scale(1.1);
+    box-shadow: 0 5px 15px rgba(42, 157, 143, 0.4);
+}
+
 /* Category and Country Badges in Popups */
 .map-popup-categories,
 .map-popup-countries {
