@@ -81,6 +81,38 @@ export class GoogleMapsBackendClient {
     }
 
     /**
+     * Search for nearby places at coordinates
+     * @param {number} lat - Latitude
+     * @param {number} lng - Longitude
+     * @param {number} radiusMeters - Search radius in meters (default 100)
+     * @param {string|null} type - Optional place type filter (e.g., "restaurant")
+     * @returns {Promise<Object>} - Nearby places
+     */
+    async nearbySearch(lat, lng, radiusMeters = 100, type = null) {
+        try {
+            let url = `${this.apiBase}/googlemaps/nearby?lat=${lat}&lng=${lng}&radius=${radiusMeters}`;
+            if (type) {
+                url += `&type=${encodeURIComponent(type)}`;
+            }
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`Nearby search failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            console.log(`🔍 Nearby search at (${lat}, ${lng}) - Found ${data.results?.length || 0} places`);
+
+            return data;
+        } catch (error) {
+            console.error('Failed to search nearby:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Get cache statistics
      * @returns {Promise<Object>} - Cache statistics
      */
@@ -136,7 +168,15 @@ export class GoogleMapsBackendClient {
             googlePlaceId: result.placeId,
             name: result.name,
             types: result.types,
-            fromCache: result.fromCache
+            fromCache: result.fromCache,
+            // Extended place data
+            rating: result.rating,
+            userRatingsTotal: result.userRatingsTotal,
+            priceLevel: result.priceLevel,
+            website: result.website,
+            phoneNumber: result.phoneNumber,
+            openingHours: result.openingHours,
+            photos: result.photos || []
         }));
     }
 

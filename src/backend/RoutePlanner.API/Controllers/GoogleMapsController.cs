@@ -98,6 +98,29 @@ namespace RoutePlanner.API.Controllers
         }
 
         /// <summary>
+        /// Search for nearby places at coordinates
+        /// GET: api/googlemaps/nearby?lat=40.7128&lng=-74.0060&radius=100&type=restaurant
+        /// </summary>
+        [HttpGet("nearby")]
+        public async Task<ActionResult<List<PlaceSearchResult>>> NearbySearch(
+            [FromQuery] double lat,
+            [FromQuery] double lng,
+            [FromQuery] int radius = 100,
+            [FromQuery] string? type = null)
+        {
+            try
+            {
+                var results = await _googleMapsService.NearbySearch(lat, lng, radius, type);
+                return Ok(new { results });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error in nearby search at ({lat}, {lng})");
+                return StatusCode(500, new { error = "Nearby search failed", message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Clean expired cache entries (maintenance endpoint)
         /// POST: api/googlemaps/cache/clean
         /// </summary>
@@ -113,6 +136,25 @@ namespace RoutePlanner.API.Controllers
             {
                 _logger.LogError(ex, "Error cleaning expired cache");
                 return StatusCode(500, new { error = "Failed to clean cache", message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Clear ALL cache entries (for testing/debugging)
+        /// DELETE: api/googlemaps/cache/clear
+        /// </summary>
+        [HttpDelete("cache/clear")]
+        public async Task<ActionResult> ClearAllCache()
+        {
+            try
+            {
+                await _googleMapsService.ClearAllCache();
+                return Ok(new { message = "All cache entries cleared successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error clearing all cache");
+                return StatusCode(500, new { error = "Failed to clear cache", message = ex.Message });
             }
         }
     }

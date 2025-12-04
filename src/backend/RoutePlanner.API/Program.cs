@@ -15,6 +15,9 @@ builder.Services.AddHttpClient<GoogleMapsService>();
 // Google Maps Service
 builder.Services.AddScoped<GoogleMapsService>();
 
+// Place Service
+builder.Services.AddScoped<IPlaceService, PlaceService>();
+
 // HttpClient and Service for Park4Night Scraper
 builder.Services.AddHttpClient<Park4NightScraperService>();
 builder.Services.AddScoped<Park4NightScraperService>();

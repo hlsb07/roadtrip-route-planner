@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -9,12 +10,14 @@ using RoutePlanner.API.Data;
 
 #nullable disable
 
-namespace RoutePlanner.API.Migrations
+namespace RoutePlanner.API.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251103205121_RefactorPlacesWithGoogleIntegration")]
+    partial class RefactorPlacesWithGoogleIntegration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -389,8 +392,8 @@ namespace RoutePlanner.API.Migrations
             modelBuilder.Entity("RoutePlanner.API.Models.GooglePlaceData", b =>
                 {
                     b.Property<string>("GooglePlaceId")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("BusinessStatus")
                         .HasMaxLength(50)
@@ -412,8 +415,8 @@ namespace RoutePlanner.API.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("OpeningHours")
                         .HasColumnType("text");
@@ -441,8 +444,8 @@ namespace RoutePlanner.API.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("Website")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("GooglePlaceId");
 
@@ -469,8 +472,8 @@ namespace RoutePlanner.API.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("GooglePlaceId")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTime?>("LastViewedAt")
                         .HasColumnType("timestamp with time zone");
@@ -585,7 +588,7 @@ namespace RoutePlanner.API.Migrations
 
                     b.Property<string>("GooglePlaceId")
                         .IsRequired()
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<int?>("Height")
                         .HasColumnType("integer");
@@ -597,13 +600,13 @@ namespace RoutePlanner.API.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("PhotoReference")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("PhotoUrl")
                         .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<string>("Source")
                         .IsRequired()

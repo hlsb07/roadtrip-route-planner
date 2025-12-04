@@ -22,6 +22,23 @@ namespace RoutePlanner.API.DTOs
         public double Longitude { get; set; }
         public List<string> Types { get; set; } = new();
         public bool FromCache { get; set; }
+
+        // Extended place information
+        public double? Rating { get; set; }
+        public int? UserRatingsTotal { get; set; }
+        public int? PriceLevel { get; set; }
+        public string? Website { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string? OpeningHours { get; set; }
+        public List<PlacePhotoDto> Photos { get; set; } = new();
+    }
+
+    public class PlacePhotoDto
+    {
+        public string PhotoReference { get; set; } = string.Empty;
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public string? PhotoUrl { get; set; }
     }
 
     public class CacheStatistics

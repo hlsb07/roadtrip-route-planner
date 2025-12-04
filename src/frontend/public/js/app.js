@@ -6,8 +6,10 @@ import { CampsiteManager } from './campsiteManager.js';
 import { FilterManager } from './filterManager.js';
 import { AllPlacesManager } from './allPlacesManager.js';
 import { TagManager } from './tagManager.js';
-import { showError, showSuccess } from './utils.js';
+import { ApiService } from './api.js';
+import { showError, showSuccess, showConfirm } from './utils.js';
 import { CONFIG } from './config.js';
+import { SwipeHandler } from './swipeHandler.js';
 
 class App {
     constructor() {
@@ -30,6 +32,8 @@ class App {
 
         this.bindEventListeners();
         this.setupKeyboardShortcuts();
+        this.setupMobilePopupSwipe();
+        this.setupMobilePanelSwipe();
     }
 
     async init() {
@@ -50,6 +54,17 @@ class App {
             // Setup campsite marker click handler
             this.mapService.setCampsiteMarkerClickCallback((index) => {
                 this.selectCampsite(index);
+            });
+
+            // Setup non-route/filtered place marker click handler
+            this.mapService.setNonRouteMarkerClickCallback((placeId, index) => {
+                // This is called when clicking markers in All Places view
+                this.allPlacesManager.selectCard(index);
+            });
+
+            // Setup route calculation callback to update route info panel
+            this.mapService.setRouteCalculatedCallback((routeInfo) => {
+                this.updateRouteInfoPanel(routeInfo);
             });
 
             // Initialize filters FIRST (fetches all places with full data)
@@ -96,6 +111,26 @@ class App {
             });
         }
 
+        // Campsite URL input (desktop)
+        const campsiteUrlInput = document.getElementById('campsiteUrlInput');
+        if (campsiteUrlInput) {
+            campsiteUrlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleAddCampsite();
+                }
+            });
+        }
+
+        // Campsite URL input (mobile)
+        const mobileCampsiteUrlInput = document.getElementById('mobileCampsiteUrlInput');
+        if (mobileCampsiteUrlInput) {
+            mobileCampsiteUrlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleAddCampsite();
+                }
+            });
+        }
+
         // Import file
         const importFile = document.getElementById('importFile');
         if (importFile) {
@@ -130,25 +165,301 @@ class App {
         });
     }
 
+    /**
+     * Get the currently active view context
+     * @returns {Object} Context object with view info and selection
+     */
+    getActiveViewContext() {
+        // Check desktop nav
+        const activeDesktopNav = document.querySelector('.desktop-nav-item.active');
+        const activeMobileNav = document.querySelector('.mobile-nav-item.active');
+        const activeNav = activeDesktopNav || activeMobileNav;
+        const mode = activeNav?.dataset.mode || 'places';
+
+        // Check what's visible
+        const allPlacesVisible = document.getElementById('allPlacesSection')?.style.display !== 'none' ||
+                                 document.querySelector('.mobile-section[data-section="allplaces"]')?.style.display !== 'none';
+        const campsitesVisible = document.getElementById('campsitesList')?.style.display !== 'none' ||
+                                document.querySelector('.mobile-section[data-section="campsites"]')?.style.display !== 'none';
+
+        let context = {
+            mode: mode,
+            view: 'places', // default
+            selectedIndex: null,
+            items: [],
+            manager: null
+        };
+
+        if (allPlacesVisible || mode === 'allplaces') {
+            context.view = 'allplaces';
+            context.items = this.allPlacesManager.filteredPlaces || [];
+            context.manager = this.allPlacesManager;
+            context.selectedIndex = this.allPlacesManager.selectedIndex;
+        } else if (campsitesVisible || mode === 'campsites') {
+            context.view = 'campsites';
+            context.selectedIndex = this.campsiteManager.selectedIndex;
+            context.items = this.campsiteManager.campsites || [];
+            context.manager = this.campsiteManager;
+        } else {
+            // Default to route places
+            context.view = 'places';
+            context.selectedIndex = this.placeManager.selectedIndex;
+            context.items = this.placeManager.places || [];
+            context.manager = this.placeManager;
+        }
+
+        return context;
+    }
+
+    /**
+     * Deselect the current selection in the active view
+     */
+    deselectCurrentView() {
+        const context = this.getActiveViewContext();
+        if (context.view === 'places' && this.placeManager.selectedIndex !== null) {
+            this.placeManager.deselectPlace();
+            this.mapService.deselectPlace();
+            this.updateUI();
+        } else if (context.view === 'allplaces' && this.allPlacesManager.selectedIndex !== null) {
+            this.allPlacesManager.deselectCard();
+            this.mapService.deselectAllPlace();
+            this.allPlacesManager.updateAllPlacesList();
+        } else if (context.view === 'campsites' && this.campsiteManager.selectedIndex !== null) {
+            this.campsiteManager.deselectCampsite();
+            this.mapService.deselectCampsite();
+        }
+    }
+
     setupKeyboardShortcuts() {
-        document.addEventListener('keydown', (e) => {
-            // ESC closes modal
+        document.addEventListener('keydown', async (e) => {
+            // Helper: Check if we should ignore shortcuts (typing in input/textarea)
+            const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+            const hasActiveModal = document.querySelector('.modal.active, .confirm-overlay.show');
+
+            // ESC always works - closes fullscreen gallery, mobile popup, modal, or deselects
             if (e.key === 'Escape') {
-                this.routeManager.closeRouteModal();
-            }
-            
-            // Enter in modal saves
-            if (e.key === 'Enter' && document.getElementById('routeModal').classList.contains('active')) {
-                this.routeManager.saveRoute().then(() => {
-                    this.updateRoutesList();
-                });
+                // Check if fullscreen image gallery is open (highest priority)
+                const fullscreenGallery = document.getElementById('fullscreenImageGallery');
+                if (fullscreenGallery && fullscreenGallery.classList.contains('show')) {
+                    this.mapService.hideFullscreenImageGallery();
+                    return;
+                }
+
+                // Check if mobile docked popup is open
+                const mobilePopup = document.getElementById('mobileDockedPopup');
+                if (mobilePopup && mobilePopup.classList.contains('show')) {
+                    this.mapService.hideMobileDockedPopup();
+                    return;
+                }
+
+                if (hasActiveModal) {
+                    this.routeManager.closeRouteModal();
+                } else {
+                    this.deselectCurrentView();
+                }
+                return;
             }
 
-            // Enter in place edit modal saves
-            if (e.key === 'Enter' && document.getElementById('editPlaceModal').classList.contains('active')) {
-                this.placeManager.savePlaceEdit();
+            // Modal-specific shortcuts
+            if (hasActiveModal) {
+                // Enter in route modal saves
+                if (e.key === 'Enter' && document.getElementById('routeModal')?.classList.contains('active')) {
+                    this.routeManager.saveRoute().then(() => {
+                        this.updateRoutesList();
+                    });
+                }
+                // Enter in place edit modal saves
+                if (e.key === 'Enter' && document.getElementById('editPlaceModal')?.classList.contains('active')) {
+                    this.placeManager.savePlaceEdit();
+                }
+                return; // Don't process other shortcuts when modal is open
+            }
+
+            // Don't process shortcuts when typing in inputs
+            if (isTyping && !['Escape'].includes(e.key)) {
+                return;
+            }
+
+            // === Context-Aware Shortcuts ===
+            const context = this.getActiveViewContext();
+            const selectedIndex = context.selectedIndex;
+            const items = context.items;
+
+            // Delete key - Remove/delete item based on view
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIndex !== null && !e.shiftKey) {
+                e.preventDefault();
+
+                if (context.view === 'places') {
+                    // Remove from route
+                    const success = await this.removePlace(selectedIndex);
+                    if (success) {
+                        this.updateUI();
+                    }
+                } else if (context.view === 'allplaces') {
+                    // All Places - permanently delete (with confirmation)
+                    const item = items[selectedIndex];
+                    if (item) {
+                        await this.allPlacesManager.deletePlace(item.id, item.name);
+                        this.allPlacesManager.updateAllPlacesList();
+                    }
+                } else if (context.view === 'campsites') {
+                    // Campsites - just deselect for now
+                    this.campsiteManager.deselectCampsite();
+                }
+                return;
+            }
+
+            // Shift + Delete - Permanently delete place (same as Delete in All Places)
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIndex !== null && e.shiftKey) {
+                e.preventDefault();
+                const item = items[selectedIndex];
+                if (item && (context.view === 'places' || context.view === 'allplaces')) {
+                    await this.deleteNonRoutePlace(item.id, item.name);
+                    this.updateUI();
+                    if (context.view === 'allplaces') {
+                        this.allPlacesManager.updateAllPlacesList();
+                    }
+                }
+                return;
+            }
+
+            // Arrow Down - Select next item
+            if (e.key === 'ArrowDown' && items.length > 0) {
+                e.preventDefault();
+                const nextIndex = selectedIndex === null ? 0 : Math.min(selectedIndex + 1, items.length - 1);
+
+                if (context.view === 'places') {
+                    this.selectPlace(nextIndex);
+                } else if (context.view === 'allplaces') {
+                    this.allPlacesManager.selectCard(nextIndex);
+                    this.mapService.selectAllPlace(nextIndex);
+                    this.allPlacesManager.updateAllPlacesList();
+                } else if (context.view === 'campsites') {
+                    this.selectCampsite(nextIndex);
+                }
+                return;
+            }
+
+            // Arrow Up - Select previous item
+            if (e.key === 'ArrowUp' && items.length > 0) {
+                e.preventDefault();
+                const prevIndex = selectedIndex === null ? items.length - 1 : Math.max(selectedIndex - 1, 0);
+
+                if (context.view === 'places') {
+                    this.selectPlace(prevIndex);
+                } else if (context.view === 'allplaces') {
+                    this.allPlacesManager.selectCard(prevIndex);
+                    this.mapService.selectAllPlace(prevIndex);
+                    this.allPlacesManager.updateAllPlacesList();
+                } else if (context.view === 'campsites') {
+                    this.selectCampsite(prevIndex);
+                }
+                return;
+            }
+
+            // Enter - Edit selected item
+            if (e.key === 'Enter' && selectedIndex !== null) {
+                e.preventDefault();
+                const item = items[selectedIndex];
+                if (item && context.view === 'places') {
+                    await this.placeManager.showEditPlaceModal(selectedIndex);
+                } else if (item && context.view === 'allplaces') {
+                    await this.allPlacesManager.editPlace(item.id);
+                }
+                return;
+            }
+
+            // Ctrl/Cmd + A - Focus search input
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                const searchInput = document.getElementById('search');
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                return;
+            }
+
+            // ? - Show keyboard shortcuts help
+            if (e.key === '?' && !e.shiftKey) {
+                e.preventDefault();
+                this.showKeyboardShortcutsModal();
+                return;
             }
         });
+    }
+
+    showKeyboardShortcutsModal() {
+        // Check if modal already exists
+        let modal = document.getElementById('keyboardShortcutsModal');
+
+        if (!modal) {
+            // Create modal
+            modal = document.createElement('div');
+            modal.id = 'keyboardShortcutsModal';
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content modal-medium">
+                    <div class="modal-header">
+                        <h2><i class="fas fa-keyboard"></i> Keyboard Shortcuts</h2>
+                        <button class="close-modal" onclick="document.getElementById('keyboardShortcutsModal').classList.remove('active')">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="shortcuts-section">
+                            <h3><i class="fas fa-trash"></i> Place Management</h3>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Delete</kbd> or <kbd>Backspace</kbd></span>
+                                <span class="shortcut-description">Remove selected place from route</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Shift</kbd> + <kbd>Delete</kbd></span>
+                                <span class="shortcut-description">Permanently delete selected place</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Enter</kbd></span>
+                                <span class="shortcut-description">Edit selected place</span>
+                            </div>
+                        </div>
+
+                        <div class="shortcuts-section">
+                            <h3><i class="fas fa-arrows-alt-v"></i> Navigation</h3>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>↑</kbd> Arrow Up</span>
+                                <span class="shortcut-description">Select previous place</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>↓</kbd> Arrow Down</span>
+                                <span class="shortcut-description">Select next place</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Esc</kbd></span>
+                                <span class="shortcut-description">Deselect place or close modal</span>
+                            </div>
+                        </div>
+
+                        <div class="shortcuts-section">
+                            <h3><i class="fas fa-plus"></i> General</h3>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>Ctrl/Cmd</kbd> + <kbd>A</kbd></span>
+                                <span class="shortcut-description">Focus search input</span>
+                            </div>
+                            <div class="shortcut-item">
+                                <span class="shortcut-keys"><kbd>?</kbd></span>
+                                <span class="shortcut-description">Show this help</span>
+                            </div>
+                        </div>
+
+                        <div class="shortcuts-tip">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Tip:</strong> Select a place by clicking it in the list or on the map, then use shortcuts for quick actions!
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        modal.classList.add('active');
     }
 
     // Public methods for global access
@@ -164,6 +475,88 @@ class App {
                 await this.addPlace(result);
                 this.mapService.clearClickMarker();
             }
+        }
+    }
+
+    async handleAddCampsite() {
+        // Get input from either desktop or mobile
+        const desktopInput = document.getElementById('campsiteUrlInput');
+        const mobileInput = document.getElementById('mobileCampsiteUrlInput');
+        const input = desktopInput?.offsetParent ? desktopInput : mobileInput;
+
+        const url = input?.value.trim();
+        if (!url) {
+            showError('Please enter a Park4Night URL');
+            return;
+        }
+
+        // Get loading element
+        const desktopLoading = document.getElementById('campsiteLoading');
+        const mobileLoading = document.getElementById('mobileCampsiteLoading');
+        const loading = desktopLoading?.offsetParent ? desktopLoading : mobileLoading;
+
+        try {
+            if (loading) loading.classList.add('active');
+
+            const response = await fetch(`${CONFIG.API_BASE}/campsites?url=${encodeURIComponent(url)}`);
+            const data = await response.json();
+
+            if (loading) loading.classList.remove('active');
+
+            if (response.ok && data.success) {
+                showSuccess(data.message || 'Campsite added successfully!');
+                input.value = '';
+
+                // Refresh the map to show the new campsite
+                await this.campsiteManager.loadCampsites();
+                this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
+            } else if (response.status === 409) {
+                // Campsite already exists
+                showError(data.message || 'This campsite already exists');
+            } else {
+                showError(data.message || 'Failed to add campsite');
+            }
+        } catch (error) {
+            if (loading) loading.classList.remove('active');
+            console.error('Error adding campsite:', error);
+            showError('Failed to add campsite. Please check the URL and try again.');
+        }
+    }
+
+    async deleteCampsite(campsiteId, campsiteName) {
+        const confirmed = await showConfirm({
+            title: 'Delete Campsite',
+            message: `Delete "${campsiteName}" permanently? This cannot be undone.`,
+            type: 'danger',
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete campsite');
+            }
+
+            showSuccess(`Deleted "${campsiteName}"`);
+
+            // Refresh the map to remove the campsite marker
+            await this.campsiteManager.loadCampsites();
+            this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
+
+            // Close any open popups
+            this.mapService.hideMobileDockedPopup();
+
+        } catch (error) {
+            console.error('Failed to delete campsite:', error);
+            showError(error.message || 'Failed to delete campsite');
         }
     }
 
@@ -296,7 +689,7 @@ class App {
     }
 
     // UI Updates
-    updateUI() {
+    updateUI(centerMap = true) {
         this.placeManager.updatePlacesList();
 
         // Update All Places list
@@ -321,17 +714,58 @@ class App {
             this.mapService.updateMapWithBothPlaceTypes(routePlaces, filtered.nonRoutePlaces);
         }
 
-        // Re-center map to show all visible places
-        if (routePlaces.length > 0 || filtered.nonRoutePlaces.length > 0) {
+        // Re-center map to show all visible places (optional based on parameter)
+        if (centerMap && (routePlaces.length > 0 || filtered.nonRoutePlaces.length > 0)) {
             this.mapService.centerMap(routePlaces);
+        }
+    }
+
+    /**
+     * Update the route info panel with calculated route data
+     * @param {Object} routeInfo - Object containing distance, duration, and formatted values
+     */
+    updateRouteInfoPanel(routeInfo) {
+        const panel = document.getElementById('routeInfoPanel');
+        const distanceSpan = document.getElementById('routeDistance');
+        const durationSpan = document.getElementById('routeDuration');
+
+        if (!panel || !distanceSpan || !durationSpan) return;
+
+        // Update distance
+        distanceSpan.textContent = `${routeInfo.distanceKm} km`;
+
+        // Update duration
+        if (routeInfo.durationHours > 0) {
+            durationSpan.textContent = `${routeInfo.durationHours}h ${routeInfo.durationMinutes}min`;
+        } else {
+            durationSpan.textContent = `${routeInfo.durationMinutes}min`;
+        }
+
+        // Show the panel
+        panel.style.display = 'block';
+    }
+
+    /**
+     * Hide the route info panel
+     */
+    hideRouteInfoPanel() {
+        const panel = document.getElementById('routeInfoPanel');
+        if (panel) {
+            panel.style.display = 'none';
         }
     }
 
     selectPlace(index) {
         this.placeManager.selectPlace(index);
         this.mapService.selectedMarkerIndex = index;
-        this.updateUI();
-        this.mapService.selectPlace(index);
+        this.updateUI(false); // Don't re-center map when selecting a place
+        this.mapService.selectPlace(index); // This will center on the selected place
+
+        // Show place details in sidebar (desktop only)
+        const place = this.placeManager.getPlaces()[index];
+        if (place && window.innerWidth > 768) {
+            this.mapService.showPlaceDetailsInSidebar(place, index, false);
+        }
 
         // Collapse mobile panel if it's expanded
         if (window.innerWidth <= 768) {
@@ -421,24 +855,54 @@ class App {
     }
 
     async deleteNonRoutePlace(placeId, placeName) {
-        if (!confirm(`Delete "${placeName}" permanently? This cannot be undone.`)) {
+        const confirmed = await showConfirm({
+            title: 'Delete Place',
+            message: `Delete "${placeName}" permanently? This cannot be undone.`,
+            type: 'danger',
+            confirmText: 'Delete',
+            cancelText: 'Cancel'
+        });
+
+        if (!confirmed) {
             return;
         }
 
         try {
-            // Check if place is used in any routes
-            const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`);
-            if (!response.ok) {
-                throw new Error('Failed to check place usage');
-            }
-
             // Delete the place
             const deleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
                 method: 'DELETE'
             });
 
             if (!deleteResponse.ok) {
-                throw new Error('Failed to delete place');
+                // Parse error response for detailed information
+                const errorData = await deleteResponse.json().catch(() => null);
+
+                if (deleteResponse.status === 400 && errorData?.usedInRoutes) {
+                    // Place is used in routes - ask if user wants to force delete
+                    const routeList = errorData.usedInRoutes.join(', ');
+                    const forceDelete = await showConfirm({
+                        title: 'Place In Use',
+                        message: `"${placeName}" is used in the following route(s): ${routeList}\n\nDo you want to remove it from these routes and delete it?`,
+                        type: 'danger',
+                        confirmText: 'Force Delete',
+                        cancelText: 'Cancel'
+                    });
+
+                    if (!forceDelete) {
+                        return;
+                    }
+
+                    // Force delete the place
+                    const forceDeleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}/force`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!forceDeleteResponse.ok) {
+                        throw new Error('Failed to force delete place');
+                    }
+                } else {
+                    throw new Error(errorData?.message || 'Failed to delete place');
+                }
             }
 
             showSuccess(`Deleted "${placeName}"`);
@@ -454,16 +918,371 @@ class App {
             showError(error.message || 'Failed to delete place');
         }
     }
+
+    // ============================================
+    // MOBILE POPUP SWIPE NAVIGATION
+    // ============================================
+
+    setupMobilePopupSwipe() {
+        const popup = document.getElementById('mobileDockedPopup');
+        if (!popup) {
+            console.warn('Mobile popup element not found during setup');
+            return;
+        }
+
+        // Initialize SwipeHandler for mobile popup
+        this.popupSwipeHandler = new SwipeHandler({
+            element: popup,
+            states: [
+                { name: 'hidden', height: 0 },
+                { name: 'compact', height: 320 },
+                { name: 'expanded', height: () => window.innerHeight * 0.85 }
+            ],
+            initialState: 'compact',
+            scrollElement: document.getElementById('mobilePopupContent'),
+            enableHorizontalSwipe: true,
+            onHorizontalSwipe: (direction) => {
+                if (direction === 'left') {
+                    this.navigateToNextPlace();
+                } else {
+                    this.navigateToPreviousPlace();
+                }
+            },
+            onStateChange: (newState, oldState) => {
+                console.log(`Mobile popup state changed: ${oldState} → ${newState}`);
+
+                // Handle hide state
+                if (newState === 'hidden') {
+                    this.mapService.hideMobileDockedPopup();
+                }
+            },
+            dataStateAttribute: 'data-state',
+            scrollThreshold: 3,
+            autoScrollThreshold: 20
+        });
+
+        console.log('Mobile popup swipe handler initialized');
+    }
+
+    setupMobilePanelSwipe() {
+        const panel = document.getElementById('mobilePanel');
+        const panelHeader = document.querySelector('.mobile-panel-header');
+
+        if (!panel) {
+            console.warn('Mobile panel element not found during setup');
+            return;
+        }
+
+        if (!panelHeader) {
+            console.warn('Mobile panel header element not found during setup');
+            return;
+        }
+
+        // Initialize SwipeHandler for mobile panel
+        // Attach touch events to header, but apply height changes to panel
+        this.panelSwipeHandler = new SwipeHandler({
+            element: panel,              // The element whose height/state changes
+            handleElement: panelHeader,  // The element that receives touch events
+            states: [
+                { name: 'hidden', height: 0 },
+                { name: 'active', height: '40vh' }, // replaces 'compact' for panel
+                { name: 'expanded', height: '80vh' }
+            ],
+            initialState: 'active',
+            scrollElement: document.querySelector('.mobile-panel-content'),
+            enableHorizontalSwipe: false, // Panel doesn't need horizontal swipes
+            onStateChange: (newState, oldState) => {
+                console.log(`Mobile panel state changed: ${oldState} → ${newState}`);
+            },
+            useClasses: true, // Panel uses CSS classes (.active, .expanded, .hidden)
+            scrollThreshold: 3,
+            autoScrollThreshold: 20
+        });
+
+        console.log('Mobile panel swipe handler initialized (header handle, panel target)');
+    }
+
+    navigateToNextPlace() {
+        console.log('navigateToNextPlace called');
+        const popupData = this.mapService.getCurrentMobilePopupData();
+        console.log('Popup data:', popupData);
+        if (!popupData) {
+            console.warn('No popup data available');
+            return;
+        }
+
+        const { placeData } = popupData;
+        const context = this.getActiveViewContext();
+        console.log('Context:', context, 'Place data:', placeData);
+
+        // Determine view based on placeData and context
+        const isRoutePlace = placeData && placeData.index !== null && !placeData.isNonRoute;
+        const isAllPlacesView = context.view === 'allplaces' || context.mode === 'allplaces';
+
+        if (isRoutePlace) {
+            // Route Places view (including when viewing from "Routes" tab)
+            const currentIndex = placeData.index;
+            const nextIndex = currentIndex + 1;
+            console.log('Route Places - current:', currentIndex, 'next:', nextIndex, 'total:', this.placeManager.places.length);
+
+            if (nextIndex < this.placeManager.places.length) {
+                this.showPlaceInMobilePopup(nextIndex, false);
+                this.updatePopupPositionIndicator(nextIndex + 1, this.placeManager.places.length);
+            } else {
+                console.log('Already at last place');
+            }
+        } else if (isAllPlacesView) {
+            // All Places view
+            const currentIndex = this.allPlacesManager.selectedIndex;
+            const nextIndex = currentIndex !== null ? currentIndex + 1 : 0;
+            console.log('All Places - current:', currentIndex, 'next:', nextIndex, 'total:', this.allPlacesManager.filteredPlaces.length);
+
+            if (nextIndex < this.allPlacesManager.filteredPlaces.length) {
+                this.allPlacesManager.selectCard(nextIndex);
+                this.mapService.selectAllPlace(nextIndex);
+                this.showAllPlaceInMobilePopup(nextIndex);
+                this.updatePopupPositionIndicator(nextIndex + 1, this.allPlacesManager.filteredPlaces.length);
+            } else {
+                console.log('Already at last place');
+            }
+        } else {
+            console.log('Unknown view - isRoutePlace:', isRoutePlace, 'isAllPlacesView:', isAllPlacesView);
+        }
+    }
+
+    navigateToPreviousPlace() {
+        console.log('navigateToPreviousPlace called');
+        const popupData = this.mapService.getCurrentMobilePopupData();
+        console.log('Popup data:', popupData);
+        if (!popupData) {
+            console.warn('No popup data available');
+            return;
+        }
+
+        const { placeData } = popupData;
+        const context = this.getActiveViewContext();
+        console.log('Context:', context, 'Place data:', placeData);
+
+        // Determine view based on placeData and context
+        const isRoutePlace = placeData && placeData.index !== null && !placeData.isNonRoute;
+        const isAllPlacesView = context.view === 'allplaces' || context.mode === 'allplaces';
+
+        if (isRoutePlace) {
+            // Route Places view (including when viewing from "Routes" tab)
+            const currentIndex = placeData.index;
+            const prevIndex = currentIndex - 1;
+            console.log('Route Places - current:', currentIndex, 'prev:', prevIndex);
+
+            if (prevIndex >= 0) {
+                this.showPlaceInMobilePopup(prevIndex, false);
+                this.updatePopupPositionIndicator(prevIndex + 1, this.placeManager.places.length);
+            } else {
+                console.log('Already at first place');
+            }
+        } else if (isAllPlacesView) {
+            // All Places view
+            const currentIndex = this.allPlacesManager.selectedIndex;
+            const prevIndex = currentIndex !== null ? currentIndex - 1 : -1;
+            console.log('All Places - current:', currentIndex, 'prev:', prevIndex);
+
+            if (prevIndex >= 0) {
+                this.allPlacesManager.selectCard(prevIndex);
+                this.mapService.selectAllPlace(prevIndex);
+                this.showAllPlaceInMobilePopup(prevIndex);
+                this.updatePopupPositionIndicator(prevIndex + 1, this.allPlacesManager.filteredPlaces.length);
+            } else {
+                console.log('Already at first place');
+            }
+        } else {
+            console.log('Unknown view - isRoutePlace:', isRoutePlace, 'isAllPlacesView:', isAllPlacesView);
+        }
+    }
+
+    async showPlaceInMobilePopup(index, isNonRoute) {
+        const place = this.placeManager.places[index];
+        if (!place) return;
+
+        // Build mobile popup content
+        let mobileContent = this.mapService.buildPlacePopupContent(place, index, isNonRoute, true);
+
+        // Try to load Google data if available
+        if (place.hasGoogleData && place.id) {
+            try {
+                const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+                if (enrichedPlace && enrichedPlace.googleData) {
+                    const enrichedPlaceWithCoords = {
+                        ...place,
+                        googleData: enrichedPlace.googleData
+                    };
+                    mobileContent = this.mapService.buildPlacePopupContent(enrichedPlaceWithCoords, index, isNonRoute, true);
+                }
+            } catch (error) {
+                console.warn('Failed to load Google data for mobile popup:', error);
+            }
+        }
+
+        // Show docked popup
+        this.mapService.showMobileDockedPopup(mobileContent, place.id, { place, index, isNonRoute });
+
+        // Center map on place
+        this.mapService.map.setView(place.coords, this.mapService.map.getZoom());
+    }
+
+    async showAllPlaceInMobilePopup(index) {
+        const place = this.allPlacesManager.filteredPlaces[index];
+        if (!place) return;
+
+        const placeWithCoords = {
+            ...place,
+            coords: [place.latitude, place.longitude]
+        };
+
+        // Build mobile popup content
+        let mobileContent = this.mapService.buildPlacePopupContent(placeWithCoords, null, true, true);
+
+        // Try to load Google data if available
+        if (place.hasGoogleData && place.id) {
+            try {
+                const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+                if (enrichedPlace && enrichedPlace.googleData) {
+                    const enrichedPlaceWithCoords = {
+                        ...placeWithCoords,
+                        googleData: enrichedPlace.googleData
+                    };
+                    mobileContent = this.mapService.buildPlacePopupContent(enrichedPlaceWithCoords, null, true, true);
+                }
+            } catch (error) {
+                console.warn('Failed to load Google data for mobile popup:', error);
+            }
+        }
+
+        // Show docked popup
+        this.mapService.showMobileDockedPopup(mobileContent, place.id, { place: placeWithCoords, index: null, isNonRoute: true });
+
+        // Center map on place
+        this.mapService.map.setView([place.latitude, place.longitude], this.mapService.map.getZoom());
+    }
+
+    updatePopupPositionIndicator(current, total) {
+        const positionEl = document.getElementById('mobilePopupPosition');
+        if (positionEl) {
+            positionEl.textContent = `${current} of ${total}`;
+        }
+    }
+
+    // ============================================
+    // MODAL MODE FUNCTIONS (View/Edit Place Details)
+    // ============================================
+
+    /**
+     * Open place details modal in view or edit mode
+     * @param {number} placeId - Place ID
+     * @param {string} mode - 'view' or 'edit'
+     */
+    async showPlaceDetailsModal(placeId, mode = 'view') {
+        // Find the place in current route or all places
+        let place = null;
+        let placeIndex = null;
+
+        // Check if it's in the current route
+        placeIndex = this.placeManager.places.findIndex(p => p.id === placeId);
+        if (placeIndex >= 0) {
+            place = this.placeManager.places[placeIndex];
+        } else {
+            // Check in all places
+            place = this.filterManager.allPlaces.find(p => p.id === placeId);
+        }
+
+        if (!place) {
+            showError('Place not found');
+            return;
+        }
+
+        // Set modal mode
+        const modal = document.getElementById('editPlaceModal');
+        if (modal) {
+            modal.setAttribute('data-mode', mode);
+
+            // Update modal title based on mode
+            const modalTitle = document.getElementById('editPlaceModalTitle');
+            if (modalTitle) {
+                if (mode === 'view') {
+                    modalTitle.innerHTML = '<i class="fas fa-info-circle"></i> Place Details';
+                } else {
+                    modalTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Place';
+                }
+            }
+        }
+
+        // Open the modal using existing showRenamePlaceModal
+        if (placeIndex >= 0) {
+            await this.placeManager.showRenamePlaceModal(placeIndex);
+        } else {
+            // For non-route places, use editNonRoutePlace
+            await this.editNonRoutePlace(placeId);
+        }
+    }
+
+    /**
+     * Switch between view and edit modes in the place modal
+     * @param {string} mode - 'view' or 'edit'
+     */
+    switchPlaceModalMode(mode) {
+        const modal = document.getElementById('editPlaceModal');
+        if (!modal) return;
+
+        modal.setAttribute('data-mode', mode);
+
+        // Update modal title
+        const modalTitle = document.getElementById('editPlaceModalTitle');
+        if (modalTitle) {
+            if (mode === 'view') {
+                modalTitle.innerHTML = '<i class="fas fa-info-circle"></i> Place Details';
+            } else {
+                modalTitle.innerHTML = '<i class="fas fa-edit"></i> Edit Place';
+            }
+        }
+
+        // If switching to edit mode, make sure inputs are editable
+        if (mode === 'edit') {
+            const placeNameInput = document.getElementById('placeName');
+            const notesTextarea = document.getElementById('placeNotes');
+            if (placeNameInput) placeNameInput.removeAttribute('readonly');
+            if (notesTextarea) notesTextarea.removeAttribute('readonly');
+        }
+    }
+
+    /**
+     * Open place details from mobile popup "View Details" button
+     */
+    openPlaceDetailsFromPopup() {
+        const popupData = this.mapService.getCurrentMobilePopupData();
+        if (!popupData) return;
+
+        const { placeId, placeData } = popupData;
+
+        // Hide mobile popup
+        this.mapService.hideMobileDockedPopup();
+
+        // Open details modal in view mode
+        if (placeData?.place?.id) {
+            this.showPlaceDetailsModal(placeData.place.id, 'view');
+        } else if (placeId) {
+            this.showPlaceDetailsModal(placeId, 'view');
+        }
+    }
 }
 
 // Initialize app when DOM is loaded
 window.addEventListener('load', async () => {
     window.app = new App();
+    window.mapService = window.app.mapService; // Expose for onclick handlers
     await window.app.init();
 });
 
 // Export for global access (for inline event handlers)
 window.handleSearch = () => window.app?.handleSearch();
+window.handleAddCampsite = () => window.app?.handleAddCampsite();
 window.switchTab = (tab) => window.app?.switchTab(tab);
 window.showCreateRouteModal = () => window.app?.showCreateRouteModal();
 window.showRenameRouteModal = () => window.app?.showRenameRouteModal();
@@ -481,6 +1300,14 @@ window.savePlaceEdit = () => window.app?.placeManager?.savePlaceEdit();
 window.closeAddPlacePositionModal = () => window.app?.placeManager?.closeAddPlacePositionModal();
 window.closePlaceAddedSuccessModal = () => window.app?.placeManager?.closePlaceAddedSuccessModal();
 window.addSavedPlaceToRoute = () => window.app?.placeManager?.addSavedPlaceToRoute();
+
+// Mobile popup gallery
+window.openPhotosGallery = () => window.app?.mapService?.openCurrentPhotosGallery();
+window.closePhotosGallery = () => window.app?.mapService?.hideFullscreenImageGallery();
+
+// Mobile popup navigation
+window.navigateToNextPlace = () => window.app?.navigateToNextPlace();
+window.navigateToPreviousPlace = () => window.app?.navigateToPreviousPlace();
 
 // Global access for managers
 window.placeManager = null; // Will be set by app
