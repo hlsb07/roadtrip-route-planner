@@ -1301,7 +1301,7 @@ export class PlaceManager {
         for (let i = 1; i <= routeLength; i++) {
             buttonsHTML += `
                 <button class="position-btn" onclick="placeManager.addExistingPlaceToRouteAtPosition(${placeId}, ${i - 1})">
-                    <i class="fas fa-arrow-down"></i>
+                    <i class="fas fa-arrow-up"></i>
                     <span>Before ${i}. ${this.places[i - 1].name}</span>
                 </button>
             `;
