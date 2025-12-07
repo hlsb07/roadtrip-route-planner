@@ -4,7 +4,7 @@ export const CONFIG = {
     // - Nginx serves frontend at http://localhost
     // - Nginx proxies /api/ to backend at localhost:5166
     // - Nginx serves /images/ from shared directory
-    API_BASE: '/api',  // Proxied by Nginx to http://localhost:5166/api
+    API_BASE: '/roadtriprouteplanner/api',  // Proxied by Nginx to http://localhost:5166/api
 
     // For development without Nginx, uncomment this:
     // API_BASE: 'http://localhost:5166/api',
