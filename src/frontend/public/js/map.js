@@ -335,6 +335,41 @@ export class MapService {
         }
 
         console.log('Route segments created:', this.routeSegments.length);
+
+        // Auto-debug route segments with detailed info
+        this.debugRouteSegments();
+    }
+
+    /**
+     * Debug helper: Log route segment information in JSON format
+     * Call this in console: window.mapService.debugRouteSegments()
+     */
+    debugRouteSegments() {
+        if (!this.routeSegments || this.routeSegments.length === 0) {
+            console.warn('No route segments available. Make sure a route is calculated first.');
+            return;
+        }
+
+        const segmentsData = this.routeSegments.map((segment, index) => {
+            const distanceKm = parseFloat((segment.distance / 1000).toFixed(2));
+            const durationHours = Math.floor(segment.duration / 3600);
+            const durationMinutes = Math.floor((segment.duration % 3600) / 60);
+            const durationText = durationHours > 0
+                ? `${durationHours}h ${durationMinutes}min`
+                : `${durationMinutes}min`;
+
+            return {
+                Segment: index + 1,
+                From: segment.startPlace,
+                To: segment.endPlace,
+                'Distance (km)': distanceKm,
+                Duration: durationText
+            };
+        });
+
+        console.log(JSON.stringify(segmentsData, null, 2));
+
+        return segmentsData;
     }
 
     /**
