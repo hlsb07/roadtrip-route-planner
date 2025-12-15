@@ -13,6 +13,7 @@ namespace RoutePlanner.API.Data
         public DbSet<Place> Places { get; set; }
         public DbSet<Models.Route> Routes { get; set; }
         public DbSet<RoutePlace> RoutePlaces { get; set; }
+        public DbSet<RouteLeg> RouteLegs { get; set; }
 
         // Google Maps Integration
         public DbSet<GooglePlaceData> GooglePlaceData { get; set; }
@@ -128,6 +129,14 @@ namespace RoutePlanner.API.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.Description).HasMaxLength(1000);
+
+                // Schedule Settings
+                entity.Property(e => e.TimeZoneId).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.StartDateTime).HasColumnType("timestamptz");
+                entity.Property(e => e.EndDateTime).HasColumnType("timestamptz");
+                entity.Property(e => e.DefaultArrivalTime).HasColumnType("time without time zone");
+                entity.Property(e => e.DefaultDepartureTime).HasColumnType("time without time zone");
+
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
@@ -156,11 +165,51 @@ namespace RoutePlanner.API.Data
                       .HasForeignKey(rp => rp.PlaceId)
                       .OnDelete(DeleteBehavior.Restrict); // Verhindert Löschen von Places, die in Routes verwendet werden
 
+                // Schedule Properties
+                entity.Property(rp => rp.StopType).IsRequired().HasDefaultValue(StopType.Overnight);
+                entity.Property(rp => rp.TimeZoneId).HasMaxLength(100);
+                entity.Property(rp => rp.PlannedStart).HasColumnType("timestamptz");
+                entity.Property(rp => rp.PlannedEnd).HasColumnType("timestamptz");
+                entity.Property(rp => rp.IsStartLocked).HasDefaultValue(false);
+                entity.Property(rp => rp.IsEndLocked).HasDefaultValue(false);
+
                 // Index für Performance
                 entity.HasIndex(rp => new { rp.RouteId, rp.OrderIndex })
                       .IsUnique(); // Ein Ort kann nur einmal pro Position in einer Route sein
 
+                // Indexes for schedule queries
+                entity.HasIndex(rp => rp.PlannedStart);
+                entity.HasIndex(rp => rp.PlannedEnd);
+
                 entity.Property(rp => rp.OrderIndex).IsRequired();
+            });
+
+            // ===== RouteLeg Configuration =====
+            modelBuilder.Entity<RouteLeg>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Provider).HasMaxLength(50).IsRequired();
+
+                // Unique index on (RouteId, OrderIndex)
+                entity.HasIndex(e => new { e.RouteId, e.OrderIndex }).IsUnique();
+
+                // Relationship to Route (cascade delete)
+                entity.HasOne(e => e.Route)
+                      .WithMany(r => r.Legs)
+                      .HasForeignKey(e => e.RouteId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Relationships to RoutePlace (restrict - manual cleanup on reorder)
+                entity.HasOne(e => e.FromRoutePlace)
+                      .WithMany()
+                      .HasForeignKey(e => e.FromRoutePlaceId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.ToRoutePlace)
+                      .WithMany()
+                      .HasForeignKey(e => e.ToRoutePlaceId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // GoogleMapsCache Konfiguration

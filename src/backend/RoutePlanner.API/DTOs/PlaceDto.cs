@@ -1,3 +1,6 @@
+using System.ComponentModel.DataAnnotations;
+using RoutePlanner.API.Models;
+
 namespace RoutePlanner.API.DTOs
 {
     public class PlaceDto
@@ -277,5 +280,135 @@ namespace RoutePlanner.API.DTOs
         public string? Name { get; set; }
         public string? FormattedAddress { get; set; }
         public List<string> Types { get; set; } = new();
+    }
+
+    // ===== Route Schedule DTOs =====
+
+    /// <summary>
+    /// Route schedule settings (read-only)
+    /// </summary>
+    public record RouteScheduleSettingsDto(
+        string TimeZoneId,
+        DateTimeOffset? StartDateTime,
+        DateTimeOffset? EndDateTime,
+        TimeOnly? DefaultArrivalTime,
+        TimeOnly? DefaultDepartureTime
+    );
+
+    /// <summary>
+    /// Update route schedule settings
+    /// </summary>
+    public class UpdateRouteScheduleDto
+    {
+        [Required]
+        [MaxLength(100)]
+        public string TimeZoneId { get; set; } = "Europe/Berlin";
+
+        public DateTimeOffset? StartDateTime { get; set; }
+        public DateTimeOffset? EndDateTime { get; set; }
+        public TimeOnly? DefaultArrivalTime { get; set; }
+        public TimeOnly? DefaultDepartureTime { get; set; }
+    }
+
+    // ===== RoutePlace/Stop Schedule DTOs =====
+
+    /// <summary>
+    /// Update individual stop schedule data
+    /// </summary>
+    public class RoutePlaceScheduleUpdateDto
+    {
+        public StopType StopType { get; set; }
+
+        [MaxLength(100)]
+        public string? TimeZoneId { get; set; }
+
+        public DateTimeOffset? PlannedStart { get; set; }
+        public DateTimeOffset? PlannedEnd { get; set; }
+
+        [Range(0, int.MaxValue)]
+        public int? StayNights { get; set; }
+
+        [Range(0, int.MaxValue)]
+        public int? StayDurationMinutes { get; set; }
+
+        public bool IsStartLocked { get; set; }
+        public bool IsEndLocked { get; set; }
+    }
+
+    // ===== RouteLeg DTOs =====
+
+    /// <summary>
+    /// Route leg information (distance/time between stops)
+    /// </summary>
+    public record RouteLegDto(
+        int Id,
+        int OrderIndex,
+        int FromRoutePlaceId,
+        int ToRoutePlaceId,
+        int DistanceMeters,
+        int DurationSeconds,
+        string Provider,
+        DateTime CalculatedAt
+    );
+
+    /// <summary>
+    /// Update leg metrics (distance/time)
+    /// </summary>
+    public class UpdateLegMetricsDto
+    {
+        [Required]
+        [Range(0, int.MaxValue)]
+        public int DistanceMeters { get; set; }
+
+        [Required]
+        [Range(0, int.MaxValue)]
+        public int DurationSeconds { get; set; }
+    }
+
+    // ===== Itinerary DTO (Full Route with Schedule) =====
+
+    /// <summary>
+    /// Complete route itinerary with schedule, stops, and legs
+    /// </summary>
+    public class RouteItineraryDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+
+        // Schedule Settings
+        public RouteScheduleSettingsDto? ScheduleSettings { get; set; }
+
+        // Ordered Stops
+        public List<RoutePlaceWithScheduleDto> Places { get; set; } = new();
+
+        // Legs
+        public List<RouteLegDto> Legs { get; set; } = new();
+
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    /// <summary>
+    /// RoutePlace with full schedule information
+    /// </summary>
+    public class RoutePlaceWithScheduleDto
+    {
+        public int Id { get; set; }
+        public int PlaceId { get; set; }
+        public string PlaceName { get; set; } = string.Empty;
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public int OrderIndex { get; set; }
+
+        // Schedule Data
+        public StopType StopType { get; set; }
+        public string? TimeZoneId { get; set; }
+        public DateTimeOffset? PlannedStart { get; set; }
+        public DateTimeOffset? PlannedEnd { get; set; }
+        public int? StayNights { get; set; }
+        public int? StayDurationMinutes { get; set; }
+        public bool IsStartLocked { get; set; }
+        public bool IsEndLocked { get; set; }
     }
 }

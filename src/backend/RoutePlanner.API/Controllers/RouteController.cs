@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using RoutePlanner.API.Data;
 using RoutePlanner.API.DTOs;
 using RoutePlanner.API.Models;
+using RoutePlanner.API.Services;
 
 namespace RoutePlanner.API.Controllers
 {
@@ -11,10 +12,17 @@ namespace RoutePlanner.API.Controllers
     public class RoutesController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IRouteScheduleService _scheduleService;
+        private readonly IRouteLegService _legService;
 
-        public RoutesController(AppDbContext context)
+        public RoutesController(
+            AppDbContext context,
+            IRouteScheduleService scheduleService,
+            IRouteLegService legService)
         {
             _context = context;
+            _scheduleService = scheduleService;
+            _legService = legService;
         }
 
         // GET: api/routes - Alle Routen anzeigen
@@ -288,14 +296,112 @@ namespace RoutePlanner.API.Controllers
                 totalDistance += distance;
             }
 
-            return Ok(new 
-            { 
+            return Ok(new
+            {
                 routeId = id,
                 totalDistanceKm = Math.Round(totalDistance / 1000, 2),
                 placeCount = route.Places.Count,
                 startPlace = orderedPlaces.First().Place.Name,
                 endPlace = orderedPlaces.Last().Place.Name
             });
+        }
+
+        // ===== Schedule Management Endpoints =====
+
+        // GET: api/routes/{id}/itinerary - Get full route with schedule, stops, and legs
+        [HttpGet("{id}/itinerary")]
+        public async Task<ActionResult<RouteItineraryDto>> GetItinerary(int id)
+        {
+            try
+            {
+                var itinerary = await _scheduleService.GetItinerary(id);
+                if (itinerary == null)
+                    return NotFound($"Route with ID {id} not found");
+
+                return Ok(itinerary);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error retrieving itinerary", error = ex.Message });
+            }
+        }
+
+        // PUT: api/routes/{id}/schedule-settings - Update route schedule settings
+        [HttpPut("{id}/schedule-settings")]
+        public async Task<IActionResult> UpdateScheduleSettings(int id, [FromBody] UpdateRouteScheduleDto dto)
+        {
+            try
+            {
+                await _scheduleService.UpdateRouteScheduleSettings(id, dto);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating schedule settings", error = ex.Message });
+            }
+        }
+
+        // PUT: api/routes/{routeId}/places/{routePlaceId}/schedule - Update stop schedule
+        [HttpPut("{routeId}/places/{routePlaceId}/schedule")]
+        public async Task<IActionResult> UpdateRoutePlaceSchedule(int routeId, int routePlaceId, [FromBody] RoutePlaceScheduleUpdateDto dto)
+        {
+            try
+            {
+                await _scheduleService.UpdateRoutePlaceSchedule(routeId, routePlaceId, dto);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating stop schedule", error = ex.Message });
+            }
+        }
+
+        // ===== Leg Management Endpoints =====
+
+        // POST: api/routes/{id}/legs/rebuild - Rebuild leg skeleton
+        [HttpPost("{id}/legs/rebuild")]
+        public async Task<IActionResult> RebuildLegSkeleton(int id)
+        {
+            try
+            {
+                await _legService.RebuildLegSkeleton(id);
+                return Ok(new { message = $"Successfully rebuilt leg skeleton for route {id}" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error rebuilding leg skeleton", error = ex.Message });
+            }
+        }
+
+        // PUT: api/routes/{routeId}/legs/{legId} - Update leg metrics
+        [HttpPut("{routeId}/legs/{legId}")]
+        public async Task<IActionResult> UpdateLegMetrics(int routeId, int legId, [FromBody] UpdateLegMetricsDto dto)
+        {
+            try
+            {
+                await _legService.UpdateLegMetrics(routeId, legId, dto.DistanceMeters, dto.DurationSeconds);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating leg metrics", error = ex.Message });
+            }
         }
     }
 }
