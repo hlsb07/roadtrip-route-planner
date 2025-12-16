@@ -10,6 +10,9 @@ import { ApiService } from './api.js';
 import { showError, showSuccess, showConfirm } from './utils.js';
 import { CONFIG } from './config.js';
 import { SwipeHandler } from './swipeHandler.js';
+import { TimelineService } from './timeline/TimelineService.js';
+import { initializeScheduleIfNeeded } from './timeline/scheduleInitializer.js';
+import { mapItineraryToTimelineStops, calculateTotalDays } from './timeline/timelineMapper.js';
 
 class App {
     constructor() {
@@ -21,6 +24,7 @@ class App {
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
         this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
         this.tagManager = new TagManager();
+// Initialize Timeline Service        this.timelineService = new TimelineService({            onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),            onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),            onNeedRecalculateLegs: () => this.handleRecalculateLegs()        });
 
         // Set callback for search result selection (save to database, don't add to route)
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
@@ -75,6 +79,7 @@ class App {
             if (places && places.length > 0) {
                 this.placeManager.setPlaces(places);
                 this.updateUI();
+                await this.loadTimelineForCurrentRoute();
             }
 
             // Load campsites
@@ -160,6 +165,7 @@ class App {
                     const places = await this.routeManager.loadCurrentRoute();
                     this.placeManager.setPlaces(places);
                     this.updateUI();
+                    await this.loadTimelineForCurrentRoute();
                 }
             }
         });
@@ -1098,6 +1104,146 @@ class App {
         }
     }
 
+    // ===== Timeline Methods =====
+
+    async loadTimelineForCurrentRoute() {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) {
+            // Hide timeline if no route selected
+            const panel = document.getElementById('timelinePanel');
+            if (panel) {
+                panel.classList.remove('visible');
+            }
+            return;
+        }
+
+        try {
+            // Show timeline
+            const panel = document.getElementById('timelinePanel');
+            if (panel) {
+                panel.classList.add('visible');
+            }
+
+            // Get current route
+            const route = await ApiService.getRoute(routeId);
+
+            // Auto-initialize schedule if needed
+            await initializeScheduleIfNeeded(routeId, route);
+
+            // Load itinerary
+            const itinerary = await ApiService.getItinerary(routeId);
+
+            // Map to timeline coordinates
+            const timelineStops = mapItineraryToTimelineStops(itinerary);
+            const totalDays = calculateTotalDays(timelineStops);
+            const routeStartUtc = itinerary.scheduleSettings?.startDateTime;
+
+            // Render timeline
+            this.timelineService.render(timelineStops, totalDays, routeStartUtc);
+        } catch (error) {
+            console.error('Failed to load timeline:', error);
+            showError('Failed to load timeline');
+        }
+    }
+
+    async handleTimelineStopSelected(index, stop) {
+        // Select place on map
+        this.selectPlace(index);
+
+        // Update timeline UI
+        this.timelineService.setActiveStop(index);
+    }
+
+    async handleStopScheduleChanged(routePlaceId, dto) {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) return;
+
+        try {
+            await ApiService.updateStopSchedule(routeId, routePlaceId, dto);
+
+            // Optionally reload itinerary and refresh timeline
+            await this.loadTimelineForCurrentRoute();
+        } catch (error) {
+            console.error('Failed to update stop schedule:', error);
+            showError('Failed to update schedule');
+        }
+    }
+
+    async handleRecalculateLegs() {
+        // Optional: trigger leg recalculation after schedule changes
+        
+        // This could be implemented if we want to auto-update drive times
+        console.log('Leg recalculation requested (not yet implemented)');
+    }
+
+    // Add method to App class for rendering mobile timeline
+    async renderMobileTimeline() {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) {
+            const container = document.getElementById('mobileTimelineContent');
+            if (container) {
+                container.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">No route selected</p>';
+            }
+            return;
+        }
+
+        try {
+            const itinerary = await ApiService.getItinerary(routeId);
+            const container = document.getElementById('mobileTimelineContent');
+
+            if (!container) return;
+
+            if (!itinerary.places || itinerary.places.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">No places in route</p>';
+                return;
+            }
+
+            // Render simple list view
+            const html = itinerary.places.map((place, idx) => {
+                const startDate = place.plannedStart ? new Date(place.plannedStart).toLocaleString() : 'Not scheduled';
+                const endDate = place.plannedEnd ? new Date(place.plannedEnd).toLocaleString() : 'Not scheduled';
+                const stopTypeLabel = place.stopType === 0 ? 'Overnight' : place.stopType === 1 ? 'Day Stop' : 'Waypoint';
+
+                return `
+                    <div class="mobile-timeline-place" style="background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                            <div style="background: linear-gradient(135deg, ${this.getColorForIndex(idx)}); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 10px;">${idx + 1}</div>
+                            <h4 style="margin: 0; flex: 1;">${place.placeName}</h4>
+                            <span style="background: #e3f2fd; padding: 4px 8px; border-radius: 12px; font-size: 11px; color: #1976D2;">${stopTypeLabel}</span>
+                        </div>
+                        <div style="font-size: 13px; color: #666;">
+                            <div style="margin-bottom: 4px;">
+                                <i class="fas fa-sign-in-alt" style="width: 16px;"></i> <strong>Arrival:</strong> ${startDate}
+                            </div>
+                            <div>
+                                <i class="fas fa-sign-out-alt" style="width: 16px;"></i> <strong>Departure:</strong> ${endDate}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            container.innerHTML = html;
+        } catch (error) {
+            console.error('Failed to render mobile timeline:', error);
+            const container = document.getElementById('mobileTimelineContent');
+            if (container) {
+                container.innerHTML = '<p style="text-align: center; padding: 20px; color: #f44336;">Failed to load timeline</p>';
+            }
+        }
+    }
+
+    getColorForIndex(idx) {
+        const colors = [
+            '#FF6B6B, #EE5A52',
+            '#4ECDC4, #44B3AA',
+            '#FFE66D, #F4D03F',
+            '#A8E6CF, #88D4AB',
+            '#C7CEEA, #A8B3D7'
+        ];
+        return colors[idx % colors.length];
+    }
+
     async showPlaceInMobilePopup(index, isNonRoute) {
         const place = this.placeManager.places[index];
         if (!place) return;
@@ -1331,3 +1477,52 @@ window.addEventListener('load', () => {
         }
     }, 100);
 });
+// Mobile mode switching function
+window.switchMobileMode = function(mode) {
+    console.log('Switching to mobile mode:', mode);
+    
+    // Update nav items
+    const navItems = document.querySelectorAll('.mobile-nav-item');
+    navItems.forEach(item => {
+        if (item.dataset.mode === mode) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
+    });
+    
+    // Update mobile sections
+    const sections = document.querySelectorAll('.mobile-section');
+    sections.forEach(section => {
+        if (section.dataset.section === mode) {
+            section.style.display = 'block';
+        } else {
+            section.style.display = 'none';
+        }
+    });
+    
+    // Update panel title
+    const titles = {
+        routes: 'Route Selection',
+        search: 'Save Place',
+        places: 'Route Places',
+        allplaces: 'All Places',
+        campsites: 'Campsites',
+        controls: 'Tools',
+        timeline: 'Route Timeline'
+    };
+    
+    const titleEl = document.getElementById('mobilePanelTitle');
+    if (titleEl && titles[mode]) {
+        titleEl.textContent = titles[mode];
+    }
+    
+    // If timeline mode, ensure timeline is rendered for mobile
+    if (mode === 'timeline' && window.app) {
+        // The timeline will use the same TimelineService instance
+        // Just make sure it's visible and rendered
+        setTimeout(() => {
+            window.app.renderMobileTimeline();
+        }, 100);
+    }
+};

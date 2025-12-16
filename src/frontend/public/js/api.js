@@ -455,4 +455,90 @@ export class ApiService {
         }
         return await response.json();
     }
+
+    // ===== Timeline / Schedule API Methods =====
+
+    /**
+     * Get complete route itinerary with schedule settings, stops, and legs
+     * @param {number} routeId - Route ID
+     * @returns {Promise<Object>} Route itinerary with schedule data
+     */
+    static async getItinerary(routeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/itinerary`);
+        if (!response.ok) {
+            throw new Error(`Failed to load itinerary: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * Update route-level schedule settings
+     * @param {number} routeId - Route ID
+     * @param {Object} dto - Schedule settings DTO
+     * @returns {Promise<void>}
+     */
+    static async updateRouteScheduleSettings(routeId, dto) {
+        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/schedule-settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update route schedule settings');
+        }
+    }
+
+    /**
+     * Update schedule data for a specific stop in the route
+     * @param {number} routeId - Route ID
+     * @param {number} routePlaceId - RoutePlace ID
+     * @param {Object} dto - Schedule update DTO
+     * @returns {Promise<void>}
+     */
+    static async updateStopSchedule(routeId, routePlaceId, dto) {
+        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places/${routePlaceId}/schedule`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update stop schedule');
+        }
+    }
+
+    /**
+     * Rebuild leg skeleton for a route (creates legs for consecutive stop pairs)
+     * @param {number} routeId - Route ID
+     * @returns {Promise<void>}
+     */
+    static async rebuildLegs(routeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/rebuild`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to rebuild legs');
+        }
+    }
+
+    /**
+     * Update distance and duration metrics for a specific leg
+     * @param {number} routeId - Route ID
+     * @param {number} legId - Leg ID
+     * @param {Object} dto - Leg metrics DTO {distanceMeters, durationSeconds}
+     * @returns {Promise<void>}
+     */
+    static async updateLegMetrics(routeId, legId, dto) {
+        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/${legId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update leg metrics');
+        }
+    }
 }

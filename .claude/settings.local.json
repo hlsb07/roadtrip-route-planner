@@ -10,7 +10,9 @@
       "Bash(dotnet ef database:*)",
       "Bash(dir:*)",
       "Bash(dotnet list:*)",
-      "Bash(timeout /t 5)"
+      "Bash(timeout /t 5)",
+      "Bash(find:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

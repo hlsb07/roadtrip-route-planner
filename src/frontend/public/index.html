@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./styles/timeline.css">
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -30,6 +31,10 @@
                         <span>Save Place</span>
                     </button>
                     <button class="desktop-nav-item" data-mode="places" onclick="switchDesktopMode('places')">
+                <button class="mobile-nav-item" data-mode="timeline" onclick="switchMobileMode('timeline')">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Timeline</span>
+                </button>
                         <i class="fas fa-list"></i>
                         <span>Route Places</span>
                     </button>
@@ -225,6 +230,44 @@
             </div>
         </div>
 
+        <!-- Timeline Panel (Collapsible Overlay) -->
+        <div class="timeline-panel collapsed visible" id="timelinePanel">
+            <div class="timeline-panel-header" onclick="toggleTimeline()">
+                <button class="timeline-toggle" id="timelineToggle">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Timeline</span>
+                    <i class="fas fa-chevron-down" id="timelineChevron"></i>
+                </button>
+                <div class="timeline-info">
+                    <div class="timeline-current">
+                        <div class="current-day-label" id="currentDayLabel">Day 1</div>
+                        <div class="current-places" id="currentPlaces"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="timeline-content" id="timelineContent">
+                <div class="gantt-wrapper">
+                    <div class="day-labels" id="dayLabels"></div>
+                    <div class="gantt-grid" id="ganttGrid"></div>
+                    <div class="gantt-content">
+                        <div class="gantt-bars" id="ganttBars"></div>
+
+                        <!-- Track + Progress + Slider -->
+                        <div class="timeline-track">
+                            <div class="timeline-progress" id="timelineProgress"></div>
+                        </div>
+                        <input type="range" id="timelineSlider" />
+                    </div>
+
+                    <!-- Cursor -->
+                    <div class="timeline-cursor" id="timelineCursor">
+                        <div class="timeline-cursor-label" id="timelineCursorLabel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Mobile Navigation -->
         <div class="mobile-nav" id="mobileNav">
             <div class="mobile-nav-items">
@@ -237,6 +280,10 @@
                     <span>Save</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="places" onclick="switchMobileMode('places')">
+                <button class="mobile-nav-item" data-mode="timeline" onclick="switchMobileMode('timeline')">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Timeline</span>
+                </button>
                     <i class="fas fa-list"></i>
                     <span>Route</span>
                 </button>
@@ -353,6 +400,18 @@
 
                 <!-- Campsites List Section -->
                 <div class="mobile-section campsites-list" data-section="campsites" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                <!-- Timeline Section (Mobile) -->
+                <div class="mobile-section timeline-mobile-section" data-section="timeline" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <div class="timeline-mobile-wrapper">
+                        <!-- Timeline will be cloned here for mobile or rendered separately -->
+                        <div class="mobile-timeline-info">
+                            <p>Switch to the desktop view for the interactive timeline, or view the schedule below:</p>
+                        </div>
+                        <div id="mobileTimelineContent">
+                            <!-- Timeline content will be rendered here -->
+                        </div>
+                    </div>
+                </div>
                     <!-- Campsites will be populated here -->
                 </div>
 
