@@ -26,22 +26,25 @@ export async function initializeScheduleIfNeeded(routeId, route) {
         });
     }
 
+    // Load itinerary to get RoutePlace IDs (not Place IDs)
+    const itinerary = await ApiService.getItinerary(routeId);
+
     // Check if places have schedule data
-    const placesNeedSchedule = route.places && route.places.some(p => !p.plannedStart);
+    const placesNeedSchedule = itinerary.places && itinerary.places.some(p => !p.plannedStart);
 
     if (placesNeedSchedule) {
         console.log('Some places need schedule data, generating default schedules...');
-        await generateDefaultStopSchedules(routeId, route);
+        await generateDefaultStopSchedules(routeId, itinerary);
     }
 
     // Check if legs exist
-    if (!route.legs || route.legs.length !== route.places.length - 1) {
+    if (!itinerary.legs || itinerary.legs.length !== itinerary.places.length - 1) {
         console.log('Legs missing or stale, rebuilding...');
         await ApiService.rebuildLegs(routeId);
 
         // Then calculate OSRM and save
-        if (route.places && route.places.length > 1) {
-            await calculateAndSaveOSRMLegs(routeId, route.places);
+        if (itinerary.places && itinerary.places.length > 1) {
+            await calculateAndSaveOSRMLegs(routeId, itinerary.places);
         }
     }
 
@@ -70,21 +73,23 @@ function calculateDefaultStart(route) {
 /**
  * Generate default stop schedules for all places in a route
  * @param {number} routeId - Route ID
- * @param {Object} route - Route object with places
+ * @param {Object} itinerary - Itinerary object with places (containing RoutePlace IDs)
  * @returns {Promise<void>}
  */
-async function generateDefaultStopSchedules(routeId, route) {
-    if (!route.places || route.places.length === 0) {
-        console.log('No places in route, skipping schedule generation');
+async function generateDefaultStopSchedules(routeId, itinerary) {
+    if (!itinerary.places || itinerary.places.length === 0) {
+        console.log('No places in itinerary, skipping schedule generation');
         return;
     }
 
-    const startDateTime = route.startDateTime ? new Date(route.startDateTime) : calculateDefaultStart(route);
+    const startDateTime = itinerary.scheduleSettings?.startDateTime
+        ? new Date(itinerary.scheduleSettings.startDateTime)
+        : new Date();
     console.log(`Generating schedules starting from: ${startDateTime.toISOString()}`);
 
-    for (let i = 0; i < route.places.length; i++) {
-        const place = route.places[i];
-        const routePlaceId = place.id;
+    for (let i = 0; i < itinerary.places.length; i++) {
+        const place = itinerary.places[i];
+        const routePlaceId = place.id; // ✅ Now this is the RoutePlace ID from itinerary
 
         // Simple logic: 1 day per stop
         const dayOffset = i; // Day 1 = index 0
@@ -103,7 +108,7 @@ async function generateDefaultStopSchedules(routeId, route) {
             plannedEnd.setHours(plannedEnd.getHours() + 2); // 2 hours later
         }
 
-        console.log(`Setting schedule for place ${i + 1} (${place.name}): ${plannedStart.toISOString()} to ${plannedEnd.toISOString()}`);
+        console.log(`Setting schedule for place ${i + 1} (${place.placeName}): ${plannedStart.toISOString()} to ${plannedEnd.toISOString()}`);
 
         try {
             await ApiService.updateStopSchedule(routeId, routePlaceId, {
@@ -117,7 +122,7 @@ async function generateDefaultStopSchedules(routeId, route) {
                 isEndLocked: false
             });
         } catch (error) {
-            console.error(`Failed to set schedule for place ${place.name}:`, error);
+            console.error(`Failed to set schedule for place ${place.placeName}:`, error);
             // Continue with other places even if one fails
         }
     }
@@ -137,7 +142,7 @@ async function calculateAndSaveOSRMLegs(routeId, places) {
         const from = places[i];
         const to = places[i + 1];
 
-        console.log(`Calculating leg ${i + 1}: ${from.name} → ${to.name}`);
+        console.log(`Calculating leg ${i + 1}: ${from.placeName || from.name} → ${to.placeName || to.name}`);
 
         try {
             // Call OSRM

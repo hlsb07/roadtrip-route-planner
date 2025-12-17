@@ -45,6 +45,12 @@ export class TimelineService {
     render(timelineStops, totalDays, routeStartUtc) {
         console.log(`Timeline render: ${timelineStops.length} stops, ${totalDays} days`);
 
+        // Check if DOM elements are available
+        if (!this.ganttWrapper || !this.ganttBarsContainer) {
+            console.warn('Timeline DOM not ready, skipping render');
+            return;
+        }
+
         this.timelineStops = timelineStops;
         this.totalDays = totalDays;
         this.routeStartUtc = routeStartUtc;

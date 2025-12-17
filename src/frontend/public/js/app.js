@@ -24,7 +24,13 @@ class App {
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
         this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
         this.tagManager = new TagManager();
-// Initialize Timeline Service        this.timelineService = new TimelineService({            onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),            onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),            onNeedRecalculateLegs: () => this.handleRecalculateLegs()        });
+
+        // Initialize Timeline Service
+        this.timelineService = new TimelineService({
+            onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),
+            onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),
+            onNeedRecalculateLegs: () => this.handleRecalculateLegs()
+        });
 
         // Set callback for search result selection (save to database, don't add to route)
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
