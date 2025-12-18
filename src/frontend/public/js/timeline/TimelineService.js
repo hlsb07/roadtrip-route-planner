@@ -32,6 +32,7 @@ export class TimelineService {
         this.cursorLabel = document.getElementById('timelineCursorLabel');
         this.slider = document.getElementById('timelineSlider');
         this.progress = document.getElementById('timelineProgress');
+        this.timelineContent = document.getElementById('timelineContent');
 
         // Check if elements exist
         if (!this.ganttWrapper || !this.ganttBarsContainer) {
@@ -40,6 +41,7 @@ export class TimelineService {
         }
 
         this.attachSliderListeners();
+        this.attachHorizontalScrollListener();
     }
 
     render(timelineStops, totalDays, routeStartUtc) {
@@ -55,11 +57,24 @@ export class TimelineService {
         this.totalDays = totalDays;
         this.routeStartUtc = routeStartUtc;
 
+        // Set explicit width based on total days
+        const dayWidth = this.getDayWidth();
+        const totalWidth = totalDays * dayWidth;
+        this.ganttWrapper.style.minWidth = `${totalWidth}px`;
+
         this.renderDayLabels();
         this.renderDayGrid();
         this.renderBars();
         this.configureSlider();
         this.updateCursor(0);
+    }
+
+    getDayWidth() {
+        // Return day width based on screen size
+        if (window.innerWidth <= 768) {
+            return 80; // Mobile
+        }
+        return 120; // Desktop
     }
 
     renderDayLabels() {
@@ -313,6 +328,25 @@ export class TimelineService {
         });
     }
 
+    attachHorizontalScrollListener() {
+        if (!this.timelineContent) return;
+
+        // Convert vertical mouse wheel to horizontal scroll
+        this.timelineContent.addEventListener('wheel', (e) => {
+            // Only convert to horizontal scroll if we have horizontal scrollable content
+            const hasHorizontalScroll = this.timelineContent.scrollWidth > this.timelineContent.clientWidth;
+
+            if (hasHorizontalScroll) {
+                // Prevent default vertical scroll
+                e.preventDefault();
+
+                // Apply horizontal scroll based on vertical wheel delta
+                // deltaY is positive when scrolling down, negative when scrolling up
+                this.timelineContent.scrollLeft += e.deltaY;
+            }
+        }, { passive: false }); // passive: false allows preventDefault()
+    }
+
     updateCursor(t) {
         this.currentT = t;
         const pct = (t / this.totalDays) * 100;
@@ -371,6 +405,42 @@ export class TimelineService {
         const bar = this.barElsByIndex.get(index);
         if (bar) {
             bar.classList.add('active');
+
+            // Center the timeline on this bar
+            this.centerOnStop(index);
+        }
+    }
+    
+
+    centerOnStop(index) {
+        if (!this.timelineContent || !this.timelineStops[index]) {
+            return;
+        }
+
+        const stop = this.timelineStops[index];
+        const bar = this.barElsByIndex.get(index);
+
+        if (!bar) return;
+
+        // Calculate the center position of the stop in the timeline
+        const dayWidth = this.getDayWidth();
+        const stopCenterT = (stop.startT + stop.endT) / 2; // Middle of the stop
+        const stopCenterPx = stopCenterT * dayWidth;
+
+        // Calculate the scroll position to center the stop in the viewport
+        const containerWidth = this.timelineContent.clientWidth;
+        const scrollLeft = stopCenterPx - (containerWidth / 2);
+
+        // Smooth scroll to the calculated position
+        this.timelineContent.scrollTo({
+            left: Math.max(0, scrollLeft),
+            behavior: 'smooth'
+        });
+
+        // Update the timeline slider and cursor to the stop's center position
+        if (this.slider) {
+            this.slider.value = stopCenterT;
+            this.updateCursor(stopCenterT);
         }
     }
 

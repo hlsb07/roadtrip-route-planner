@@ -773,6 +773,11 @@ class App {
         this.updateUI(false); // Don't re-center map when selecting a place
         this.mapService.selectPlace(index); // This will center on the selected place
 
+        // Center timeline on selected place
+        if (this.timelineService) {
+            this.timelineService.setActiveStop(index);
+        }
+
         // Show place details in sidebar (desktop only)
         const place = this.placeManager.getPlaces()[index];
         if (place && window.innerWidth > 768) {
@@ -1153,11 +1158,8 @@ class App {
     }
 
     async handleTimelineStopSelected(index, stop) {
-        // Select place on map
+        // Select place on map (which will also update timeline)
         this.selectPlace(index);
-
-        // Update timeline UI
-        this.timelineService.setActiveStop(index);
     }
 
     async handleStopScheduleChanged(routePlaceId, dto) {
