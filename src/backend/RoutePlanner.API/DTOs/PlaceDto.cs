@@ -338,7 +338,7 @@ namespace RoutePlanner.API.DTOs
     // ===== RouteLeg DTOs =====
 
     /// <summary>
-    /// Route leg information (distance/time between stops)
+    /// Route leg information (distance/time/geometry between stops)
     /// </summary>
     public record RouteLegDto(
         int Id,
@@ -348,7 +348,8 @@ namespace RoutePlanner.API.DTOs
         int DistanceMeters,
         int DurationSeconds,
         string Provider,
-        DateTime CalculatedAt
+        DateTime CalculatedAt,
+        List<List<double>>? GeometryCoordinates // [[lon, lat], ...] for frontend visualization
     );
 
     /// <summary>

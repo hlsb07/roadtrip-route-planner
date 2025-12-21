@@ -541,4 +541,20 @@ export class ApiService {
             throw new Error(errorText || 'Failed to update leg metrics');
         }
     }
+
+    /**
+     * Recalculate route legs from OSRM (distance, duration, geometry)
+     * @param {number} routeId - Route ID
+     * @returns {Promise<Object>} - Success message
+     */
+    static async recalculateLegsFromOsrm(routeId) {
+        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/recalculate`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to recalculate route legs');
+        }
+        return await response.json();
+    }
 }

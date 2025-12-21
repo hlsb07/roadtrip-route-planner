@@ -184,11 +184,11 @@ export class MapService {
         // Convert places to waypoints
         const waypoints = places.map(place => L.latLng(place.coords[0], place.coords[1]));
 
-        // Create routing control with OSRM
+        // Create routing control with backend OSRM proxy
         this.routingControl = L.Routing.control({
             waypoints: waypoints,
             router: L.Routing.osrmv1({
-                serviceUrl: 'https://router.project-osrm.org/route/v1',
+                serviceUrl: `${CONFIG.API_BASE}/osrm/route/v1`,
                 profile: 'driving' // car routing
             }),
             routeWhileDragging: false,

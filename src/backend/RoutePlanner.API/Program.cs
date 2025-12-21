@@ -26,6 +26,9 @@ builder.Services.AddScoped<IRouteLegService, RouteLegService>();
 builder.Services.AddHttpClient<Park4NightScraperService>();
 builder.Services.AddScoped<Park4NightScraperService>();
 
+// OSRM Routing Client
+builder.Services.AddHttpClient<IOsrmClient, OsrmClient>();
+
 // PostgreSQL Database mit PostGIS
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(

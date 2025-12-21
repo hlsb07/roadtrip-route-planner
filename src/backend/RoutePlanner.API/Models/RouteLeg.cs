@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using NetTopologySuite.Geometries;
 
 namespace RoutePlanner.API.Models
 {
@@ -19,6 +20,12 @@ namespace RoutePlanner.API.Models
         // OSRM Data
         public int DistanceMeters { get; set; }
         public int DurationSeconds { get; set; }
+
+        /// <summary>
+        /// Road-following geometry from OSRM (LineString, SRID 4326)
+        /// Nullable for backward compatibility with existing legs
+        /// </summary>
+        public LineString? Geometry { get; set; }
 
         [MaxLength(50)]
         public string Provider { get; set; } = "OSRM";

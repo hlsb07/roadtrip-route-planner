@@ -130,6 +130,9 @@ namespace RoutePlanner.API.Services
 
         private RouteLegDto MapToRouteLegDto(RouteLeg leg)
         {
+            // Convert LineString to coordinate array for frontend
+            var geometryCoords = GeometryUtils.LineStringToCoordinateArray(leg.Geometry);
+
             return new RouteLegDto(
                 leg.Id,
                 leg.OrderIndex,
@@ -138,7 +141,8 @@ namespace RoutePlanner.API.Services
                 leg.DistanceMeters,
                 leg.DurationSeconds,
                 leg.Provider,
-                leg.CalculatedAt
+                leg.CalculatedAt,
+                geometryCoords
             );
         }
     }

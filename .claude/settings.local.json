@@ -12,7 +12,8 @@
       "Bash(dotnet list:*)",
       "Bash(timeout /t 5)",
       "Bash(find:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(dotnet ef dbcontext scaffold:*)"
     ],
     "deny": [],
     "ask": []

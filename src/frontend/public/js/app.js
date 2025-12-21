@@ -1443,6 +1443,22 @@ window.showRenameRouteModal = () => window.app?.showRenameRouteModal();
 window.closeRouteModal = () => window.app?.closeRouteModal();
 window.saveRoute = () => window.app?.saveRoute();
 window.deleteCurrentRoute = () => window.app?.deleteCurrentRoute();
+window.recalculateCurrentRoute = async () => {
+    const routeId = window.app?.routeManager?.currentRouteId;
+    if (!routeId) {
+        showError('No route selected');
+        return;
+    }
+    try {
+        const result = await ApiService.recalculateLegsFromOsrm(routeId);
+        showSuccess(result.message || 'Route recalculated successfully!');
+        // Reload timeline to show updated data
+        await window.app?.loadTimelineForCurrentRoute();
+    } catch (error) {
+        console.error('Failed to recalculate route:', error);
+        showError(error.message || 'Failed to recalculate route');
+    }
+};
 window.centerMap = () => window.app?.centerMap();
 window.toggleRoute = () => window.app?.toggleRoute();
 window.getCurrentLocation = () => window.app?.getCurrentLocation();

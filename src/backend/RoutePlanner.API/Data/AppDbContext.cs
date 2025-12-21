@@ -191,6 +191,13 @@ namespace RoutePlanner.API.Data
 
                 entity.Property(e => e.Provider).HasMaxLength(50).IsRequired();
 
+                // Configure Geometry column for OSRM road-following route
+                entity.Property(e => e.Geometry)
+                      .HasColumnType("geometry (linestring, 4326)");
+
+                // Spatial index on Geometry for performance
+                entity.HasIndex(e => e.Geometry).HasMethod("gist");
+
                 // Unique index on (RouteId, OrderIndex)
                 entity.HasIndex(e => new { e.RouteId, e.OrderIndex }).IsUnique();
 

@@ -14,15 +14,18 @@ namespace RoutePlanner.API.Controllers
         private readonly AppDbContext _context;
         private readonly IRouteScheduleService _scheduleService;
         private readonly IRouteLegService _legService;
+        private readonly ILogger<RoutesController> _logger;
 
         public RoutesController(
             AppDbContext context,
             IRouteScheduleService scheduleService,
-            IRouteLegService legService)
+            IRouteLegService legService,
+            ILogger<RoutesController> logger)
         {
             _context = context;
             _scheduleService = scheduleService;
             _legService = legService;
+            _logger = logger;
         }
 
         // GET: api/routes - Alle Routen anzeigen
@@ -199,6 +202,18 @@ namespace RoutePlanner.API.Controllers
             route.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
+            // Auto-recalculate legs from OSRM after adding place
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(id);
+                _logger.LogInformation($"Auto-recalculated legs after adding place to route {id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                // Don't fail the operation if recalculation fails
+            }
+
             return Ok(new { message = "Place added to route successfully" });
         }
 
@@ -222,6 +237,18 @@ namespace RoutePlanner.API.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // Auto-recalculate legs from OSRM after removing place
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(id);
+                _logger.LogInformation($"Auto-recalculated legs after removing place from route {id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                // Don't fail the operation if recalculation fails
+            }
 
             return NoContent();
         }
@@ -256,6 +283,18 @@ namespace RoutePlanner.API.Controllers
 
             route.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            // Auto-recalculate legs from OSRM after reordering places
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(id);
+                _logger.LogInformation($"Auto-recalculated legs after reordering places in route {id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                // Don't fail the operation if recalculation fails
+            }
 
             return NoContent();
         }
@@ -401,6 +440,25 @@ namespace RoutePlanner.API.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { message = "Error updating leg metrics", error = ex.Message });
+            }
+        }
+
+        // POST: api/routes/{id}/legs/recalculate - Recalculate legs from OSRM
+        [HttpPost("{id}/legs/recalculate")]
+        public async Task<IActionResult> RecalculateLegsFromOsrm(int id)
+        {
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(id);
+                return Ok(new { message = $"Successfully recalculated legs for route {id}" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error recalculating legs", error = ex.Message });
             }
         }
     }

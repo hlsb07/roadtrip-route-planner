@@ -37,14 +37,17 @@ export async function initializeScheduleIfNeeded(routeId, route) {
         await generateDefaultStopSchedules(routeId, itinerary);
     }
 
-    // Check if legs exist
-    if (!itinerary.legs || itinerary.legs.length !== itinerary.places.length - 1) {
-        console.log('Legs missing or stale, rebuilding...');
-        await ApiService.rebuildLegs(routeId);
+    // Check if legs exist AND have valid OSRM data
+    const legsAreMissing = !itinerary.legs || itinerary.legs.length !== itinerary.places.length - 1;
+    const legsHaveNoData = itinerary.legs && itinerary.legs.length > 0 &&
+                           itinerary.legs.every(leg => leg.distanceMeters === 0 && leg.durationSeconds === 0);
 
-        // Then calculate OSRM and save
+    if (legsAreMissing || legsHaveNoData) {
+        console.log('Legs missing or have no OSRM data, triggering backend recalculation...');
+
+        // Trigger backend to recalculate legs from OSRM
         if (itinerary.places && itinerary.places.length > 1) {
-            await calculateAndSaveOSRMLegs(routeId, itinerary.places);
+            await triggerBackendLegRecalculation(routeId);
         }
     }
 
@@ -129,74 +132,27 @@ async function generateDefaultStopSchedules(routeId, itinerary) {
 }
 
 /**
- * Calculate OSRM legs and save to backend
+ * Trigger backend to recalculate OSRM legs for entire route
  * @param {number} routeId - Route ID
- * @param {Array} places - Array of places in the route
  * @returns {Promise<void>}
  */
-async function calculateAndSaveOSRMLegs(routeId, places) {
-    console.log(`Calculating OSRM legs for ${places.length} places...`);
+async function triggerBackendLegRecalculation(routeId) {
+    console.log(`Triggering backend leg recalculation for route ${routeId}...`);
 
-    // For each consecutive pair of places
-    for (let i = 0; i < places.length - 1; i++) {
-        const from = places[i];
-        const to = places[i + 1];
+    try {
+        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/recalculate`, {
+            method: 'POST'
+        });
 
-        console.log(`Calculating leg ${i + 1}: ${from.placeName || from.name} → ${to.placeName || to.name}`);
-
-        try {
-            // Call OSRM
-            const result = await callOSRM([from, to]);
-
-            if (!result || !result.routes || result.routes.length === 0) {
-                console.warn(`No route found for leg ${i + 1}`);
-                continue;
-            }
-
-            const route = result.routes[0];
-            const distanceMeters = Math.round(route.distance);
-            const durationSeconds = Math.round(route.duration);
-
-            console.log(`  Distance: ${distanceMeters}m, Duration: ${durationSeconds}s`);
-
-            // Get the itinerary to find the leg ID
-            const itinerary = await ApiService.getItinerary(routeId);
-            const leg = itinerary.legs.find(l => l.orderIndex === i);
-
-            if (leg) {
-                await ApiService.updateLegMetrics(routeId, leg.id, {
-                    distanceMeters: distanceMeters,
-                    durationSeconds: durationSeconds
-                });
-                console.log(`  Saved metrics for leg ${leg.id}`);
-            } else {
-                console.warn(`  Could not find leg with orderIndex ${i}`);
-            }
-        } catch (error) {
-            console.error(`Failed to calculate/save leg ${i + 1}:`, error);
-            // Continue with other legs even if one fails
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Backend recalculation failed: ${errorText}`);
         }
+
+        const result = await response.json();
+        console.log('Backend leg recalculation complete:', result);
+    } catch (error) {
+        console.error('Failed to trigger backend leg recalculation:', error);
+        throw error;
     }
-
-    console.log('OSRM leg calculation complete');
-}
-
-/**
- * Call OSRM API to get route between waypoints
- * @param {Array} waypoints - Array of place objects with latitude/longitude
- * @returns {Promise<Object>} OSRM response
- */
-async function callOSRM(waypoints) {
-    const coords = waypoints.map(p => `${p.longitude},${p.latitude}`).join(';');
-    const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full`;
-
-    console.log(`  OSRM request: ${url}`);
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-        throw new Error(`OSRM request failed: ${response.status}`);
-    }
-
-    return await response.json();
 }

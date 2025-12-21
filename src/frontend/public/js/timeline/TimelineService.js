@@ -168,6 +168,7 @@ export class TimelineService {
         let startX = 0;
         let startStartT = 0;
         let startEndT = 0;
+        let hasMoved = false; // Track if user actually moved the bar
 
         const pxToT = (deltaPx) => {
             const rect = this.ganttWrapper.getBoundingClientRect();
@@ -177,6 +178,11 @@ export class TimelineService {
         const onPointerMove = (e) => {
             const dx = e.clientX - startX;
             const dt = pxToT(dx);
+
+            // Mark as moved if there's any significant movement
+            if (Math.abs(dx) > 2) {
+                hasMoved = true;
+            }
 
             if (mode === 'resizeL') {
                 stop.startT = Math.max(0, Math.min(startStartT + dt, startEndT - MIN_DUR));
@@ -197,23 +203,33 @@ export class TimelineService {
             document.removeEventListener('pointerup', onPointerUp);
 
             barEl.classList.remove('resizing', 'moving');
+
+            // Only save if the user actually moved the bar
+            if (hasMoved) {
+                console.log(`Saving schedule for stop: ${stop.name}`);
+                await this.saveStopSchedule(stop);
+
+                // Optionally recalculate legs
+                // this.callbacks.onNeedRecalculateLegs();
+
+                this.relayoutRows();
+            }
+
             mode = null;
-
-            // Save to backend
-            console.log(`Saving schedule for stop: ${stop.name}`);
-            await this.saveStopSchedule(stop);
-
-            // Optionally recalculate legs
-            // this.callbacks.onNeedRecalculateLegs();
-
-            this.relayoutRows();
+            hasMoved = false;
         };
 
         barEl.addEventListener('pointerdown', (e) => {
             const isLeft = e.target.classList.contains('left');
             const isRight = e.target.classList.contains('right');
 
-            if (!isLeft && !isRight && !e.currentTarget.classList.contains('gantt-bar')) return;
+            // Allow drag on resize handles or on the bar itself (not on label)
+            if (!isLeft && !isRight) {
+                // If clicking on the label, don't start drag mode
+                if (e.target.classList.contains('bar-label')) {
+                    return;
+                }
+            }
 
             e.preventDefault();
             e.stopPropagation(); // Prevent click event
@@ -222,6 +238,7 @@ export class TimelineService {
             startX = e.clientX;
             startStartT = stop.startT;
             startEndT = stop.endT;
+            hasMoved = false; // Reset movement flag
 
             barEl.classList.add(mode === 'move' ? 'moving' : 'resizing');
             barEl.setPointerCapture(e.pointerId);
