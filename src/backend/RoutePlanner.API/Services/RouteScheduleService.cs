@@ -94,6 +94,133 @@ namespace RoutePlanner.API.Services
             };
         }
 
+        public async Task<RecalculateScheduleResultDto> RecalculateScheduleAfterReorder(
+            int routeId,
+            bool preserveLockedDays = true)
+        {
+            var route = await _context.Routes
+                .Include(r => r.Places.OrderBy(p => p.OrderIndex))
+                    .ThenInclude(rp => rp.Place)
+                .Include(r => r.Legs.OrderBy(l => l.OrderIndex))
+                .FirstOrDefaultAsync(r => r.Id == routeId);
+
+            if (route == null)
+            {
+                throw new InvalidOperationException($"Route {routeId} not found");
+            }
+
+            var orderedStops = route.Places.OrderBy(p => p.OrderIndex).ToList();
+
+            if (orderedStops.Count == 0)
+            {
+                return new RecalculateScheduleResultDto { UpdatedStops = 0 };
+            }
+
+            // Get route start time or use first stop's time
+            var routeStart = route.StartDateTime ?? orderedStops[0].PlannedStart ?? DateTimeOffset.UtcNow;
+            var currentTime = routeStart;
+
+            int updatedCount = 0;
+            var changes = new List<ScheduleChangeDetail>();
+
+            for (int i = 0; i < orderedStops.Count; i++)
+            {
+                var stop = orderedStops[i];
+                var originalStart = stop.PlannedStart;
+                var originalEnd = stop.PlannedEnd;
+
+                if (preserveLockedDays && stop.IsStartLocked && stop.PlannedStart.HasValue)
+                {
+                    // Preserve the day component but may adjust time
+                    var lockedDay = stop.PlannedStart.Value.Date;
+                    var currentDay = currentTime.Date;
+
+                    // If locked day is in the past relative to current time, adjust
+                    if (lockedDay < currentDay)
+                    {
+                        currentTime = new DateTimeOffset(
+                            currentDay.Add(stop.PlannedStart.Value.TimeOfDay),
+                            stop.PlannedStart.Value.Offset);
+                    }
+                    else
+                    {
+                        currentTime = stop.PlannedStart.Value;
+                    }
+                }
+
+                if (!stop.IsStartLocked || !preserveLockedDays)
+                {
+                    stop.PlannedStart = currentTime;
+                    updatedCount++;
+                }
+
+                // Calculate end time
+                DateTimeOffset endTime;
+
+                if (stop.StopType == StopType.Overnight && stop.StayNights.HasValue)
+                {
+                    endTime = currentTime.AddDays(stop.StayNights.Value);
+                }
+                else if (stop.StayDurationMinutes.HasValue)
+                {
+                    endTime = currentTime.AddMinutes(stop.StayDurationMinutes.Value);
+                }
+                else
+                {
+                    // Default: 2 hours for day stop
+                    endTime = currentTime.AddHours(2);
+                }
+
+                if (!stop.IsEndLocked || !preserveLockedDays)
+                {
+                    stop.PlannedEnd = endTime;
+                    updatedCount++;
+                }
+
+                changes.Add(new ScheduleChangeDetail
+                {
+                    RoutePlaceId = stop.Id,
+                    PlaceName = stop.Place?.Name ?? "",
+                    OldStart = originalStart,
+                    OldEnd = originalEnd,
+                    NewStart = stop.PlannedStart,
+                    NewEnd = stop.PlannedEnd,
+                    WasLocked = stop.IsStartLocked || stop.IsEndLocked
+                });
+
+                // Add leg duration for next stop
+                if (i < route.Legs.Count)
+                {
+                    var leg = route.Legs.FirstOrDefault(l => l.OrderIndex == i);
+                    if (leg != null && leg.DurationSeconds > 0)
+                    {
+                        currentTime = endTime.AddSeconds(leg.DurationSeconds);
+                    }
+                    else
+                    {
+                        currentTime = endTime.AddHours(1); // Default 1h travel
+                    }
+                }
+                else
+                {
+                    currentTime = endTime;
+                }
+            }
+
+            route.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                $"Recalculated schedule for route {routeId}: {updatedCount} stops updated");
+
+            return new RecalculateScheduleResultDto
+            {
+                UpdatedStops = updatedCount,
+                Changes = changes,
+                PreservedLockedDays = preserveLockedDays
+            };
+        }
+
         // ===== Manual Mapping Helpers =====
 
         private RouteScheduleSettingsDto MapToRouteScheduleSettingsDto(Models.Route route)

@@ -18,9 +18,10 @@ builder.Services.AddScoped<GoogleMapsService>();
 // Place Service
 builder.Services.AddScoped<IPlaceService, PlaceService>();
 
-// Schedule and Leg Services
+// Schedule, Leg, and Conflict Services
 builder.Services.AddScoped<IRouteScheduleService, RouteScheduleService>();
 builder.Services.AddScoped<IRouteLegService, RouteLegService>();
+builder.Services.AddScoped<IRouteConflictService, RouteConflictService>();
 
 // HttpClient and Service for Park4Night Scraper
 builder.Services.AddHttpClient<Park4NightScraperService>();

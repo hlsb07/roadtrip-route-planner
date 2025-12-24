@@ -494,7 +494,7 @@ export class ApiService {
      * @param {number} routeId - Route ID
      * @param {number} routePlaceId - RoutePlace ID
      * @param {Object} dto - Schedule update DTO
-     * @returns {Promise<void>}
+     * @returns {Promise<Object|null>} Response object if contains conflict info, null otherwise
      */
     static async updateStopSchedule(routeId, routePlaceId, dto) {
         const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places/${routePlaceId}/schedule`, {
@@ -506,6 +506,9 @@ export class ApiService {
             const errorText = await response.text();
             throw new Error(errorText || 'Failed to update stop schedule');
         }
+        // If response has content (conflict info), return it
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
     }
 
     /**
@@ -556,5 +559,115 @@ export class ApiService {
             throw new Error(errorText || 'Failed to recalculate route legs');
         }
         return await response.json();
+    }
+
+    // ===== Conflict Management Methods =====
+
+    /**
+     * Get itinerary with conflict information
+     * @param {number} routeId - Route ID
+     * @returns {Promise<Object>} Itinerary with conflict info
+     */
+    static async getItineraryWithConflicts(routeId) {
+        const response = await fetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/itinerary?includeConflicts=true`
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to load itinerary: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * Check if a schedule change would create a conflict
+     * @param {number} routeId - Route ID
+     * @param {number} routePlaceId - RoutePlace ID
+     * @param {string} newStart - New planned start (ISO string)
+     * @param {string} newEnd - New planned end (ISO string)
+     * @returns {Promise<Object>} Conflict information
+     */
+    static async checkScheduleChangeConflict(routeId, routePlaceId, newStart, newEnd) {
+        const response = await fetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/conflicts/check-schedule-change`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    routePlaceId,
+                    newPlannedStart: newStart,
+                    newPlannedEnd: newEnd
+                })
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to check conflicts');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Resolve conflicts by reordering route based on timeline
+     * @param {number} routeId - Route ID
+     * @param {boolean} recalculateSchedule - Whether to recalculate schedule after reordering
+     * @returns {Promise<Object>} Success message
+     */
+    static async resolveConflictByReorder(routeId, recalculateSchedule = false) {
+        const response = await fetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/conflicts/resolve-by-reorder`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recalculateScheduleAfter: recalculateSchedule })
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to resolve conflicts');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Recalculate schedule after route reorder
+     * @param {number} routeId - Route ID
+     * @param {boolean} preserveLockedDays - Whether to preserve locked days
+     * @returns {Promise<Object>} Recalculation result
+     */
+    static async recalculateSchedule(routeId, preserveLockedDays = true) {
+        const response = await fetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/schedule/recalculate?preserveLockedDays=${preserveLockedDays}`,
+            {
+                method: 'POST'
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to recalculate schedule');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Reorder places with schedule recalculation options
+     * @param {number} routeId - Route ID
+     * @param {number[]} placeIds - Array of place IDs in new order
+     * @param {boolean} recalculateSchedule - Whether to recalculate schedule
+     * @param {boolean} preserveLockedDays - Whether to preserve locked days
+     * @returns {Promise<void>}
+     */
+    static async reorderPlacesWithSchedule(routeId, placeIds, recalculateSchedule = true, preserveLockedDays = true) {
+        const response = await fetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/places/reorder`,
+            {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    placeIds,
+                    recalculateSchedule,
+                    preserveLockedDays
+                })
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to reorder places');
+        }
     }
 }

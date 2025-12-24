@@ -14,17 +14,20 @@ namespace RoutePlanner.API.Controllers
         private readonly AppDbContext _context;
         private readonly IRouteScheduleService _scheduleService;
         private readonly IRouteLegService _legService;
+        private readonly IRouteConflictService _conflictService;
         private readonly ILogger<RoutesController> _logger;
 
         public RoutesController(
             AppDbContext context,
             IRouteScheduleService scheduleService,
             IRouteLegService legService,
+            IRouteConflictService conflictService,
             ILogger<RoutesController> logger)
         {
             _context = context;
             _scheduleService = scheduleService;
             _legService = legService;
+            _conflictService = conflictService;
             _logger = logger;
         }
 
@@ -255,7 +258,7 @@ namespace RoutePlanner.API.Controllers
 
         // PUT: api/routes/{id}/places/reorder - Reihenfolge der Orte ändern
         [HttpPut("{id}/places/reorder")]
-        public async Task<IActionResult> ReorderPlaces(int id, [FromBody] List<int> placeIds)
+        public async Task<IActionResult> ReorderPlaces(int id, [FromBody] ReorderPlacesRequest request)
         {
             var route = await _context.Routes
                 .Include(r => r.Places)
@@ -263,6 +266,9 @@ namespace RoutePlanner.API.Controllers
 
             if (route == null)
                 return NotFound();
+
+            // Support legacy format (simple array) by checking if PlaceIds is provided
+            var placeIds = request.PlaceIds ?? new List<int>();
 
             // Step 1: Set all OrderIndex to negative values to avoid unique constraint conflicts
             for (int i = 0; i < route.Places.Count; i++)
@@ -294,6 +300,24 @@ namespace RoutePlanner.API.Controllers
             {
                 _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
                 // Don't fail the operation if recalculation fails
+            }
+
+            // Recalculate schedule if requested
+            if (request.RecalculateSchedule)
+            {
+                try
+                {
+                    await _scheduleService.RecalculateScheduleAfterReorder(
+                        id,
+                        request.PreserveLockedDays);
+
+                    _logger.LogInformation($"Recalculated schedule after reordering route {id}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, $"Failed to recalculate schedule for route {id}");
+                    // Don't fail the operation if schedule recalculation fails
+                }
             }
 
             return NoContent();
@@ -349,13 +373,31 @@ namespace RoutePlanner.API.Controllers
 
         // GET: api/routes/{id}/itinerary - Get full route with schedule, stops, and legs
         [HttpGet("{id}/itinerary")]
-        public async Task<ActionResult<RouteItineraryDto>> GetItinerary(int id)
+        public async Task<ActionResult<object>> GetItinerary(int id, [FromQuery] bool includeConflicts = true)
         {
             try
             {
                 var itinerary = await _scheduleService.GetItinerary(id);
                 if (itinerary == null)
                     return NotFound($"Route with ID {id} not found");
+
+                if (includeConflicts)
+                {
+                    var conflicts = await _conflictService.DetectOrderConflicts(id);
+                    var itineraryWithConflicts = new RouteItineraryWithConflictsDto
+                    {
+                        Id = itinerary.Id,
+                        Name = itinerary.Name,
+                        Description = itinerary.Description,
+                        ScheduleSettings = itinerary.ScheduleSettings,
+                        Places = itinerary.Places,
+                        Legs = itinerary.Legs,
+                        CreatedAt = itinerary.CreatedAt,
+                        UpdatedAt = itinerary.UpdatedAt,
+                        ConflictInfo = conflicts
+                    };
+                    return Ok(itineraryWithConflicts);
+                }
 
                 return Ok(itinerary);
             }
@@ -390,7 +432,31 @@ namespace RoutePlanner.API.Controllers
         {
             try
             {
+                // Check if this would create a conflict (before applying the change)
+                ScheduleChangeConflictDto? conflictCheck = null;
+                if (dto.PlannedStart.HasValue && dto.PlannedEnd.HasValue)
+                {
+                    conflictCheck = await _conflictService.CheckScheduleChangeConflict(
+                        routeId,
+                        routePlaceId,
+                        dto.PlannedStart.Value,
+                        dto.PlannedEnd.Value);
+                }
+
+                // Update the schedule
                 await _scheduleService.UpdateRoutePlaceSchedule(routeId, routePlaceId, dto);
+
+                // Return conflict information if any
+                if (conflictCheck != null && conflictCheck.WouldCreateConflict)
+                {
+                    return Ok(new
+                    {
+                        success = true,
+                        conflict = conflictCheck,
+                        message = "Schedule updated but created ordering conflict"
+                    });
+                }
+
                 return NoContent();
             }
             catch (InvalidOperationException ex)
@@ -400,6 +466,78 @@ namespace RoutePlanner.API.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { message = "Error updating stop schedule", error = ex.Message });
+            }
+        }
+
+        // ===== Conflict Management Endpoints =====
+
+        // POST: api/routes/{id}/conflicts/check-schedule-change - Check if schedule change would create conflict
+        [HttpPost("{id}/conflicts/check-schedule-change")]
+        public async Task<ActionResult<ScheduleChangeConflictDto>> CheckScheduleChangeConflict(
+            int id,
+            [FromBody] CheckScheduleChangeRequest request)
+        {
+            try
+            {
+                var result = await _conflictService.CheckScheduleChangeConflict(
+                    id,
+                    request.RoutePlaceId,
+                    request.NewPlannedStart,
+                    request.NewPlannedEnd);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error checking conflicts", error = ex.Message });
+            }
+        }
+
+        // POST: api/routes/{id}/conflicts/resolve-by-reorder - Resolve conflicts by reordering based on times
+        [HttpPost("{id}/conflicts/resolve-by-reorder")]
+        public async Task<IActionResult> ResolveConflictByReorder(
+            int id,
+            [FromBody] ResolveConflictByReorderDto dto)
+        {
+            try
+            {
+                // Apply time-based order
+                await _conflictService.ApplyTimeBasedOrder(id);
+
+                // Recalculate OSRM legs
+                await _legService.RecalculateLegsFromOsrm(id);
+
+                // Optionally recalculate schedule
+                if (dto.RecalculateScheduleAfter)
+                {
+                    await _scheduleService.RecalculateScheduleAfterReorder(id);
+                }
+
+                return Ok(new { message = "Conflicts resolved by reordering" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error resolving conflicts", error = ex.Message });
+            }
+        }
+
+        // POST: api/routes/{id}/schedule/recalculate - Recalculate schedule after reorder
+        [HttpPost("{id}/schedule/recalculate")]
+        public async Task<ActionResult<RecalculateScheduleResultDto>> RecalculateSchedule(
+            int id,
+            [FromQuery] bool preserveLockedDays = true)
+        {
+            try
+            {
+                var result = await _scheduleService.RecalculateScheduleAfterReorder(
+                    id,
+                    preserveLockedDays);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error recalculating schedule", error = ex.Message });
             }
         }
 

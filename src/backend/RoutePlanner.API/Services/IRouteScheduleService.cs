@@ -21,5 +21,15 @@ namespace RoutePlanner.API.Services
         /// Gets complete route itinerary with schedule settings, ordered stops, and legs
         /// </summary>
         Task<RouteItineraryDto?> GetItinerary(int routeId);
+
+        /// <summary>
+        /// Recalculates schedule for all stops after a reorder, preserving locked days
+        /// </summary>
+        /// <param name="routeId">The route ID</param>
+        /// <param name="preserveLockedDays">If true, preserves day component of locked times</param>
+        /// <returns>Result with details of what was changed</returns>
+        Task<RecalculateScheduleResultDto> RecalculateScheduleAfterReorder(
+            int routeId,
+            bool preserveLockedDays = true);
     }
 }
