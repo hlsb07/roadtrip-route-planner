@@ -934,12 +934,18 @@ export class PlaceManager {
     async reorderPlaces(newOrder) {
         const currentRouteId = this.routeManager.getCurrentRouteId();
         if (!currentRouteId) return false;
-        
+
         try {
-            await ApiService.reorderPlaces(currentRouteId, newOrder);
+            // Use enhanced reorder with schedule recalculation
+            await ApiService.reorderPlacesWithSchedule(
+                currentRouteId,
+                newOrder,
+                true,  // recalculateSchedule
+                true   // preserveLockedDays
+            );
             this.places = await this.routeManager.loadCurrentRoute();
             return true;
-            
+
         } catch (error) {
             console.error('Failed to reorder places:', error);
             showError('Failed to reorder places');
@@ -1363,8 +1369,13 @@ export class PlaceManager {
                 // Get place IDs in new order
                 const reorderedIds = newOrder.map(p => p.id);
 
-                // Update order on backend
-                await ApiService.reorderPlaces(currentRouteId, reorderedIds);
+                // Update order on backend with schedule recalculation
+                await ApiService.reorderPlacesWithSchedule(
+                    currentRouteId,
+                    reorderedIds,
+                    true,  // recalculateSchedule
+                    true   // preserveLockedDays
+                );
 
                 // Reload to confirm
                 this.places = await this.routeManager.loadCurrentRoute();

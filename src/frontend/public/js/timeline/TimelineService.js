@@ -1,4 +1,5 @@
 import { timelineCoordsToUTC } from './timelineMapper.js';
+import { ConflictUIManager } from './conflictUI.js';
 
 /**
  * TimelineService - Handles timeline UI rendering and user interactions
@@ -8,7 +9,8 @@ export class TimelineService {
         this.callbacks = {
             onStopSelected: callbacks.onStopSelected || (() => {}),
             onStopScheduleChanged: callbacks.onStopScheduleChanged || (() => {}),
-            onNeedRecalculateLegs: callbacks.onNeedRecalculateLegs || (() => {})
+            onNeedRecalculateLegs: callbacks.onNeedRecalculateLegs || (() => {}),
+            onResolveConflictByReorder: callbacks.onResolveConflictByReorder || (() => {})
         };
 
         this.timelineStops = [];
@@ -19,6 +21,9 @@ export class TimelineService {
         this.barElsByIndex = new Map();
         this.rafId = null;
         this.isScrubbing = false;
+
+        this.conflictUI = new ConflictUIManager();
+        this.currentConflicts = null;
 
         this.initDOM();
     }
@@ -67,6 +72,51 @@ export class TimelineService {
         this.renderBars();
         this.configureSlider();
         this.updateCursor(0);
+    }
+
+    /**
+     * Render timeline with conflict information
+     * @param {Array} timelineStops - Array of timeline stop data
+     * @param {number} totalDays - Total number of days
+     * @param {string} routeStartUtc - Route start date/time in UTC
+     * @param {Object} conflictInfo - Conflict information from backend
+     */
+    renderWithConflicts(timelineStops, totalDays, routeStartUtc, conflictInfo) {
+        // Call existing render method
+        this.render(timelineStops, totalDays, routeStartUtc);
+
+        // Store conflict info
+        this.currentConflicts = conflictInfo;
+
+        // Show conflict indicators if present
+        if (conflictInfo && conflictInfo.hasConflict) {
+            this.conflictUI.markConflictingBars(
+                conflictInfo.conflictingStops,
+                this.barElsByIndex,
+                this.timelineStops
+            );
+
+            this.conflictUI.showConflictBanner(
+                conflictInfo,
+                () => this.handleResolveConflicts(),
+                () => this.conflictUI.hideConflictBanner()
+            );
+        } else {
+            this.conflictUI.hideConflictBanner();
+        }
+    }
+
+    /**
+     * Handle user request to resolve conflicts
+     */
+    async handleResolveConflicts() {
+        try {
+            await this.callbacks.onResolveConflictByReorder();
+            this.conflictUI.showResolutionSuccess();
+            this.conflictUI.hideConflictBanner();
+        } catch (error) {
+            console.error('Failed to resolve conflicts:', error);
+        }
     }
 
     getDayWidth() {
@@ -256,7 +306,7 @@ export class TimelineService {
         );
 
         try {
-            await this.callbacks.onStopScheduleChanged(stop.routePlaceId, {
+            const response = await this.callbacks.onStopScheduleChanged(stop.routePlaceId, {
                 stopType: stop.stopType,
                 timeZoneId: null, // Use route default
                 plannedStart: startUtc,
@@ -266,6 +316,19 @@ export class TimelineService {
                 isStartLocked: true, // Lock after manual edit
                 isEndLocked: true
             });
+
+            // Check if response contains conflict information
+            if (response && response.conflict && response.conflict.wouldCreateConflict) {
+                const userWantsReorder = await this.conflictUI.showScheduleChangeConflictPrompt(
+                    response.conflict
+                );
+
+                if (userWantsReorder) {
+                    await this.callbacks.onResolveConflictByReorder();
+                    this.conflictUI.showResolutionSuccess();
+                }
+            }
+
             console.log(`Successfully saved schedule for ${stop.name}`);
         } catch (error) {
             console.error(`Failed to save schedule for ${stop.name}:`, error);

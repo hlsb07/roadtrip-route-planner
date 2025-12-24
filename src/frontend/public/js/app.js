@@ -29,7 +29,8 @@ class App {
         this.timelineService = new TimelineService({
             onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),
             onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),
-            onNeedRecalculateLegs: () => this.handleRecalculateLegs()
+            onNeedRecalculateLegs: () => this.handleRecalculateLegs(),
+            onResolveConflictByReorder: () => this.handleResolveConflictByReorder()
         });
 
         // Set callback for search result selection (save to database, don't add to route)
@@ -1144,16 +1145,21 @@ class App {
             // Auto-initialize schedule if needed
             await initializeScheduleIfNeeded(routeId, route);
 
-            // Load itinerary
-            const itinerary = await ApiService.getItinerary(routeId);
+            // Load itinerary WITH conflict information
+            const itinerary = await ApiService.getItineraryWithConflicts(routeId);
 
             // Map to timeline coordinates
             const timelineStops = mapItineraryToTimelineStops(itinerary);
             const totalDays = calculateTotalDays(timelineStops);
             const routeStartUtc = itinerary.scheduleSettings?.startDateTime;
 
-            // Render timeline
-            this.timelineService.render(timelineStops, totalDays, routeStartUtc);
+            // Render with conflict information
+            this.timelineService.renderWithConflicts(
+                timelineStops,
+                totalDays,
+                routeStartUtc,
+                itinerary.conflictInfo
+            );
         } catch (error) {
             console.error('Failed to load timeline:', error);
             showError('Failed to load timeline');
@@ -1167,24 +1173,53 @@ class App {
 
     async handleStopScheduleChanged(routePlaceId, dto) {
         const routeId = this.routeManager.currentRouteId;
-        if (!routeId) return;
+        if (!routeId) return null;
 
         try {
-            await ApiService.updateStopSchedule(routeId, routePlaceId, dto);
+            const response = await ApiService.updateStopSchedule(routeId, routePlaceId, dto);
 
-            // Optionally reload itinerary and refresh timeline
+            // Reload itinerary and refresh timeline
             await this.loadTimelineForCurrentRoute();
+
+            // Return response (may contain conflict info)
+            return response;
         } catch (error) {
             console.error('Failed to update stop schedule:', error);
             showError('Failed to update schedule');
+            throw error;
         }
     }
 
     async handleRecalculateLegs() {
         // Optional: trigger leg recalculation after schedule changes
-        
+
         // This could be implemented if we want to auto-update drive times
         console.log('Leg recalculation requested (not yet implemented)');
+    }
+
+    async handleResolveConflictByReorder() {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) return;
+
+        try {
+            // Resolve conflicts by applying time-based order
+            await ApiService.resolveConflictByReorder(routeId, false);
+
+            // Reload route to show new order
+            const places = await this.routeManager.loadCurrentRoute();
+            if (places && places.length > 0) {
+                this.placeManager.setPlaces(places);
+                this.updateUI();
+            }
+
+            // Reload timeline
+            await this.loadTimelineForCurrentRoute();
+
+            showSuccess('Route reordered to match timeline');
+        } catch (error) {
+            console.error('Failed to resolve conflicts:', error);
+            showError('Failed to reorder route');
+        }
     }
 
     // Add method to App class for rendering mobile timeline

@@ -106,7 +106,7 @@ namespace RoutePlanner.API.Services
                 .ToListAsync();
 
             // Create hypothetical time sequence with new values
-            var timeSequence = allStops
+            var timeSequenceData = allStops
                 .Select(rp => new
                 {
                     RoutePlace = rp,
@@ -118,10 +118,13 @@ namespace RoutePlanner.API.Services
                 .OrderBy(x => x.PlannedStart)
                 .ToList();
 
+            // Get just the RoutePlaces in time order for comparison
+            var timeSequence = timeSequenceData.Select(x => x.RoutePlace).ToList();
+
             // Check if this creates a conflict
             bool wouldCreateConflict = false;
             int currentOrderPosition = routePlace.OrderIndex;
-            int timePosition = timeSequence.FindIndex(s => s.RoutePlace.Id == routePlaceId);
+            int timePosition = timeSequence.FindIndex(s => s.Id == routePlaceId);
 
             if (currentOrderPosition != timePosition)
             {
@@ -192,13 +195,13 @@ namespace RoutePlanner.API.Services
 
         private List<int> CalculateAffectedStops(
             List<Models.RoutePlace> orderSequence,
-            List<dynamic> timeSequence)
+            List<Models.RoutePlace> timeSequence)
         {
             var affected = new List<int>();
 
             for (int i = 0; i < Math.Min(orderSequence.Count, timeSequence.Count); i++)
             {
-                if (orderSequence[i].Id != timeSequence[i].RoutePlace.Id)
+                if (orderSequence[i].Id != timeSequence[i].Id)
                 {
                     affected.Add(orderSequence[i].Id);
                 }
