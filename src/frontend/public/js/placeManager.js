@@ -2,10 +2,11 @@ import { ApiService } from './api.js';
 import { showSuccess, showError, sleep, showConfirm } from './utils.js';
 
 export class PlaceManager {
-    constructor(routeManager, onUpdate = null) {
+    constructor(routeManager, onUpdate = null, onReordered = null) {
         this.routeManager = routeManager;
         this.places = [];
         this.onUpdate = onUpdate;
+        this.onReordered = onReordered; // Callback for when route order changes
         this.selectedIndex = null;
         this.sortableInstances = {}; // Track Sortable instances
         this.sortingEnabled = false; // Track if sorting mode is active
@@ -944,6 +945,12 @@ export class PlaceManager {
                 true   // preserveLockedDays
             );
             this.places = await this.routeManager.loadCurrentRoute();
+
+            // Trigger timeline reload after route reorder
+            if (this.onReordered) {
+                await this.onReordered();
+            }
+
             return true;
 
         } catch (error) {

@@ -188,18 +188,18 @@ namespace RoutePlanner.API.Services
                     WasLocked = stop.IsStartLocked || stop.IsEndLocked
                 });
 
-                // Add leg duration for next stop
-                if (i < route.Legs.Count)
+                // Move to next day for next stop (day-based spacing)
+                // Each stop gets its own day instead of piling up on the same day
+                if (i < orderedStops.Count - 1)
                 {
-                    var leg = route.Legs.FirstOrDefault(l => l.OrderIndex == i);
-                    if (leg != null && leg.DurationSeconds > 0)
-                    {
-                        currentTime = endTime.AddSeconds(leg.DurationSeconds);
-                    }
-                    else
-                    {
-                        currentTime = endTime.AddHours(1); // Default 1h travel
-                    }
+                    // Get the time component from route default or use 9:00 AM
+                    var defaultTime = route.DefaultArrivalTime?.ToTimeSpan() ?? new TimeSpan(9, 0, 0);
+
+                    // Move to next day and apply default arrival time
+                    var nextDay = endTime.Date.AddDays(1);
+                    currentTime = new DateTimeOffset(
+                        nextDay.Add(defaultTime),
+                        endTime.Offset);
                 }
                 else
                 {

@@ -20,7 +20,11 @@ class App {
         this.filterManager = new FilterManager();  // Create filterManager first
         this.routeManager = new RouteManager(this.filterManager);  // Pass filterManager
         this.searchManager = new SearchManager();
-        this.placeManager = new PlaceManager(this.routeManager, () => this.updateUI());
+        this.placeManager = new PlaceManager(
+            this.routeManager,
+            () => this.updateUI(),
+            () => this.loadTimelineForCurrentRoute()  // Reload timeline after route reorder
+        );
         this.campsiteManager = new CampsiteManager(() => this.updateCampsiteUI());
         this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
         this.tagManager = new TagManager();
