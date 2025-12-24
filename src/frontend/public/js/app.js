@@ -710,6 +710,9 @@ class App {
         // Get current route places
         const routePlaces = this.placeManager.getPlaces();
 
+        // Get route legs if available
+        const routeLegs = this.routeManager.currentRouteLegs || null;
+
         // Get filtered places from FilterManager
         const filtered = this.filterManager.getFilteredPlaces(routePlaces);
         const scope = this.filterManager.filterScope;
@@ -717,13 +720,13 @@ class App {
         // Update map based on filter scope
         if (scope === 'route') {
             // Show only route places (existing behavior)
-            this.mapService.updateMap(routePlaces);
+            this.mapService.updateMap(routePlaces, routeLegs);
         } else if (scope === 'all') {
             // Show only non-route places
-            this.mapService.updateMapWithBothPlaceTypes([], filtered.nonRoutePlaces);
+            this.mapService.updateMapWithBothPlaceTypes([], filtered.nonRoutePlaces, null);
         } else {
             // Show both (default)
-            this.mapService.updateMapWithBothPlaceTypes(routePlaces, filtered.nonRoutePlaces);
+            this.mapService.updateMapWithBothPlaceTypes(routePlaces, filtered.nonRoutePlaces, routeLegs);
         }
 
         // Re-center map to show all visible places (optional based on parameter)
@@ -1452,8 +1455,16 @@ window.recalculateCurrentRoute = async () => {
     try {
         const result = await ApiService.recalculateLegsFromOsrm(routeId);
         showSuccess(result.message || 'Route recalculated successfully!');
+
+        // Reload route to get fresh legs
+        const places = await window.app?.routeManager?.loadCurrentRoute();
+        window.app?.placeManager?.setPlaces(places);
+
         // Reload timeline to show updated data
         await window.app?.loadTimelineForCurrentRoute();
+
+        // Update UI with fresh geometry
+        window.app?.updateUI();
     } catch (error) {
         console.error('Failed to recalculate route:', error);
         showError(error.message || 'Failed to recalculate route');

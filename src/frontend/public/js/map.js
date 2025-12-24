@@ -114,7 +114,7 @@ export class MapService {
         }
     }
 
-    updateMap(places) {
+    updateMap(places, routeLegs = null) {
         // Clear existing markers
         this.markers.forEach(marker => this.map.removeLayer(marker));
         this.markers = [];
@@ -158,7 +158,15 @@ export class MapService {
 
         // Add routing if enabled and we have at least 2 places
         if (this.showRoute && places.length > 1) {
-            this.calculateRoute(places);
+            if (routeLegs && routeLegs.length > 0 && routeLegs[0].geometryCoordinates) {
+                // Use stored geometry from database
+                console.log('Rendering route from stored geometry (no OSRM call)');
+                this.renderRouteFromGeometry(places, routeLegs);
+            } else {
+                // Fall back to OSRM when geometry not available
+                console.log('Geometry not available, calling OSRM');
+                this.renderRouteWithOSRM(places);
+            }
         } else {
             // Hide route info panel if routing is disabled
             const panel = document.getElementById('routeInfoPanel');
@@ -167,10 +175,116 @@ export class MapService {
     }
 
     /**
-     * Calculate real route between places using OSRM
+     * Render route using stored geometry from database (no OSRM call)
+     * @param {Array} places - Array of place objects with coords property
+     * @param {Array} legs - Array of route leg objects with geometryCoordinates
+     */
+    renderRouteFromGeometry(places, legs) {
+        console.log('Rendering route from stored geometry (no OSRM call)');
+
+        // Clear existing routing
+        if (this.routingControl) {
+            this.map.removeControl(this.routingControl);
+            this.routingControl = null;
+        }
+        this.clearSegmentPolylines();
+
+        // Validate we have geometry data
+        if (!legs || legs.length === 0 || !legs[0].geometryCoordinates || legs[0].geometryCoordinates.length === 0) {
+            console.warn('No geometry available, falling back to OSRM');
+            this.renderRouteWithOSRM(places);
+            return;
+        }
+
+        // Render each leg as a polyline using stored geometry
+        let totalDistance = 0;
+        let totalDuration = 0;
+
+        for (let i = 0; i < legs.length; i++) {
+            const leg = legs[i];
+            const startPlace = places[i];
+            const endPlace = places[i + 1];
+
+            // Convert [[lon, lat], ...] to [[lat, lon], ...] for Leaflet
+            const coords = leg.geometryCoordinates.map(c => [c[1], c[0]]);
+
+            // Create polyline for this leg
+            const polyline = L.polyline(coords, {
+                color: '#0E54F9',
+                weight: 6,
+                opacity: 0.7,
+                className: 'route-segment'
+            }).addTo(this.map);
+
+            // Add hover/click handlers
+            this.addPolylineHandlers(polyline, startPlace, endPlace, leg, i);
+
+            // Store segment data
+            this.routeSegments.push({
+                startPlace: startPlace.name,
+                endPlace: endPlace.name,
+                distance: leg.distanceMeters,
+                duration: leg.durationSeconds,
+                coordinates: coords
+            });
+
+            this.segmentPolylines.push(polyline);
+            totalDistance += leg.distanceMeters;
+            totalDuration += leg.durationSeconds;
+        }
+
+        console.log('Route segments created from geometry:', this.routeSegments.length);
+
+        // Update route info panel
+        if (this.onRouteCalculated) {
+            this.onRouteCalculated({
+                distance: totalDistance,
+                duration: totalDuration,
+                distanceKm: (totalDistance / 1000).toFixed(1),
+                durationHours: Math.floor(totalDuration / 3600),
+                durationMinutes: Math.floor((totalDuration % 3600) / 60)
+            });
+        }
+
+        // Auto-debug route segments
+        this.debugRouteSegments();
+    }
+
+    /**
+     * Add hover and click handlers to a route polyline
+     * @param {L.Polyline} polyline - Leaflet polyline object
+     * @param {Object} startPlace - Start place object
+     * @param {Object} endPlace - End place object
+     * @param {Object} leg - Route leg object with distance/duration
+     * @param {number} index - Segment index
+     */
+    addPolylineHandlers(polyline, startPlace, endPlace, leg, index) {
+        // Hover effects
+        polyline.on('mouseover', function() {
+            this.setStyle({ weight: 8, opacity: 0.9, color: '#f90e0eff' });
+        });
+        polyline.on('mouseout', function() {
+            this.setStyle({ weight: 6, opacity: 0.7, color: '#0E54F9' });
+        });
+
+        // Click popup
+        polyline.on('click', (e) => {
+            const popupContent = this.createSegmentPopup(
+                startPlace.name,
+                endPlace.name,
+                leg.distanceMeters,
+                leg.durationSeconds,
+                index
+            );
+            L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(this.map);
+        });
+    }
+
+    /**
+     * Calculate real route between places using OSRM (fallback when no geometry)
      * @param {Array} places - Array of place objects with coords
      */
-    calculateRoute(places) {
+    renderRouteWithOSRM(places) {
         if (!places || places.length < 2) {
             // Hide route info panel if there's no route
             const panel = document.getElementById('routeInfoPanel');
@@ -1456,8 +1570,9 @@ export class MapService {
      * Update map with both route places (blue markers with polyline) and non-route places (gray markers)
      * @param {Array} routePlaces - Places in the current route
      * @param {Array} nonRoutePlaces - Places not in the current route
+     * @param {Array} routeLegs - Optional array of route leg objects with geometryCoordinates
      */
-    updateMapWithBothPlaceTypes(routePlaces, nonRoutePlaces) {
+    updateMapWithBothPlaceTypes(routePlaces, nonRoutePlaces, routeLegs = null) {
         // Clear existing markers (route places)
         this.markers.forEach(marker => this.map.removeLayer(marker));
         this.markers = [];
@@ -1504,7 +1619,15 @@ export class MapService {
 
             // Add routing if enabled and we have at least 2 places
             if (this.showRoute && routePlaces.length > 1) {
-                this.calculateRoute(routePlaces);
+                if (routeLegs && routeLegs.length > 0 && routeLegs[0].geometryCoordinates) {
+                    // Use stored geometry from database
+                    console.log('Rendering route from stored geometry (no OSRM call)');
+                    this.renderRouteFromGeometry(routePlaces, routeLegs);
+                } else {
+                    // Fall back to OSRM when geometry not available
+                    console.log('Geometry not available, calling OSRM');
+                    this.renderRouteWithOSRM(routePlaces);
+                }
             } else {
                 // Hide route info panel if routing is disabled
                 const panel = document.getElementById('routeInfoPanel');
