@@ -155,10 +155,16 @@ namespace RoutePlanner.API.Services
                     updatedCount++;
                 }
 
-                // Calculate end time
+                // Calculate end time - preserve original duration if it exists
                 DateTimeOffset endTime;
 
-                if (stop.StopType == StopType.Overnight && stop.StayNights.HasValue)
+                // If stop has both start and end times, preserve the original duration
+                if (originalStart.HasValue && originalEnd.HasValue)
+                {
+                    var originalDuration = originalEnd.Value - originalStart.Value;
+                    endTime = currentTime.Add(originalDuration);
+                }
+                else if (stop.StopType == StopType.Overnight && stop.StayNights.HasValue)
                 {
                     endTime = currentTime.AddDays(stop.StayNights.Value);
                 }
@@ -193,13 +199,24 @@ namespace RoutePlanner.API.Services
                 // Each stop gets its own day instead of piling up on the same day
                 if (i < orderedStops.Count - 1)
                 {
-                    // Get the time component from route default or use 9:00 AM
-                    var defaultTime = route.DefaultArrivalTime?.ToTimeSpan() ?? new TimeSpan(9, 0, 0);
+                    var nextStop = orderedStops[i + 1];
 
-                    // Move to next day and apply default arrival time
+                    // Preserve the next stop's original time-of-day if it exists
+                    TimeSpan timeOfDay;
+                    if (nextStop.PlannedStart.HasValue)
+                    {
+                        timeOfDay = nextStop.PlannedStart.Value.TimeOfDay;
+                    }
+                    else
+                    {
+                        // Fallback to route default or 9:00 AM for new stops without times
+                        timeOfDay = route.DefaultArrivalTime?.ToTimeSpan() ?? new TimeSpan(9, 0, 0);
+                    }
+
+                    // Move to next day and apply the preserved/default time
                     var nextDay = endTime.Date.AddDays(1);
                     currentTime = new DateTimeOffset(
-                        nextDay.Add(defaultTime),
+                        nextDay.Add(timeOfDay),
                         endTime.Offset);
                 }
                 else
