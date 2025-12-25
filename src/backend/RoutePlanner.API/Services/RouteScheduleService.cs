@@ -96,7 +96,8 @@ namespace RoutePlanner.API.Services
 
         public async Task<RecalculateScheduleResultDto> RecalculateScheduleAfterReorder(
             int routeId,
-            bool preserveLockedDays = true)
+            bool preserveLockedDays = true,
+            bool ignoreLockedStops = false)
         {
             var route = await _context.Routes
                 .Include(r => r.Places.OrderBy(p => p.OrderIndex))
@@ -148,7 +149,7 @@ namespace RoutePlanner.API.Services
                     }
                 }
 
-                if (!stop.IsStartLocked || !preserveLockedDays)
+                if (ignoreLockedStops || !stop.IsStartLocked || !preserveLockedDays)
                 {
                     stop.PlannedStart = currentTime;
                     updatedCount++;
@@ -171,7 +172,7 @@ namespace RoutePlanner.API.Services
                     endTime = currentTime.AddHours(2);
                 }
 
-                if (!stop.IsEndLocked || !preserveLockedDays)
+                if (ignoreLockedStops || !stop.IsEndLocked || !preserveLockedDays)
                 {
                     stop.PlannedEnd = endTime;
                     updatedCount++;

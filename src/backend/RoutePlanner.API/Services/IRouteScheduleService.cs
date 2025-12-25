@@ -27,9 +27,11 @@ namespace RoutePlanner.API.Services
         /// </summary>
         /// <param name="routeId">The route ID</param>
         /// <param name="preserveLockedDays">If true, preserves day component of locked times</param>
+        /// <param name="ignoreLockedStops">If true, updates all stops regardless of lock status (used after manual reorder)</param>
         /// <returns>Result with details of what was changed</returns>
         Task<RecalculateScheduleResultDto> RecalculateScheduleAfterReorder(
             int routeId,
-            bool preserveLockedDays = true);
+            bool preserveLockedDays = true,
+            bool ignoreLockedStops = false);
     }
 }

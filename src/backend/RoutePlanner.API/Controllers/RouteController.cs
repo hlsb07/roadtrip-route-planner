@@ -309,7 +309,8 @@ namespace RoutePlanner.API.Controllers
                 {
                     await _scheduleService.RecalculateScheduleAfterReorder(
                         id,
-                        request.PreserveLockedDays);
+                        request.PreserveLockedDays,
+                        ignoreLockedStops: true);  // Always ignore locks after manual reorder (OrderIndex is source of truth)
 
                     _logger.LogInformation($"Recalculated schedule after reordering route {id}");
                 }
