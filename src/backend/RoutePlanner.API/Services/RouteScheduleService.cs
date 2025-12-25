@@ -197,32 +197,32 @@ namespace RoutePlanner.API.Services
 
                 // Move to next day for next stop (day-based spacing)
                 // Each stop gets its own day instead of piling up on the same day
-                if (i < orderedStops.Count - 1)
-                {
-                    var nextStop = orderedStops[i + 1];
+                // if (i < orderedStops.Count - 1)
+                // {
+                //     var nextStop = orderedStops[i + 1];
 
-                    // Preserve the next stop's original time-of-day if it exists
-                    TimeSpan timeOfDay;
-                    if (nextStop.PlannedStart.HasValue)
-                    {
-                        timeOfDay = nextStop.PlannedStart.Value.TimeOfDay;
-                    }
-                    else
-                    {
-                        // Fallback to route default or 9:00 AM for new stops without times
-                        timeOfDay = route.DefaultArrivalTime?.ToTimeSpan() ?? new TimeSpan(9, 0, 0);
-                    }
+                //     // Preserve the next stop's original time-of-day if it exists
+                //     TimeSpan timeOfDay;
+                //     if (nextStop.PlannedStart.HasValue)
+                //     {
+                //         timeOfDay = nextStop.PlannedStart.Value.TimeOfDay;
+                //     }
+                //     else
+                //     {
+                //         // Fallback to route default or 9:00 AM for new stops without times
+                //         timeOfDay = route.DefaultArrivalTime?.ToTimeSpan() ?? new TimeSpan(9, 0, 0);
+                //     }
 
-                    // Move to next day and apply the preserved/default time
-                    var nextDay = endTime.Date.AddDays(1);
-                    currentTime = new DateTimeOffset(
-                        nextDay.Add(timeOfDay),
-                        endTime.Offset);
-                }
-                else
-                {
-                    currentTime = endTime;
-                }
+                //     // Move to next day and apply the preserved/default time
+                //     var nextDay = endTime.Date.AddDays(1);
+                //     currentTime = new DateTimeOffset(
+                //         nextDay.Add(timeOfDay),
+                //         endTime.Offset);
+                // }
+                // else
+                // {
+                //     currentTime = endTime;
+                // }
             }
 
             route.UpdatedAt = DateTime.UtcNow;
