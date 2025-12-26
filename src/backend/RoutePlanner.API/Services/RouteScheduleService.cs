@@ -97,7 +97,10 @@ namespace RoutePlanner.API.Services
         public async Task<RecalculateScheduleResultDto> RecalculateScheduleAfterReorder(
             int routeId,
             bool preserveLockedDays = true,
-            bool ignoreLockedStops = false)
+            bool ignoreLockedStops = false,
+            int? movedPlaceId = null,
+            int? oldIndex = null,
+            int? newIndex = null)
         {
             var route = await _context.Routes
                 .Include(r => r.Places.OrderBy(p => p.OrderIndex))
@@ -117,71 +120,81 @@ namespace RoutePlanner.API.Services
                 return new RecalculateScheduleResultDto { UpdatedStops = 0 };
             }
 
-            // Get route start time or use first stop's time
-            var routeStart = route.StartDateTime ?? orderedStops[0].PlannedStart ?? DateTimeOffset.UtcNow;
-            var currentTime = routeStart;
+            // If no move detected, return early (no changes needed)
+            if (!movedPlaceId.HasValue || !oldIndex.HasValue || !newIndex.HasValue)
+            {
+                _logger.LogInformation($"No move detected for route {routeId}, skipping schedule recalculation");
+                return new RecalculateScheduleResultDto { UpdatedStops = 0 };
+            }
 
             int updatedCount = 0;
             var changes = new List<ScheduleChangeDetail>();
 
-            for (int i = 0; i < orderedStops.Count; i++)
+            // Calculate affected range
+            int minIndex = Math.Min(oldIndex.Value, newIndex.Value);
+            int maxIndex = Math.Max(oldIndex.Value, newIndex.Value);
+            bool movedUp = newIndex.Value < oldIndex.Value;  // Moved to lower index
+
+            // Find the moved place
+            var movedPlace = orderedStops.FirstOrDefault(rp => rp.PlaceId == movedPlaceId.Value);
+            if (movedPlace == null)
+            {
+                _logger.LogWarning($"Moved place {movedPlaceId.Value} not found in route {routeId}");
+                return new RecalculateScheduleResultDto { UpdatedStops = 0 };
+            }
+
+            // Store original times for all affected places
+            var originalTimes = orderedStops
+                .Where((rp, i) => i >= minIndex && i <= maxIndex)
+                .ToDictionary(rp => rp.PlaceId, rp => new { Start = rp.PlannedStart, End = rp.PlannedEnd });
+
+            // Process each place in the affected range
+            for (int i = minIndex; i <= maxIndex; i++)
             {
                 var stop = orderedStops[i];
                 var originalStart = stop.PlannedStart;
                 var originalEnd = stop.PlannedEnd;
 
-                if (preserveLockedDays && stop.IsStartLocked && stop.PlannedStart.HasValue)
+                if (stop.PlaceId == movedPlaceId.Value)
                 {
-                    // Preserve the day component but may adjust time
-                    var lockedDay = stop.PlannedStart.Value.Date;
-                    var currentDay = currentTime.Date;
-
-                    // If locked day is in the past relative to current time, adjust
-                    if (lockedDay < currentDay)
+                    // This is the moved place - keep its time, but assign to new position's day
+                    // It takes the day from the place that was at newIndex
+                    if (originalStart.HasValue)
                     {
-                        currentTime = new DateTimeOffset(
-                            currentDay.Add(stop.PlannedStart.Value.TimeOfDay),
-                            stop.PlannedStart.Value.Offset);
+                        // Calculate the day it should be on based on position
+                        var dayOffset = i - minIndex;
+                        var baseTime = originalTimes.First().Value.Start ?? DateTimeOffset.UtcNow;
+
+                        stop.PlannedStart = new DateTimeOffset(
+                            baseTime.Date.AddDays(dayOffset).Add(originalStart.Value.TimeOfDay),
+                            originalStart.Value.Offset);
+
+                        if (originalEnd.HasValue)
+                        {
+                            var duration = originalEnd.Value - originalStart.Value;
+                            stop.PlannedEnd = stop.PlannedStart.Value.Add(duration);
+                        }
+
+                        updatedCount++;
                     }
-                    else
-                    {
-                        currentTime = stop.PlannedStart.Value;
-                    }
-                }
-
-                if (ignoreLockedStops || !stop.IsStartLocked || !preserveLockedDays)
-                {
-                    stop.PlannedStart = currentTime;
-                    updatedCount++;
-                }
-
-                // Calculate end time - preserve original duration if it exists
-                DateTimeOffset endTime;
-
-                // If stop has both start and end times, preserve the original duration
-                if (originalStart.HasValue && originalEnd.HasValue)
-                {
-                    var originalDuration = originalEnd.Value - originalStart.Value;
-                    endTime = currentTime.Add(originalDuration);
-                }
-                else if (stop.StopType == StopType.Overnight && stop.StayNights.HasValue)
-                {
-                    endTime = currentTime.AddDays(stop.StayNights.Value);
-                }
-                else if (stop.StayDurationMinutes.HasValue)
-                {
-                    endTime = currentTime.AddMinutes(stop.StayDurationMinutes.Value);
                 }
                 else
                 {
-                    // Default: 2 hours for day stop
-                    endTime = currentTime.AddHours(2);
-                }
+                    // This is a place in the affected range - shift by ±1 day
+                    if (originalStart.HasValue)
+                    {
+                        var dayShift = movedUp ? 1 : -1;  // If moved UP, others shift DOWN (+1 day), vice versa
 
-                if (ignoreLockedStops || !stop.IsEndLocked || !preserveLockedDays)
-                {
-                    stop.PlannedEnd = endTime;
-                    updatedCount++;
+                        stop.PlannedStart = originalStart.Value.AddDays(dayShift);
+
+                        if (originalEnd.HasValue)
+                        {
+                            var duration = originalEnd.Value - originalStart.Value;
+                            stop.PlannedEnd = stop.PlannedStart.Value.Add(duration);
+                        }
+
+                        updatedCount++;
+                    }
                 }
 
                 changes.Add(new ScheduleChangeDetail
@@ -194,42 +207,13 @@ namespace RoutePlanner.API.Services
                     NewEnd = stop.PlannedEnd,
                     WasLocked = stop.IsStartLocked || stop.IsEndLocked
                 });
-
-                // Move to next day for next stop (day-based spacing)
-                // Each stop gets its own day instead of piling up on the same day
-                // if (i < orderedStops.Count - 1)
-                // {
-                //     var nextStop = orderedStops[i + 1];
-
-                //     // Preserve the next stop's original time-of-day if it exists
-                //     TimeSpan timeOfDay;
-                //     if (nextStop.PlannedStart.HasValue)
-                //     {
-                //         timeOfDay = nextStop.PlannedStart.Value.TimeOfDay;
-                //     }
-                //     else
-                //     {
-                //         // Fallback to route default or 9:00 AM for new stops without times
-                //         timeOfDay = route.DefaultArrivalTime?.ToTimeSpan() ?? new TimeSpan(9, 0, 0);
-                //     }
-
-                //     // Move to next day and apply the preserved/default time
-                //     var nextDay = endTime.Date.AddDays(1);
-                //     currentTime = new DateTimeOffset(
-                //         nextDay.Add(timeOfDay),
-                //         endTime.Offset);
-                // }
-                // else
-                // {
-                //     currentTime = endTime;
-                // }
             }
 
             route.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
-                $"Recalculated schedule for route {routeId}: {updatedCount} stops updated");
+                $"Recalculated schedule for route {routeId}: {updatedCount} stops updated (moved place: {movedPlaceId}, {oldIndex}→{newIndex})");
 
             return new RecalculateScheduleResultDto
             {

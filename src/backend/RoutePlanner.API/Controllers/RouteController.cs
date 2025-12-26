@@ -270,6 +270,9 @@ namespace RoutePlanner.API.Controllers
             // Support legacy format (simple array) by checking if PlaceIds is provided
             var placeIds = request.PlaceIds ?? new List<int>();
 
+            // Capture old positions before reordering (for detecting which place moved)
+            var oldPositions = route.Places.ToDictionary(rp => rp.PlaceId, rp => rp.OrderIndex);
+
             // Step 1: Set all OrderIndex to negative values to avoid unique constraint conflicts
             for (int i = 0; i < route.Places.Count; i++)
             {
@@ -289,6 +292,23 @@ namespace RoutePlanner.API.Controllers
 
             route.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
+
+            // Detect which place moved (for selective schedule recalculation)
+            int? movedPlaceId = null;
+            int? oldIndex = null;
+            int? newIndex = null;
+
+            for (int i = 0; i < placeIds.Count; i++)
+            {
+                var placeId = placeIds[i];
+                if (oldPositions.ContainsKey(placeId) && oldPositions[placeId] != i)
+                {
+                    movedPlaceId = placeId;
+                    oldIndex = oldPositions[placeId];
+                    newIndex = i;
+                    break;  // Single move at a time
+                }
+            }
 
             // Auto-recalculate legs from OSRM after reordering places
             try
@@ -310,7 +330,10 @@ namespace RoutePlanner.API.Controllers
                     await _scheduleService.RecalculateScheduleAfterReorder(
                         id,
                         request.PreserveLockedDays,
-                        ignoreLockedStops: true);  // Always ignore locks after manual reorder (OrderIndex is source of truth)
+                        ignoreLockedStops: true,  // Always ignore locks after manual reorder (OrderIndex is source of truth)
+                        movedPlaceId: movedPlaceId,
+                        oldIndex: oldIndex,
+                        newIndex: newIndex);
 
                     _logger.LogInformation($"Recalculated schedule after reordering route {id}");
                 }

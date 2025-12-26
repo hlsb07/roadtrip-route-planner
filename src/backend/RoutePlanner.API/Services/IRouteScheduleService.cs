@@ -32,6 +32,9 @@ namespace RoutePlanner.API.Services
         Task<RecalculateScheduleResultDto> RecalculateScheduleAfterReorder(
             int routeId,
             bool preserveLockedDays = true,
-            bool ignoreLockedStops = false);
+            bool ignoreLockedStops = false,
+            int? movedPlaceId = null,
+            int? oldIndex = null,
+            int? newIndex = null);
     }
 }
