@@ -1,4 +1,4 @@
-import { timelineCoordsToUTC } from './timelineMapper.js';
+import { timelineCoordsToUTC, formatDayTime } from './timelineMapper.js';
 import { ConflictUIManager } from './conflictUI.js';
 
 /**
@@ -66,6 +66,8 @@ export class TimelineService {
         const dayWidth = this.getDayWidth();
         const totalWidth = totalDays * dayWidth;
         this.ganttWrapper.style.minWidth = `${totalWidth}px`;
+
+        console.log(`Timeline grid: dayWidth=${dayWidth}px, totalDays=${totalDays}, totalWidth=${totalWidth}px`);
 
         this.renderDayLabels();
         this.renderDayGrid();
@@ -202,14 +204,18 @@ export class TimelineService {
     }
 
     updateBarPosition(barEl, stop) {
-        const leftPercent = (stop.startT / this.totalDays) * 100;
-        const widthPercent = ((stop.endT - stop.startT) / this.totalDays) * 100;
+        // Use pixel-based positioning for accurate alignment with day grid
+        const dayWidth = this.getDayWidth();
+        const leftPx = stop.startT * dayWidth;
+        const widthPx = (stop.endT - stop.startT) * dayWidth;
 
-        barEl.style.left = `${leftPercent}%`;
-        barEl.style.width = `${widthPercent}%`;
+        barEl.style.left = `${leftPx}px`;
+        barEl.style.width = `${widthPx}px`;
 
         barEl.dataset.startT = stop.startT;
         barEl.dataset.endT = stop.endT;
+
+        console.log(`Bar position for ${stop.name}: dayWidth=${dayWidth}px, startT=${stop.startT.toFixed(2)}, endT=${stop.endT.toFixed(2)}, leftPx=${leftPx.toFixed(1)}px, widthPx=${widthPx.toFixed(1)}px`);
     }
 
     attachBarDragResize(barEl, stop, index) {
@@ -429,14 +435,16 @@ export class TimelineService {
 
     updateCursor(t) {
         this.currentT = t;
-        const pct = (t / this.totalDays) * 100;
+        const dayWidth = this.getDayWidth();
+        const leftPx = t * dayWidth;
+        const totalWidthPx = this.totalDays * dayWidth;
 
         if (this.cursor) {
-            this.cursor.style.left = `${Math.max(0, Math.min(100, pct))}%`;
+            this.cursor.style.left = `${Math.max(0, Math.min(totalWidthPx, leftPx))}px`;
         }
 
         if (this.progress) {
-            this.progress.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+            this.progress.style.width = `${Math.max(0, Math.min(totalWidthPx, leftPx))}px`;
         }
 
         // Update label
@@ -486,8 +494,42 @@ export class TimelineService {
         if (bar) {
             bar.classList.add('active');
 
+            // Update selected place time display
+            this.updateSelectedPlaceTime(index);
+
             // Center the timeline on this bar
             this.centerOnStop(index);
+        }
+    }
+
+    updateSelectedPlaceTime(index) {
+        const stop = this.timelineStops[index];
+        if (!stop) {
+            this.hideSelectedPlaceTime();
+            return;
+        }
+
+        const selectedPlaceTime = document.getElementById('selectedPlaceTime');
+        const selectedPlaceName = document.getElementById('selectedPlaceName');
+        const selectedPlaceTimeRange = document.getElementById('selectedPlaceTimeRange');
+
+        if (!selectedPlaceTime || !selectedPlaceName || !selectedPlaceTimeRange) {
+            return;
+        }
+
+        // Format the time range
+        const startTime = formatDayTime(stop.startT, this.totalDays);
+        const endTime = formatDayTime(stop.endT, this.totalDays);
+
+        selectedPlaceName.textContent = stop.name;
+        selectedPlaceTimeRange.textContent = `${startTime} - ${endTime}`;
+        selectedPlaceTime.style.display = 'flex';
+    }
+
+    hideSelectedPlaceTime() {
+        const selectedPlaceTime = document.getElementById('selectedPlaceTime');
+        if (selectedPlaceTime) {
+            selectedPlaceTime.style.display = 'none';
         }
     }
     

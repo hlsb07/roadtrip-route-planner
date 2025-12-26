@@ -143,36 +143,73 @@ namespace RoutePlanner.API.Services
                 return new RecalculateScheduleResultDto { UpdatedStops = 0 };
             }
 
-            // Store original times for all affected places
+            // Store original times for all places (before any updates)
             var originalTimes = orderedStops
-                .Where((rp, i) => i >= minIndex && i <= maxIndex)
                 .ToDictionary(rp => rp.PlaceId, rp => new { Start = rp.PlannedStart, End = rp.PlannedEnd });
 
-            // Process each place in the affected range
+            // Calculate the moved place's duration (in days)
+            TimeSpan movedPlaceDuration;
+            var movedOriginal = originalTimes[movedPlaceId.Value];
+
+            if (movedOriginal.Start.HasValue && movedOriginal.End.HasValue)
+            {
+                movedPlaceDuration = movedOriginal.End.Value - movedOriginal.Start.Value;
+            }
+            else if (movedPlace.StopType == StopType.Overnight && movedPlace.StayNights.HasValue)
+            {
+                movedPlaceDuration = TimeSpan.FromDays(movedPlace.StayNights.Value);
+            }
+            else if (movedPlace.StayDurationMinutes.HasValue)
+            {
+                movedPlaceDuration = TimeSpan.FromMinutes(movedPlace.StayDurationMinutes.Value);
+            }
+            else
+            {
+                movedPlaceDuration = TimeSpan.FromHours(2); // Default
+            }
+
+            // Calculate how many days to shift other places (at least 1 day)
+            int daysToShift = Math.Max(1, (int)Math.Ceiling(movedPlaceDuration.TotalDays));
+
+            // Find the target day for the moved place
+            // If moved UP: take the day from the place now at newIndex + 1 (which was at newIndex before)
+            // If moved DOWN: take the day from the place now at newIndex - 1 (which was at newIndex before)
+            DateTimeOffset targetDay;
+            if (movedUp && newIndex.Value + 1 < orderedStops.Count)
+            {
+                var placeAtTarget = orderedStops[newIndex.Value + 1];
+                targetDay = originalTimes[placeAtTarget.PlaceId].Start ?? DateTimeOffset.UtcNow;
+            }
+            else if (!movedUp && newIndex.Value - 1 >= 0)
+            {
+                var placeAtTarget = orderedStops[newIndex.Value - 1];
+                targetDay = originalTimes[placeAtTarget.PlaceId].Start ?? DateTimeOffset.UtcNow;
+            }
+            else
+            {
+                // Edge case: moving to first or last position with no reference
+                targetDay = movedOriginal.Start ?? DateTimeOffset.UtcNow;
+            }
+
+            // Update all places in the affected range
             for (int i = minIndex; i <= maxIndex; i++)
             {
                 var stop = orderedStops[i];
-                var originalStart = stop.PlannedStart;
-                var originalEnd = stop.PlannedEnd;
+                var originalStart = originalTimes[stop.PlaceId].Start;
+                var originalEnd = originalTimes[stop.PlaceId].End;
 
                 if (stop.PlaceId == movedPlaceId.Value)
                 {
-                    // This is the moved place - keep its time, but assign to new position's day
-                    // It takes the day from the place that was at newIndex
+                    // This is the moved place - assign to target day, keep time-of-day
                     if (originalStart.HasValue)
                     {
-                        // Calculate the day it should be on based on position
-                        var dayOffset = i - minIndex;
-                        var baseTime = originalTimes.First().Value.Start ?? DateTimeOffset.UtcNow;
-
                         stop.PlannedStart = new DateTimeOffset(
-                            baseTime.Date.AddDays(dayOffset).Add(originalStart.Value.TimeOfDay),
+                            targetDay.Date.Add(originalStart.Value.TimeOfDay),
                             originalStart.Value.Offset);
 
                         if (originalEnd.HasValue)
                         {
-                            var duration = originalEnd.Value - originalStart.Value;
-                            stop.PlannedEnd = stop.PlannedStart.Value.Add(duration);
+                            stop.PlannedEnd = stop.PlannedStart.Value.Add(movedPlaceDuration);
                         }
 
                         updatedCount++;
@@ -180,10 +217,11 @@ namespace RoutePlanner.API.Services
                 }
                 else
                 {
-                    // This is a place in the affected range - shift by ±1 day
+                    // This is a place in the affected range - shift by moved place's duration
                     if (originalStart.HasValue)
                     {
-                        var dayShift = movedUp ? 1 : -1;  // If moved UP, others shift DOWN (+1 day), vice versa
+                        // If moved UP, others shift DOWN (+days), if moved DOWN, others shift UP (-days)
+                        int dayShift = movedUp ? daysToShift : -daysToShift;
 
                         stop.PlannedStart = originalStart.Value.AddDays(dayShift);
 

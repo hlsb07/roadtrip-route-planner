@@ -71,6 +71,30 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     gap: 6px;
 }
 
+.selected-place-time {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #e3f2fd;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #1976D2;
+    font-weight: 500;
+}
+
+.selected-place-time i {
+    color: #1976D2;
+}
+
+.selected-place-time #selectedPlaceName {
+    font-weight: 600;
+}
+
+.selected-place-time #selectedPlaceTimeRange {
+    color: #666;
+}
+
 .timeline-current {
     display: flex;
     flex-direction: column;
