@@ -67,6 +67,30 @@ export class TimelineService {
         const totalWidth = totalDays * dayWidth;
         this.ganttWrapper.style.minWidth = `${totalWidth}px`;
 
+        // Set explicit widths for slider, track, and gantt-content to match timeline width
+        const ganttContent = document.querySelector('.gantt-content');
+        const timelineTrack = document.querySelector('.timeline-track');
+        const timelineSlider = document.getElementById('timelineSlider');
+        const dayLabels = document.querySelector('.day-labels');
+        const ganttGrid = document.querySelector('.gantt-grid');
+
+        if (ganttContent) {
+            ganttContent.style.width = `${totalWidth}px`;
+            ganttContent.style.minWidth = `${totalWidth}px`;
+        }
+        if (timelineTrack) {
+            timelineTrack.style.width = `${totalWidth}px`;
+        }
+        if (timelineSlider) {
+            timelineSlider.style.width = `${totalWidth}px`;
+        }
+        if (dayLabels) {
+            dayLabels.style.width = `${totalWidth}px`;
+        }
+        if (ganttGrid) {
+            ganttGrid.style.width = `${totalWidth}px`;
+        }
+
         console.log(`Timeline grid: dayWidth=${dayWidth}px, totalDays=${totalDays}, totalWidth=${totalWidth}px`);
 
         this.renderDayLabels();
@@ -129,14 +153,51 @@ export class TimelineService {
         return 120; // Desktop
     }
 
+    /**
+     * Get calendar date for a day index (0-based)
+     * @param {number} dayIndex - Day index (0 = first day, 1 = second day, etc.)
+     * @returns {Date} Calendar date for that day
+     */
+    getCalendarDateForDay(dayIndex) {
+        if (!this.routeStartUtc) {
+            return new Date();
+        }
+
+        const routeStart = new Date(this.routeStartUtc);
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+        // Get the calendar date of route start (at midnight UTC)
+        const routeStartDate = new Date(Date.UTC(
+            routeStart.getUTCFullYear(),
+            routeStart.getUTCMonth(),
+            routeStart.getUTCDate(),
+            0, 0, 0, 0
+        ));
+
+        return new Date(routeStartDate.getTime() + dayIndex * MS_PER_DAY);
+    }
+
     renderDayLabels() {
         if (!this.dayLabelsContainer) return;
+
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
         this.dayLabelsContainer.innerHTML = '';
         for (let day = 1; day <= this.totalDays; day++) {
             const label = document.createElement('div');
             label.className = 'day-label';
-            label.textContent = `Day ${day}`;
+
+            // Show calendar date instead of "Day N"
+            if (this.routeStartUtc) {
+                const calendarDate = this.getCalendarDateForDay(day - 1);
+                const month = monthNames[calendarDate.getUTCMonth()];
+                const dayNum = calendarDate.getUTCDate();
+                label.textContent = `${month} ${dayNum}`;
+            } else {
+                label.textContent = `Day ${day}`;
+            }
+
             label.dataset.day = day;
             this.dayLabelsContainer.appendChild(label);
         }
@@ -447,19 +508,24 @@ export class TimelineService {
             this.progress.style.width = `${Math.max(0, Math.min(totalWidthPx, leftPx))}px`;
         }
 
-        // Update label
+        // Update label with absolute clock time
         const dayInt = Math.floor(t) + 1;
-        const minutes = Math.round((t - Math.floor(t)) * 24 * 60);
-        const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
-        const mm = String(minutes % 60).padStart(2, '0');
 
         if (this.cursorLabel) {
-            this.cursorLabel.textContent = `Day ${dayInt} · ${hh}:${mm}`;
+            const formattedTime = formatDayTime(t, this.totalDays, this.routeStartUtc);
+            this.cursorLabel.textContent = formattedTime;
         }
 
-        // Update current day label
+        // Update current day label with calendar date
         const currentDayLabel = document.getElementById('currentDayLabel');
-        if (currentDayLabel) {
+        if (currentDayLabel && this.routeStartUtc) {
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                               'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const calendarDate = this.getCalendarDateForDay(Math.floor(t));
+            const month = monthNames[calendarDate.getUTCMonth()];
+            const dayNum = calendarDate.getUTCDate();
+            currentDayLabel.textContent = `${month} ${dayNum}`;
+        } else if (currentDayLabel) {
             currentDayLabel.textContent = `Day ${dayInt} of ${this.totalDays}`;
         }
 
@@ -517,9 +583,9 @@ export class TimelineService {
             return;
         }
 
-        // Format the time range
-        const startTime = formatDayTime(stop.startT, this.totalDays);
-        const endTime = formatDayTime(stop.endT, this.totalDays);
+        // Format the time range with absolute clock time
+        const startTime = formatDayTime(stop.startT, this.totalDays, this.routeStartUtc);
+        const endTime = formatDayTime(stop.endT, this.totalDays, this.routeStartUtc);
 
         selectedPlaceName.textContent = stop.name;
         selectedPlaceTimeRange.textContent = `${startTime} - ${endTime}`;

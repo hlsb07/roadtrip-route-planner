@@ -5,7 +5,7 @@
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Map itinerary data from backend to timeline stops with float day coordinates
+ * Map itinerary data from backend to timeline stops with calendar-date-based coordinates
  * @param {Object} itinerary - Route itinerary from backend
  * @returns {Array} Timeline stops with startT/endT coordinates
  */
@@ -19,7 +19,15 @@ export function mapItineraryToTimelineStops(itinerary) {
         ? new Date(itinerary.scheduleSettings.startDateTime)
         : new Date(); // Fallback (shouldn't happen with auto-init)
 
-    console.log(`Mapping ${itinerary.places.length} stops, route start: ${routeStart.toISOString()}`);
+    // Get the calendar date of route start (at midnight UTC)
+    const routeStartDate = new Date(Date.UTC(
+        routeStart.getUTCFullYear(),
+        routeStart.getUTCMonth(),
+        routeStart.getUTCDate(),
+        0, 0, 0, 0
+    ));
+
+    console.log(`Mapping ${itinerary.places.length} stops, route start: ${routeStart.toISOString()}, route start date (midnight): ${routeStartDate.toISOString()}`);
 
     return itinerary.places.map((stop, idx) => {
         const start = stop.plannedStart ? new Date(stop.plannedStart) : null;
@@ -36,12 +44,14 @@ export function mapItineraryToTimelineStops(itinerary) {
             }
         }
 
-        // Calculate float days (0.0 = route start, 1.0 = end of day 1)
+        // Calculate calendar-date-based coordinates
+        // startT = day index (0-based) + fraction of day (time-of-day as 0.0-1.0)
+        // Day 0 = first calendar date, Day 1 = second calendar date, etc.
         const startT = start
-            ? (start.getTime() - routeStart.getTime()) / MS_PER_DAY
+            ? (start.getTime() - routeStartDate.getTime()) / MS_PER_DAY
             : idx; // Fallback to sequential
         const endT = end
-            ? (end.getTime() - routeStart.getTime()) / MS_PER_DAY
+            ? (end.getTime() - routeStartDate.getTime()) / MS_PER_DAY
             : (idx + 1);
 
         const timelineStop = {
@@ -88,17 +98,25 @@ export function calculateTotalDays(timelineStops) {
 }
 
 /**
- * Convert timeline coordinates (float days) back to UTC timestamps
- * @param {number} startT - Start time in float days
- * @param {number} endT - End time in float days
+ * Convert timeline coordinates (calendar-date-based float days) back to UTC timestamps
+ * @param {number} startT - Start time in float days (from first calendar date midnight)
+ * @param {number} endT - End time in float days (from first calendar date midnight)
  * @param {string} routeStartUtc - Route start datetime (ISO string)
  * @returns {Object} {startUtc, endUtc} ISO timestamp strings
  */
 export function timelineCoordsToUTC(startT, endT, routeStartUtc) {
     const routeStart = new Date(routeStartUtc);
 
-    const startUtc = new Date(routeStart.getTime() + startT * MS_PER_DAY);
-    const endUtc = new Date(routeStart.getTime() + endT * MS_PER_DAY);
+    // Get the calendar date of route start (at midnight UTC)
+    const routeStartDate = new Date(Date.UTC(
+        routeStart.getUTCFullYear(),
+        routeStart.getUTCMonth(),
+        routeStart.getUTCDate(),
+        0, 0, 0, 0
+    ));
+
+    const startUtc = new Date(routeStartDate.getTime() + startT * MS_PER_DAY);
+    const endUtc = new Date(routeStartDate.getTime() + endT * MS_PER_DAY);
 
     return {
         startUtc: startUtc.toISOString(),
@@ -107,19 +125,47 @@ export function timelineCoordsToUTC(startT, endT, routeStartUtc) {
 }
 
 /**
- * Format a float day value to a human-readable string
- * @param {number} t - Time in float days
+ * Format a float day value to a human-readable string with calendar date and time
+ * @param {number} t - Time in float days (from first calendar date midnight)
  * @param {number} totalDays - Total days in timeline
- * @returns {string} Formatted string like "Day 1 · 09:00"
+ * @param {string} routeStartUtc - Route start datetime (ISO string)
+ * @returns {string} Formatted string like "Dec 26 · 09:00"
  */
-export function formatDayTime(t, totalDays) {
-    const dayIndex = Math.floor(t) + 1;
-    let minutes = Math.round((t - Math.floor(t)) * 24 * 60);
-    if (minutes >= 24 * 60) minutes = 0;
+export function formatDayTime(t, totalDays, routeStartUtc) {
+    // Calculate absolute time
+    if (routeStartUtc) {
+        const routeStart = new Date(routeStartUtc);
 
-    const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
-    const mm = String(minutes % 60).padStart(2, '0');
-    const dayClamped = Math.max(1, Math.min(dayIndex, totalDays));
+        // Get the calendar date of route start (at midnight UTC)
+        const routeStartDate = new Date(Date.UTC(
+            routeStart.getUTCFullYear(),
+            routeStart.getUTCMonth(),
+            routeStart.getUTCDate(),
+            0, 0, 0, 0
+        ));
 
-    return `Day ${dayClamped} · ${hh}:${mm}`;
+        const absoluteTime = new Date(routeStartDate.getTime() + t * MS_PER_DAY);
+
+        // Format as "Month Day · HH:MM"
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = monthNames[absoluteTime.getUTCMonth()];
+        const day = absoluteTime.getUTCDate();
+        const hh = String(absoluteTime.getUTCHours()).padStart(2, '0');
+        const mm = String(absoluteTime.getUTCMinutes()).padStart(2, '0');
+
+        return `${month} ${day} · ${hh}:${mm}`;
+    } else {
+        // Fallback to Day N format if no route start provided
+        const dayIndex = Math.floor(t) + 1;
+        const dayClamped = Math.max(1, Math.min(dayIndex, totalDays));
+
+        let minutes = Math.round((t - Math.floor(t)) * 24 * 60);
+        if (minutes >= 24 * 60) minutes = 0;
+
+        const hh = String(Math.floor(minutes / 60)).padStart(2, '0');
+        const mm = String(minutes % 60).padStart(2, '0');
+
+        return `Day ${dayClamped} · ${hh}:${mm}`;
+    }
 }

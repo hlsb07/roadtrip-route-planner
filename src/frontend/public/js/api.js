@@ -111,7 +111,11 @@ export class ApiService {
         const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places/reorder`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(placeIds)
+            body: JSON.stringify({
+                placeIds: placeIds,
+                recalculateSchedule: true,
+                preserveLockedDays: false
+            })
         });
         if (!response.ok) {
             const errorText = await response.text();

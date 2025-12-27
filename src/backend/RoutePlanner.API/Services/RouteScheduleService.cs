@@ -147,92 +147,52 @@ namespace RoutePlanner.API.Services
             var originalTimes = orderedStops
                 .ToDictionary(rp => rp.PlaceId, rp => new { Start = rp.PlannedStart, End = rp.PlannedEnd });
 
-            // Calculate the moved place's duration (in days)
-            TimeSpan movedPlaceDuration;
-            var movedOriginal = originalTimes[movedPlaceId.Value];
+            _logger.LogInformation($"RecalculateScheduleAfterReorder: movedPlaceId={movedPlaceId}, oldIndex={oldIndex}, newIndex={newIndex}, minIndex={minIndex}, maxIndex={maxIndex}");
 
-            if (movedOriginal.Start.HasValue && movedOriginal.End.HasValue)
-            {
-                movedPlaceDuration = movedOriginal.End.Value - movedOriginal.Start.Value;
-            }
-            else if (movedPlace.StopType == StopType.Overnight && movedPlace.StayNights.HasValue)
-            {
-                movedPlaceDuration = TimeSpan.FromDays(movedPlace.StayNights.Value);
-            }
-            else if (movedPlace.StayDurationMinutes.HasValue)
-            {
-                movedPlaceDuration = TimeSpan.FromMinutes(movedPlace.StayDurationMinutes.Value);
-            }
-            else
-            {
-                movedPlaceDuration = TimeSpan.FromHours(2); // Default
-            }
+            // Find the base date - start from the first day in the affected range
+            // Get the earliest start time among affected places
+            var affectedPlaces = orderedStops.Where((rp, idx) => idx >= minIndex && idx <= maxIndex).ToList();
+            var earliestStart = affectedPlaces
+                .Select(rp => originalTimes[rp.PlaceId].Start)
+                .Where(s => s.HasValue)
+                .OrderBy(s => s)
+                .FirstOrDefault() ?? DateTimeOffset.UtcNow;
 
-            // Calculate how many days to shift other places (at least 1 day)
-            int daysToShift = Math.Max(1, (int)Math.Ceiling(movedPlaceDuration.TotalDays));
+            _logger.LogInformation($"Affected places: {affectedPlaces.Count}, earliestStart: {earliestStart}");
 
-            // Find the target day for the moved place
-            // If moved UP: take the day from the place now at newIndex + 1 (which was at newIndex before)
-            // If moved DOWN: take the day from the place now at newIndex - 1 (which was at newIndex before)
-            DateTimeOffset targetDay;
-            if (movedUp && newIndex.Value + 1 < orderedStops.Count)
-            {
-                var placeAtTarget = orderedStops[newIndex.Value + 1];
-                targetDay = originalTimes[placeAtTarget.PlaceId].Start ?? DateTimeOffset.UtcNow;
-            }
-            else if (!movedUp && newIndex.Value - 1 >= 0)
-            {
-                var placeAtTarget = orderedStops[newIndex.Value - 1];
-                targetDay = originalTimes[placeAtTarget.PlaceId].Start ?? DateTimeOffset.UtcNow;
-            }
-            else
-            {
-                // Edge case: moving to first or last position with no reference
-                targetDay = movedOriginal.Start ?? DateTimeOffset.UtcNow;
-            }
+            // Get the base date (midnight of the earliest start day)
+            var baseDate = new DateTimeOffset(
+                earliestStart.Date,
+                earliestStart.Offset);
 
             // Update all places in the affected range
+            // Assign days sequentially: position minIndex gets Day 0, minIndex+1 gets Day 1, etc.
             for (int i = minIndex; i <= maxIndex; i++)
             {
                 var stop = orderedStops[i];
                 var originalStart = originalTimes[stop.PlaceId].Start;
                 var originalEnd = originalTimes[stop.PlaceId].End;
 
-                if (stop.PlaceId == movedPlaceId.Value)
+                if (originalStart.HasValue)
                 {
-                    // This is the moved place - assign to target day, keep time-of-day
-                    if (originalStart.HasValue)
+                    // Calculate which day this position should be on (sequential, 1 day per position)
+                    var dayOffset = i - minIndex;
+
+                    // Keep original time-of-day, assign to new day
+                    stop.PlannedStart = new DateTimeOffset(
+                        baseDate.Date.AddDays(dayOffset).Add(originalStart.Value.TimeOfDay),
+                        originalStart.Value.Offset);
+
+                    if (originalEnd.HasValue)
                     {
-                        stop.PlannedStart = new DateTimeOffset(
-                            targetDay.Date.Add(originalStart.Value.TimeOfDay),
-                            originalStart.Value.Offset);
-
-                        if (originalEnd.HasValue)
-                        {
-                            stop.PlannedEnd = stop.PlannedStart.Value.Add(movedPlaceDuration);
-                        }
-
-                        updatedCount++;
+                        // Keep original duration
+                        var duration = originalEnd.Value - originalStart.Value;
+                        stop.PlannedEnd = stop.PlannedStart.Value.Add(duration);
                     }
-                }
-                else
-                {
-                    // This is a place in the affected range - shift by moved place's duration
-                    if (originalStart.HasValue)
-                    {
-                        // If moved UP, others shift DOWN (+days), if moved DOWN, others shift UP (-days)
-                        int dayShift = movedUp ? daysToShift : -daysToShift;
 
-                        stop.PlannedStart = originalStart.Value.AddDays(dayShift);
+                    _logger.LogInformation($"  Position {i}: {stop.Place?.Name} - Original: {originalStart} -> New: {stop.PlannedStart}");
 
-                        if (originalEnd.HasValue)
-                        {
-                            var duration = originalEnd.Value - originalStart.Value;
-                            stop.PlannedEnd = stop.PlannedStart.Value.Add(duration);
-                        }
-
-                        updatedCount++;
-                    }
+                    updatedCount++;
                 }
 
                 changes.Add(new ScheduleChangeDetail
