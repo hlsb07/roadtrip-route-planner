@@ -147,27 +147,21 @@ namespace RoutePlanner.API.Services
             var originalTimes = orderedStops
                 .ToDictionary(rp => rp.PlaceId, rp => new { Start = rp.PlannedStart, End = rp.PlannedEnd });
 
-            _logger.LogInformation($"RecalculateScheduleAfterReorder: movedPlaceId={movedPlaceId}, oldIndex={oldIndex}, newIndex={newIndex}, minIndex={minIndex}, maxIndex={maxIndex}");
+            _logger.LogInformation($"RecalculateScheduleAfterReorder: movedPlaceId={movedPlaceId}, oldIndex={oldIndex}, newIndex={newIndex}");
 
-            // Find the base date - start from the first day in the affected range
-            // Get the earliest start time among affected places
-            var affectedPlaces = orderedStops.Where((rp, idx) => idx >= minIndex && idx <= maxIndex).ToList();
-            var earliestStart = affectedPlaces
-                .Select(rp => originalTimes[rp.PlaceId].Start)
-                .Where(s => s.HasValue)
-                .OrderBy(s => s)
-                .FirstOrDefault() ?? DateTimeOffset.UtcNow;
-
-            _logger.LogInformation($"Affected places: {affectedPlaces.Count}, earliestStart: {earliestStart}");
-
-            // Get the base date (midnight of the earliest start day)
+            // Use the route's StartDateTime as the base date for consistent day assignment
+            // Each position in the route should be on its corresponding day: position 0 = day 0, position 1 = day 1, etc.
+            var routeStartDate = route.StartDateTime ?? DateTimeOffset.UtcNow;
             var baseDate = new DateTimeOffset(
-                earliestStart.Date,
-                earliestStart.Offset);
+                routeStartDate.Date,
+                routeStartDate.Offset);
 
-            // Update all places in the affected range
-            // Assign days sequentially: position minIndex gets Day 0, minIndex+1 gets Day 1, etc.
-            for (int i = minIndex; i <= maxIndex; i++)
+            _logger.LogInformation($"Using route start date as base: {routeStartDate}, updating ALL {orderedStops.Count} positions");
+
+            // Update ALL places (not just affected range) to ensure consistency
+            // When a place moves, all positions may shift, so we recalculate everything
+            // Assign days based on absolute position: position i gets day i (relative to route start)
+            for (int i = 0; i < orderedStops.Count; i++)
             {
                 var stop = orderedStops[i];
                 var originalStart = originalTimes[stop.PlaceId].Start;
@@ -175,12 +169,20 @@ namespace RoutePlanner.API.Services
 
                 if (originalStart.HasValue)
                 {
-                    // Calculate which day this position should be on (sequential, 1 day per position)
-                    var dayOffset = i - minIndex;
+                    // Position i should be on day i (relative to route start)
+                    // This ensures consistent day assignment regardless of existing times
+                    var dayOffset = i;
+
+                    // Calculate the new date for this position
+                    var newDate = baseDate.Date.AddDays(dayOffset);
+                    var timeOfDay = originalStart.Value.TimeOfDay;
+                    var newDateTime = newDate.Add(timeOfDay);
+
+                    _logger.LogInformation($"  Position {i} ({stop.Place?.Name}, PlaceId={stop.PlaceId}): dayOffset={dayOffset}, newDate={newDate:yyyy-MM-dd}, timeOfDay={timeOfDay}, newDateTime={newDateTime}");
 
                     // Keep original time-of-day, assign to new day
                     stop.PlannedStart = new DateTimeOffset(
-                        baseDate.Date.AddDays(dayOffset).Add(originalStart.Value.TimeOfDay),
+                        newDateTime,
                         originalStart.Value.Offset);
 
                     if (originalEnd.HasValue)
