@@ -14,7 +14,8 @@
       "Bash(find:*)",
       "Bash(git checkout:*)",
       "Bash(dotnet ef dbcontext scaffold:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

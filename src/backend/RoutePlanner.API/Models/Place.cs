@@ -32,7 +32,7 @@ namespace RoutePlanner.API.Models
         // Navigation Properties
 
         // User who owns this place
-        public User User { get; set; } = null!;
+        public ApplicationUser User { get; set; } = null!;
 
         // Optional link to shared Google place data
         public GooglePlaceData? GoogleData { get; set; }

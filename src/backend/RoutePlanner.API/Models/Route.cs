@@ -41,7 +41,7 @@ namespace RoutePlanner.API.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
         // Navigation Properties
-        public User User { get; set; } = null!;
+        public ApplicationUser User { get; set; } = null!;
         public List<RoutePlace> Places { get; set; } = new();
         public List<RouteLeg> Legs { get; set; } = new();
     }
