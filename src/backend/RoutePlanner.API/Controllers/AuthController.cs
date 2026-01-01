@@ -109,7 +109,7 @@ namespace RoutePlanner.API.Controllers
             try
             {
                 // Get frontend URL from config
-                var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5500";
+                var frontendUrl = _configuration["FrontendUrl"] ?? "http://localhost:5166";
                 var resetUrl = $"{frontendUrl}/reset-password.html";
 
                 await _authService.SendPasswordResetEmailAsync(forgotDto.Email, resetUrl);

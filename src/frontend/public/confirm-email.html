@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Email - Roadtrip Route Planner</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 576 512%22><path fill=%22%232A9D8F%22 d=%22M408 120c0 54.6-73.1 151.9-105.2 192c-7.7 9.6-22 9.6-29.6 0C241.1 271.9 168 174.6 168 120C168 53.7 221.7 0 288 0s120 53.7 120 120zm8 80.4c3.5-6.9 6.7-13.8 9.6-20.6c.5-1.2 1-2.5 1.5-3.7l116-46.4C558.9 123.4 576 135 576 152V422.8c0 9.8-6 18.6-15.1 22.3L416 503V200.4zM137.6 138.3c2.4 14.1 7.2 28.3 12.8 41.5c2.9 6.8 6.1 13.7 9.6 20.6V451.8L32.9 502.7C17.1 509 0 497.4 0 480.4V209.6c0-9.8 6-18.6 15.1-22.3l122.6-49zM327.8 332c13.9-17.4 35.7-45.7 56.2-77V504.3L192 449.4V255c20.5 31.3 42.3 59.6 56.2 77c20.5 25.6 59.1 25.6 79.6 0zM288 152a40 40 0 1 0 0-80 40 40 0 1 0 0 80z%22/></svg>" type="image/svg+xml">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #2A9D8F 0%, #264653 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 500px;
+            width: 100%;
+            padding: 50px 40px;
+            text-align: center;
+        }
+
+        .icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        .icon.loading {
+            color: #2A9D8F;
+        }
+
+        .icon.success {
+            color: #28a745;
+        }
+
+        .icon.error {
+            color: #dc3545;
+        }
+
+        h1 {
+            color: #264653;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            color: #666;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2A9D8F;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: #2A9D8F;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            background: #238276;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            margin-left: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .countdown {
+            color: #999;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+
+        .details {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+
+        .details strong {
+            color: #264653;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loadingState">
+            <div class="spinner"></div>
+            <h1>Confirming Your Email</h1>
+            <p class="message">Please wait while we verify your email address...</p>
+        </div>
+
+        <div id="successState" style="display: none;">
+            <i class="fas fa-check-circle icon success"></i>
+            <h1>Email Confirmed!</h1>
+            <p class="message">
+                Your email has been successfully verified. You can now start planning your roadtrips!
+            </p>
+            <div class="details">
+                <strong>What's next?</strong><br>
+                You'll be automatically redirected to the app, or you can click the button below.
+            </div>
+            <a href="./index.html" class="btn">
+                <i class="fas fa-map-marked-alt"></i> Go to App
+            </a>
+            <p class="countdown">Redirecting in <span id="countdown">5</span> seconds...</p>
+        </div>
+
+        <div id="errorState" style="display: none;">
+            <i class="fas fa-exclamation-circle icon error"></i>
+            <h1>Verification Failed</h1>
+            <p class="message" id="errorMessage">
+                Unable to verify your email. This link may have expired or already been used.
+            </p>
+            <div class="details">
+                <strong>What can you do?</strong><br>
+                Try logging in to the app, or contact support if the problem persists.
+            </div>
+            <a href="./index.html" class="btn">
+                <i class="fas fa-arrow-left"></i> Go to App
+            </a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { CONFIG } from './js/config.js';
+
+        // Get token and email from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        const email = urlParams.get('email');
+
+        const loadingState = document.getElementById('loadingState');
+        const successState = document.getElementById('successState');
+        const errorState = document.getElementById('errorState');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Check if token and email are present
+        if (!token || !email) {
+            showError('Invalid confirmation link. Missing required parameters.');
+            return;
+        }
+
+        // Automatically confirm email on page load
+        confirmEmail();
+
+        async function confirmEmail() {
+            try {
+                const response = await fetch(`${CONFIG.API_BASE}/auth/confirm-email`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: email,
+                        token: token
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({ message: 'Email confirmation failed' }));
+                    throw new Error(error.message || 'Email confirmation failed');
+                }
+
+                // Success
+                showSuccess();
+
+            } catch (error) {
+                console.error('Email confirmation error:', error);
+                showError(error.message || 'An error occurred while confirming your email.');
+            }
+        }
+
+        function showSuccess() {
+            loadingState.style.display = 'none';
+            successState.style.display = 'block';
+
+            // Start countdown
+            let seconds = 5;
+            const countdownEl = document.getElementById('countdown');
+
+            const interval = setInterval(() => {
+                seconds--;
+                countdownEl.textContent = seconds;
+
+                if (seconds <= 0) {
+                    clearInterval(interval);
+                    window.location.href = './index.html';
+                }
+            }, 1000);
+        }
+
+        function showError(message) {
+            loadingState.style.display = 'none';
+            errorState.style.display = 'block';
+            errorMessage.textContent = message;
+        }
+    </script>
+</body>
+</html>

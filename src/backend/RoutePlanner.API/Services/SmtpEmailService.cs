@@ -1,4 +1,5 @@
 using MailKit.Net.Smtp;
+using MailKit.Security;
 using MimeKit;
 
 namespace RoutePlanner.API.Services
@@ -10,7 +11,6 @@ namespace RoutePlanner.API.Services
     {
         public required string Host { get; set; }
         public int Port { get; set; }
-        public bool EnableSsl { get; set; }
         public required string Username { get; set; }
         public required string Password { get; set; }
         public required string FromEmail { get; set; }
@@ -54,7 +54,7 @@ namespace RoutePlanner.API.Services
 
         public async Task SendPasswordResetAsync(string toEmail, string resetLink)
         {
-            var subject = "Reset your password - Roadtrip Route Planner";
+            var subject = "Roadtrip Route Planner - Reset your password";
             var body = $@"
                 <html>
                 <body style='font-family: Arial, sans-serif;'>
@@ -85,7 +85,16 @@ namespace RoutePlanner.API.Services
                 message.Body = bodyBuilder.ToMessageBody();
 
                 using var client = new SmtpClient();
-                await client.ConnectAsync(_smtpSettings.Host, _smtpSettings.Port, _smtpSettings.EnableSsl);
+
+                // Determine the correct SecureSocketOptions based on port
+                var secureSocketOptions = _smtpSettings.Port switch
+                {
+                    465 => SecureSocketOptions.SslOnConnect,  // SMTPS (implicit SSL)
+                    587 => SecureSocketOptions.StartTls,      // SMTP with STARTTLS (explicit SSL)
+                    _ => SecureSocketOptions.StartTlsWhenAvailable  // Default for other ports
+                };
+
+                await client.ConnectAsync(_smtpSettings.Host, _smtpSettings.Port, secureSocketOptions);
                 await client.AuthenticateAsync(_smtpSettings.Username, _smtpSettings.Password);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);

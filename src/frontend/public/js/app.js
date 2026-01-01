@@ -1512,6 +1512,32 @@ class App {
         }
         return false;
     }
+
+    /**
+     * Handle user logout
+     */
+    async handleLogout() {
+        const confirmed = await showConfirm(
+            'Are you sure you want to logout?',
+            'You will need to login again to access your routes and places.'
+        );
+
+        if (confirmed) {
+            try {
+                await AuthManager.logout();
+                showSuccess('Logged out successfully');
+
+                // Reload page to clear state and show login modal
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } catch (error) {
+                console.error('Logout error:', error);
+                // Still reload on error since tokens are cleared locally
+                window.location.reload();
+            }
+        }
+    }
 }
 
 // Initialize app when DOM is loaded
@@ -1524,6 +1550,7 @@ window.addEventListener('load', async () => {
 // Export for global access (for inline event handlers)
 window.handleSearch = () => window.app?.handleSearch();
 window.handleAddCampsite = () => window.app?.handleAddCampsite();
+window.handleLogout = () => window.app?.handleLogout();
 window.switchTab = (tab) => window.app?.switchTab(tab);
 window.showCreateRouteModal = () => window.app?.showCreateRouteModal();
 window.showRenameRouteModal = () => window.app?.showRenameRouteModal();
