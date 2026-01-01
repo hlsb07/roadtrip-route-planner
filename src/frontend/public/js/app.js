@@ -13,9 +13,14 @@ import { SwipeHandler } from './swipeHandler.js';
 import { TimelineService } from './timeline/TimelineService.js';
 import { initializeScheduleIfNeeded } from './timeline/scheduleInitializer.js';
 import { mapItineraryToTimelineStops, calculateTotalDays } from './timeline/timelineMapper.js';
+import { AuthManager } from './authManager.js';
+import { LoginModal } from './loginModal.js';
 
 class App {
     constructor() {
+        // Initialize authentication
+        this.loginModal = new LoginModal();
+
         this.mapService = new MapService();
         this.filterManager = new FilterManager();  // Create filterManager first
         this.routeManager = new RouteManager(this.filterManager);  // Pass filterManager
@@ -53,6 +58,18 @@ class App {
 
     async init() {
         try {
+            // Check authentication first
+            const isAuthenticated = await AuthManager.ensureAuthenticated();
+            if (!isAuthenticated) {
+                // Show login modal
+                this.loginModal.init(() => this.onLoginSuccess());
+                this.loginModal.show();
+                return; // Don't initialize app until logged in
+            }
+
+            // Initialize login modal for potential future use
+            this.loginModal.init(() => this.onLoginSuccess());
+
             // Initialize map
             this.mapService.init();
 
@@ -1466,6 +1483,34 @@ class App {
         } else if (placeId) {
             this.showPlaceDetailsModal(placeId, 'view');
         }
+    }
+
+    /**
+     * Handle successful login - reload the application
+     */
+    async onLoginSuccess() {
+        console.log('Login successful, initializing app...');
+        try {
+            // Reload the page to reinitialize everything with authentication
+            window.location.reload();
+        } catch (error) {
+            console.error('Error after login:', error);
+            showError('Error loading application after login. Please refresh the page.');
+        }
+    }
+
+    /**
+     * Handle authentication errors globally
+     */
+    handleAuthenticationError(error) {
+        if (error.message === 'AUTHENTICATION_REQUIRED') {
+            console.log('Authentication required, showing login modal');
+            if (this.loginModal) {
+                this.loginModal.show();
+            }
+            return true;
+        }
+        return false;
     }
 }
 

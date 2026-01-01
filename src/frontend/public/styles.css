@@ -6012,3 +6012,16 @@ textarea.form-input {
         font-size: 0.85rem;
     }
 }
+
+
+/* Login Modal Error Message */
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 12px;
+    border-radius: 4px;
+    border: 1px solid #f5c6cb;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
