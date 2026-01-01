@@ -394,8 +394,8 @@ namespace RoutePlanner.API.Data
                     NormalizedEmail = "DEFAULT@ROADTRIP.LOCAL",
                     EmailConfirmed = true, // Pre-confirmed for backward compatibility
                     PasswordHash = "AQAAAAIAAYagAAAAEGZvb3RvdXJpc3RzZWVkZGF0YQ==", // Placeholder - will need proper password
-                    SecurityStamp = Guid.NewGuid().ToString(),
-                    ConcurrencyStamp = Guid.NewGuid().ToString(),
+                    SecurityStamp = "8f8c6a62-5b4d-4f8e-9c3a-1d7e4b2f9a8c", // Static GUID for seed data
+                    ConcurrencyStamp = "7a9b5c81-4e3f-2d1a-8c6b-9e4f3a2d1c8b", // Static GUID for seed data
                     CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                     UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 }
