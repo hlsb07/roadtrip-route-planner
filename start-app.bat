@@ -59,7 +59,7 @@ echo Press any key to open in browser...
 pause >nul
 
 REM Open browser
-start http://localhost
+start http://localhost/roadtriprouteplanner/
 
 echo.
 echo ========================================

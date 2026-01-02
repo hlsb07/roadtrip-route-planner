@@ -2,10 +2,11 @@ import { ApiService } from './api.js';
 import { showSuccess, showError, sleep, showConfirm } from './utils.js';
 
 export class PlaceManager {
-    constructor(routeManager, onUpdate = null) {
+    constructor(routeManager, onUpdate = null, onReordered = null) {
         this.routeManager = routeManager;
         this.places = [];
         this.onUpdate = onUpdate;
+        this.onReordered = onReordered; // Callback for when route order changes
         this.selectedIndex = null;
         this.sortableInstances = {}; // Track Sortable instances
         this.sortingEnabled = false; // Track if sorting mode is active
@@ -934,12 +935,24 @@ export class PlaceManager {
     async reorderPlaces(newOrder) {
         const currentRouteId = this.routeManager.getCurrentRouteId();
         if (!currentRouteId) return false;
-        
+
         try {
-            await ApiService.reorderPlaces(currentRouteId, newOrder);
+            // Use enhanced reorder with schedule recalculation
+            await ApiService.reorderPlacesWithSchedule(
+                currentRouteId,
+                newOrder,
+                true,  // recalculateSchedule
+                true   // preserveLockedDays
+            );
             this.places = await this.routeManager.loadCurrentRoute();
+
+            // Trigger timeline reload after route reorder
+            if (this.onReordered) {
+                await this.onReordered();
+            }
+
             return true;
-            
+
         } catch (error) {
             console.error('Failed to reorder places:', error);
             showError('Failed to reorder places');
@@ -1363,8 +1376,13 @@ export class PlaceManager {
                 // Get place IDs in new order
                 const reorderedIds = newOrder.map(p => p.id);
 
-                // Update order on backend
-                await ApiService.reorderPlaces(currentRouteId, reorderedIds);
+                // Update order on backend with schedule recalculation
+                await ApiService.reorderPlacesWithSchedule(
+                    currentRouteId,
+                    reorderedIds,
+                    true,  // recalculateSchedule
+                    true   // preserveLockedDays
+                );
 
                 // Reload to confirm
                 this.places = await this.routeManager.loadCurrentRoute();

@@ -1,27 +1,59 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RoutePlanner.API.Data;
 using RoutePlanner.API.DTOs;
 using RoutePlanner.API.Models;
+using RoutePlanner.API.Services;
+using System.Security.Claims;
 
 namespace RoutePlanner.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // Require authentication for all endpoints
     public class RoutesController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IRouteScheduleService _scheduleService;
+        private readonly IRouteLegService _legService;
+        private readonly IRouteConflictService _conflictService;
+        private readonly ILogger<RoutesController> _logger;
 
-        public RoutesController(AppDbContext context)
+        public RoutesController(
+            AppDbContext context,
+            IRouteScheduleService scheduleService,
+            IRouteLegService legService,
+            IRouteConflictService conflictService,
+            ILogger<RoutesController> logger)
         {
             _context = context;
+            _scheduleService = scheduleService;
+            _legService = legService;
+            _conflictService = conflictService;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// Get the current authenticated user's ID from JWT claims
+        /// </summary>
+        private int GetCurrentUserId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+            {
+                throw new UnauthorizedAccessException("User not authenticated");
+            }
+            return userId;
         }
 
         // GET: api/routes - Alle Routen anzeigen
         [HttpGet]
         public async Task<ActionResult<List<RouteListDto>>> GetRoutes()
         {
+            var currentUserId = GetCurrentUserId();
             var routes = await _context.Routes
+                .Where(r => r.UserId == currentUserId)
                 .Include(r => r.Places)
                 .Select(r => new RouteListDto
                 {
@@ -40,7 +72,9 @@ namespace RoutePlanner.API.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<RouteDto>> GetRoute(int id)
         {
+            var currentUserId = GetCurrentUserId();
             var route = await _context.Routes
+                .Where(r => r.UserId == currentUserId)
                 .Include(r => r.Places)
                     .ThenInclude(rp => rp.Place)
                         .ThenInclude(p => p.PlaceCategories)
@@ -99,8 +133,10 @@ namespace RoutePlanner.API.Controllers
         [HttpPost]
         public async Task<ActionResult<RouteDto>> CreateRoute(CreateRouteDto createDto)
         {
+            var currentUserId = GetCurrentUserId();
             var route = new Models.Route
             {
+                UserId = currentUserId,
                 Name = createDto.Name,
                 Description = createDto.Description,
                 CreatedAt = DateTime.UtcNow,
@@ -128,7 +164,8 @@ namespace RoutePlanner.API.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateRoute(int id, UpdateRouteDto updateDto)
         {
-            var route = await _context.Routes.FindAsync(id);
+            var currentUserId = GetCurrentUserId();
+            var route = await _context.Routes.FirstOrDefaultAsync(r => r.Id == id && r.UserId == currentUserId);
             if (route == null)
                 return NotFound();
 
@@ -145,7 +182,9 @@ namespace RoutePlanner.API.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteRoute(int id)
         {
+            var currentUserId = GetCurrentUserId();
             var route = await _context.Routes
+                .Where(r => r.UserId == currentUserId)
                 .Include(r => r.Places)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
@@ -162,14 +201,16 @@ namespace RoutePlanner.API.Controllers
         [HttpPost("{id}/places")]
         public async Task<IActionResult> AddPlaceToRoute(int id, AddPlaceToRouteDto addDto)
         {
+            var currentUserId = GetCurrentUserId();
             var route = await _context.Routes
+                .Where(r => r.UserId == currentUserId)
                 .Include(r => r.Places)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
             if (route == null)
                 return NotFound("Route not found");
 
-            var place = await _context.Places.FindAsync(addDto.PlaceId);
+            var place = await _context.Places.FirstOrDefaultAsync(p => p.Id == addDto.PlaceId && p.UserId == currentUserId);
             if (place == null)
                 return NotFound("Place not found");
 
@@ -191,6 +232,18 @@ namespace RoutePlanner.API.Controllers
             route.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
+            // Auto-recalculate legs from OSRM after adding place
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(id);
+                _logger.LogInformation($"Auto-recalculated legs after adding place to route {id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                // Don't fail the operation if recalculation fails
+            }
+
             return Ok(new { message = "Place added to route successfully" });
         }
 
@@ -198,6 +251,12 @@ namespace RoutePlanner.API.Controllers
         [HttpDelete("{id}/places/{placeId}")]
         public async Task<IActionResult> RemovePlaceFromRoute(int id, int placeId)
         {
+            var currentUserId = GetCurrentUserId();
+            // Verify route belongs to user
+            var route = await _context.Routes.FirstOrDefaultAsync(r => r.Id == id && r.UserId == currentUserId);
+            if (route == null)
+                return NotFound("Route not found");
+
             var routePlace = await _context.RoutePlaces
                 .FirstOrDefaultAsync(rp => rp.RouteId == id && rp.PlaceId == placeId);
 
@@ -207,27 +266,43 @@ namespace RoutePlanner.API.Controllers
             _context.RoutePlaces.Remove(routePlace);
 
             // UpdatedAt der Route aktualisieren
-            var route = await _context.Routes.FindAsync(id);
-            if (route != null)
-            {
-                route.UpdatedAt = DateTime.UtcNow;
-            }
+            route.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Auto-recalculate legs from OSRM after removing place
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(id);
+                _logger.LogInformation($"Auto-recalculated legs after removing place from route {id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                // Don't fail the operation if recalculation fails
+            }
 
             return NoContent();
         }
 
         // PUT: api/routes/{id}/places/reorder - Reihenfolge der Orte ändern
         [HttpPut("{id}/places/reorder")]
-        public async Task<IActionResult> ReorderPlaces(int id, [FromBody] List<int> placeIds)
+        public async Task<IActionResult> ReorderPlaces(int id, [FromBody] ReorderPlacesRequest request)
         {
+            var currentUserId = GetCurrentUserId();
             var route = await _context.Routes
+                .Where(r => r.UserId == currentUserId)
                 .Include(r => r.Places)
                 .FirstOrDefaultAsync(r => r.Id == id);
 
             if (route == null)
                 return NotFound();
+
+            // Support legacy format (simple array) by checking if PlaceIds is provided
+            var placeIds = request.PlaceIds ?? new List<int>();
+
+            // Capture old positions before reordering (for detecting which place moved)
+            var oldPositions = route.Places.ToDictionary(rp => rp.PlaceId, rp => rp.OrderIndex);
 
             // Step 1: Set all OrderIndex to negative values to avoid unique constraint conflicts
             for (int i = 0; i < route.Places.Count; i++)
@@ -249,6 +324,57 @@ namespace RoutePlanner.API.Controllers
             route.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
+            // Detect which place moved (for selective schedule recalculation)
+            int? movedPlaceId = null;
+            int? oldIndex = null;
+            int? newIndex = null;
+
+            for (int i = 0; i < placeIds.Count; i++)
+            {
+                var placeId = placeIds[i];
+                if (oldPositions.ContainsKey(placeId) && oldPositions[placeId] != i)
+                {
+                    movedPlaceId = placeId;
+                    oldIndex = oldPositions[placeId];
+                    newIndex = i;
+                    break;  // Single move at a time
+                }
+            }
+
+            // Auto-recalculate legs from OSRM after reordering places
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(id);
+                _logger.LogInformation($"Auto-recalculated legs after reordering places in route {id}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                // Don't fail the operation if recalculation fails
+            }
+
+            // Recalculate schedule if requested
+            if (request.RecalculateSchedule)
+            {
+                try
+                {
+                    await _scheduleService.RecalculateScheduleAfterReorder(
+                        id,
+                        request.PreserveLockedDays,
+                        ignoreLockedStops: true,  // Always ignore locks after manual reorder (OrderIndex is source of truth)
+                        movedPlaceId: movedPlaceId,
+                        oldIndex: oldIndex,
+                        newIndex: newIndex);
+
+                    _logger.LogInformation($"Recalculated schedule after reordering route {id}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, $"Failed to recalculate schedule for route {id}");
+                    // Don't fail the operation if schedule recalculation fails
+                }
+            }
+
             return NoContent();
         }
 
@@ -256,7 +382,9 @@ namespace RoutePlanner.API.Controllers
         [HttpGet("{id}/stats")]
         public async Task<ActionResult<object>> GetRouteStats(int id)
         {
+            var currentUserId = GetCurrentUserId();
             var route = await _context.Routes
+                .Where(r => r.UserId == currentUserId)
                 .Include(r => r.Places)
                     .ThenInclude(rp => rp.Place)
                 .FirstOrDefaultAsync(r => r.Id == id);
@@ -288,14 +416,290 @@ namespace RoutePlanner.API.Controllers
                 totalDistance += distance;
             }
 
-            return Ok(new 
-            { 
+            return Ok(new
+            {
                 routeId = id,
                 totalDistanceKm = Math.Round(totalDistance / 1000, 2),
                 placeCount = route.Places.Count,
                 startPlace = orderedPlaces.First().Place.Name,
                 endPlace = orderedPlaces.Last().Place.Name
             });
+        }
+
+        // ===== Schedule Management Endpoints =====
+
+        // GET: api/routes/{id}/itinerary - Get full route with schedule, stops, and legs
+        [HttpGet("{id}/itinerary")]
+        public async Task<ActionResult<object>> GetItinerary(int id, [FromQuery] bool includeConflicts = true)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound($"Route with ID {id} not found");
+
+                var itinerary = await _scheduleService.GetItinerary(id);
+                if (itinerary == null)
+                    return NotFound($"Route with ID {id} not found");
+
+                if (includeConflicts)
+                {
+                    var conflicts = await _conflictService.DetectOrderConflicts(id);
+                    var itineraryWithConflicts = new RouteItineraryWithConflictsDto
+                    {
+                        Id = itinerary.Id,
+                        Name = itinerary.Name,
+                        Description = itinerary.Description,
+                        ScheduleSettings = itinerary.ScheduleSettings,
+                        Places = itinerary.Places,
+                        Legs = itinerary.Legs,
+                        CreatedAt = itinerary.CreatedAt,
+                        UpdatedAt = itinerary.UpdatedAt,
+                        ConflictInfo = conflicts
+                    };
+                    return Ok(itineraryWithConflicts);
+                }
+
+                return Ok(itinerary);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error retrieving itinerary", error = ex.Message });
+            }
+        }
+
+        // PUT: api/routes/{id}/schedule-settings - Update route schedule settings
+        [HttpPut("{id}/schedule-settings")]
+        public async Task<IActionResult> UpdateScheduleSettings(int id, [FromBody] UpdateRouteScheduleDto dto)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                await _scheduleService.UpdateRouteScheduleSettings(id, dto);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating schedule settings", error = ex.Message });
+            }
+        }
+
+        // PUT: api/routes/{routeId}/places/{routePlaceId}/schedule - Update stop schedule
+        [HttpPut("{routeId}/places/{routePlaceId}/schedule")]
+        public async Task<IActionResult> UpdateRoutePlaceSchedule(int routeId, int routePlaceId, [FromBody] RoutePlaceScheduleUpdateDto dto)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == routeId && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                // Check if this would create a conflict (before applying the change)
+                ScheduleChangeConflictDto? conflictCheck = null;
+                if (dto.PlannedStart.HasValue && dto.PlannedEnd.HasValue)
+                {
+                    conflictCheck = await _conflictService.CheckScheduleChangeConflict(
+                        routeId,
+                        routePlaceId,
+                        dto.PlannedStart.Value,
+                        dto.PlannedEnd.Value);
+                }
+
+                // Update the schedule
+                await _scheduleService.UpdateRoutePlaceSchedule(routeId, routePlaceId, dto);
+
+                // Return conflict information if any
+                if (conflictCheck != null && conflictCheck.WouldCreateConflict)
+                {
+                    return Ok(new
+                    {
+                        success = true,
+                        conflict = conflictCheck,
+                        message = "Schedule updated but created ordering conflict"
+                    });
+                }
+
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating stop schedule", error = ex.Message });
+            }
+        }
+
+        // ===== Conflict Management Endpoints =====
+
+        // POST: api/routes/{id}/conflicts/check-schedule-change - Check if schedule change would create conflict
+        [HttpPost("{id}/conflicts/check-schedule-change")]
+        public async Task<ActionResult<ScheduleChangeConflictDto>> CheckScheduleChangeConflict(
+            int id,
+            [FromBody] CheckScheduleChangeRequest request)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                var result = await _conflictService.CheckScheduleChangeConflict(
+                    id,
+                    request.RoutePlaceId,
+                    request.NewPlannedStart,
+                    request.NewPlannedEnd);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error checking conflicts", error = ex.Message });
+            }
+        }
+
+        // POST: api/routes/{id}/conflicts/resolve-by-reorder - Resolve conflicts by reordering based on times
+        [HttpPost("{id}/conflicts/resolve-by-reorder")]
+        public async Task<IActionResult> ResolveConflictByReorder(
+            int id,
+            [FromBody] ResolveConflictByReorderDto dto)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                // Apply time-based order
+                await _conflictService.ApplyTimeBasedOrder(id);
+
+                // Recalculate OSRM legs
+                await _legService.RecalculateLegsFromOsrm(id);
+
+                // Optionally recalculate schedule
+                if (dto.RecalculateScheduleAfter)
+                {
+                    await _scheduleService.RecalculateScheduleAfterReorder(id);
+                }
+
+                return Ok(new { message = "Conflicts resolved by reordering" });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error resolving conflicts", error = ex.Message });
+            }
+        }
+
+        // POST: api/routes/{id}/schedule/recalculate - Recalculate schedule after reorder
+        [HttpPost("{id}/schedule/recalculate")]
+        public async Task<ActionResult<RecalculateScheduleResultDto>> RecalculateSchedule(
+            int id,
+            [FromQuery] bool preserveLockedDays = true)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                var result = await _scheduleService.RecalculateScheduleAfterReorder(
+                    id,
+                    preserveLockedDays);
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error recalculating schedule", error = ex.Message });
+            }
+        }
+
+        // ===== Leg Management Endpoints =====
+
+        // POST: api/routes/{id}/legs/rebuild - Rebuild leg skeleton
+        [HttpPost("{id}/legs/rebuild")]
+        public async Task<IActionResult> RebuildLegSkeleton(int id)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                await _legService.RebuildLegSkeleton(id);
+                return Ok(new { message = $"Successfully rebuilt leg skeleton for route {id}" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error rebuilding leg skeleton", error = ex.Message });
+            }
+        }
+
+        // PUT: api/routes/{routeId}/legs/{legId} - Update leg metrics
+        [HttpPut("{routeId}/legs/{legId}")]
+        public async Task<IActionResult> UpdateLegMetrics(int routeId, int legId, [FromBody] UpdateLegMetricsDto dto)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == routeId && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                await _legService.UpdateLegMetrics(routeId, legId, dto.DistanceMeters, dto.DurationSeconds);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating leg metrics", error = ex.Message });
+            }
+        }
+
+        // POST: api/routes/{id}/legs/recalculate - Recalculate legs from OSRM
+        [HttpPost("{id}/legs/recalculate")]
+        public async Task<IActionResult> RecalculateLegsFromOsrm(int id)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                await _legService.RecalculateLegsFromOsrm(id);
+                return Ok(new { message = $"Successfully recalculated legs for route {id}" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error recalculating legs", error = ex.Message });
+            }
         }
     }
 }

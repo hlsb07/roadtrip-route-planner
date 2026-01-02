@@ -1,9 +1,53 @@
 import { CONFIG } from './config.js';
+import { AuthManager } from './authManager.js';
 
 // API service functions
 export class ApiService {
+    /**
+     * Make an authenticated API request
+     * @param {string} url - API endpoint URL
+     * @param {Object} options - Fetch options
+     * @returns {Promise<Response>} Fetch response
+     */
+    static async authenticatedFetch(url, options = {}) {
+        try {
+            const authHeaders = await AuthManager.getAuthHeaders();
+            const headers = {
+                ...options.headers,
+                ...authHeaders
+            };
+
+            const response = await fetch(url, { ...options, headers });
+
+            // Handle 401 Unauthorized - token might be expired
+            if (response.status === 401) {
+                // Try to refresh token
+                const refreshed = await AuthManager.refreshAccessToken();
+                if (refreshed) {
+                    // Retry request with new token
+                    const newAuthHeaders = await AuthManager.getAuthHeaders();
+                    const retryHeaders = {
+                        ...options.headers,
+                        ...newAuthHeaders
+                    };
+                    return await fetch(url, { ...options, headers: retryHeaders });
+                } else {
+                    // Refresh failed - user needs to login
+                    throw new Error('AUTHENTICATION_REQUIRED');
+                }
+            }
+
+            return response;
+        } catch (error) {
+            if (error.message === 'Not authenticated') {
+                throw new Error('AUTHENTICATION_REQUIRED');
+            }
+            throw error;
+        }
+    }
+
     static async getAllRoutes() {
-        const response = await fetch(`${CONFIG.API_BASE}/routes`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes`);
         if (!response.ok) {
             throw new Error(`Failed to load routes: ${response.status}`);
         }
@@ -11,7 +55,7 @@ export class ApiService {
     }
 
     static async getRoute(routeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}`);
         if (!response.ok) {
             throw new Error(`Failed to load route: ${response.status}`);
         }
@@ -19,7 +63,7 @@ export class ApiService {
     }
 
     static async createRoute(name, description = '') {
-        const response = await fetch(`${CONFIG.API_BASE}/routes`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, description })
@@ -31,7 +75,7 @@ export class ApiService {
     }
 
     static async updateRoute(routeId, name, description = '') {
-        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, description })
@@ -42,7 +86,7 @@ export class ApiService {
     }
 
     static async deleteRoute(routeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -51,7 +95,7 @@ export class ApiService {
     }
 
     static async createPlace(name, latitude, longitude) {
-        const response = await fetch(`${CONFIG.API_BASE}/places`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, latitude, longitude })
@@ -69,7 +113,7 @@ export class ApiService {
         if (longitude !== null) body.longitude = longitude;
         if (notes !== undefined) body.notes = notes; // Allow empty string to clear notes
 
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
@@ -80,7 +124,7 @@ export class ApiService {
     }
 
     static async addPlaceToRoute(routeId, placeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/places`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ placeId })
@@ -95,7 +139,7 @@ export class ApiService {
     }
 
     static async removePlaceFromRoute(routeId, placeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places/${placeId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/places/${placeId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -108,10 +152,14 @@ export class ApiService {
 
     static async reorderPlaces(routeId, placeIds) {
         console.log('Reordering places:', { routeId, placeIds });
-        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/places/reorder`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/places/reorder`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(placeIds)
+            body: JSON.stringify({
+                placeIds: placeIds,
+                recalculateSchedule: true,
+                preserveLockedDays: false
+            })
         });
         if (!response.ok) {
             const errorText = await response.text();
@@ -132,7 +180,7 @@ export class ApiService {
 
     // Campsite API methods
     static async getAllCampsites() {
-        const response = await fetch(`${CONFIG.API_BASE}/campsites/all`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/campsites/all`);
         if (!response.ok) {
             throw new Error(`Failed to load campsites: ${response.status}`);
         }
@@ -140,7 +188,7 @@ export class ApiService {
     }
 
     static async getCampsite(campsiteId) {
-        const response = await fetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`);
         if (!response.ok) {
             throw new Error(`Failed to load campsite: ${response.status}`);
         }
@@ -148,7 +196,7 @@ export class ApiService {
     }
 
     static async searchCampsites(query) {
-        const response = await fetch(`${CONFIG.API_BASE}/campsites/search?query=${encodeURIComponent(query)}`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/campsites/search?query=${encodeURIComponent(query)}`);
         if (!response.ok) {
             throw new Error(`Failed to search campsites: ${response.status}`);
         }
@@ -156,7 +204,7 @@ export class ApiService {
     }
 
     static async deleteCampsite(campsiteId) {
-        const response = await fetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -166,7 +214,7 @@ export class ApiService {
 
     // Category API methods
     static async getAllCategories() {
-        const response = await fetch(`${CONFIG.API_BASE}/categories`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/categories`);
         if (!response.ok) {
             throw new Error(`Failed to load categories: ${response.status}`);
         }
@@ -174,7 +222,7 @@ export class ApiService {
     }
 
     static async getCategory(categoryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/categories/${categoryId}`);
         if (!response.ok) {
             throw new Error(`Failed to load category: ${response.status}`);
         }
@@ -182,7 +230,7 @@ export class ApiService {
     }
 
     static async createCategory(name, icon = '') {
-        const response = await fetch(`${CONFIG.API_BASE}/categories`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/categories`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, icon })
@@ -195,7 +243,7 @@ export class ApiService {
     }
 
     static async updateCategory(categoryId, name, icon = '') {
-        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/categories/${categoryId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, icon })
@@ -207,7 +255,7 @@ export class ApiService {
     }
 
     static async deleteCategory(categoryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/categories/${categoryId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -217,7 +265,7 @@ export class ApiService {
     }
 
     static async getPlacesByCategory(categoryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/categories/${categoryId}/places`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/categories/${categoryId}/places`);
         if (!response.ok) {
             throw new Error(`Failed to load places for category: ${response.status}`);
         }
@@ -226,7 +274,7 @@ export class ApiService {
 
     // Country API methods
     static async getAllCountries() {
-        const response = await fetch(`${CONFIG.API_BASE}/countries`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/countries`);
         if (!response.ok) {
             throw new Error(`Failed to load countries: ${response.status}`);
         }
@@ -234,7 +282,7 @@ export class ApiService {
     }
 
     static async getCountry(countryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/countries/${countryId}`);
         if (!response.ok) {
             throw new Error(`Failed to load country: ${response.status}`);
         }
@@ -242,7 +290,7 @@ export class ApiService {
     }
 
     static async createCountry(name, icon = '') {
-        const response = await fetch(`${CONFIG.API_BASE}/countries`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/countries`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, icon })
@@ -255,7 +303,7 @@ export class ApiService {
     }
 
     static async updateCountry(countryId, name, icon = '') {
-        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/countries/${countryId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, icon })
@@ -267,7 +315,7 @@ export class ApiService {
     }
 
     static async deleteCountry(countryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/countries/${countryId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -277,7 +325,7 @@ export class ApiService {
     }
 
     static async getPlacesByCountry(countryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/countries/${countryId}/places`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/countries/${countryId}/places`);
         if (!response.ok) {
             throw new Error(`Failed to load places for country: ${response.status}`);
         }
@@ -286,7 +334,7 @@ export class ApiService {
 
     // Get all places (for filtering)
     static async getAllPlaces() {
-        const response = await fetch(`${CONFIG.API_BASE}/places`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places`);
         if (!response.ok) {
             throw new Error(`Failed to load places: ${response.status}`);
         }
@@ -295,7 +343,7 @@ export class ApiService {
 
     // Place Category Management
     static async assignCategoryToPlace(placeId, categoryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/categories`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ categoryId })
@@ -307,7 +355,7 @@ export class ApiService {
     }
 
     static async removeCategoryFromPlace(placeId, categoryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories/${categoryId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/categories/${categoryId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -316,7 +364,7 @@ export class ApiService {
     }
 
     static async getPlaceCategories(placeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/categories`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/categories`);
         if (!response.ok) {
             throw new Error('Failed to get place categories');
         }
@@ -325,7 +373,7 @@ export class ApiService {
 
     // Place Country Management
     static async assignCountryToPlace(placeId, countryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/countries`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ countryId })
@@ -337,7 +385,7 @@ export class ApiService {
     }
 
     static async removeCountryFromPlace(placeId, countryId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries/${countryId}`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/countries/${countryId}`, {
             method: 'DELETE'
         });
         if (!response.ok) {
@@ -346,7 +394,7 @@ export class ApiService {
     }
 
     static async getPlaceCountries(placeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/countries`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/countries`);
         if (!response.ok) {
             throw new Error('Failed to get place countries');
         }
@@ -363,7 +411,7 @@ export class ApiService {
      */
     static async createPlaceFromGoogle(googlePlaceId, notes = null) {
         console.log('Creating place from Google:', { googlePlaceId, notes });
-        const response = await fetch(`${CONFIG.API_BASE}/places/from-google`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/from-google`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ googlePlaceId, notes })
@@ -385,7 +433,7 @@ export class ApiService {
      * @returns {Promise<Object>} Duplicate check result
      */
     static async checkDuplicateGooglePlace(googlePlaceId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/check-duplicate`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/check-duplicate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ googlePlaceId })
@@ -402,7 +450,7 @@ export class ApiService {
      * @returns {Promise<Object>} Enriched place data
      */
     static async getEnrichedPlace(placeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/enriched`);
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/enriched`);
         if (!response.ok) {
             throw new Error('Failed to get enriched place data');
         }
@@ -415,7 +463,7 @@ export class ApiService {
      * @returns {Promise<Object>} Refresh result with updated fields
      */
     static async refreshGoogleData(placeId) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/refresh-google`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/refresh-google`, {
             method: 'POST'
         });
         if (!response.ok) {
@@ -432,7 +480,7 @@ export class ApiService {
      * @returns {Promise<void>}
      */
     static async updatePlaceNotes(placeId, notes) {
-        const response = await fetch(`${CONFIG.API_BASE}/places/${placeId}/notes`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/notes`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ notes })
@@ -447,12 +495,227 @@ export class ApiService {
      * @returns {Promise<Object>} Result with count of linked places
      */
     static async reverseGeocodeExistingPlaces() {
-        const response = await fetch(`${CONFIG.API_BASE}/places/reverse-geocode`, {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/reverse-geocode`, {
             method: 'POST'
         });
         if (!response.ok) {
             throw new Error('Failed to reverse geocode places');
         }
         return await response.json();
+    }
+
+    // ===== Timeline / Schedule API Methods =====
+
+    /**
+     * Get complete route itinerary with schedule settings, stops, and legs
+     * @param {number} routeId - Route ID
+     * @returns {Promise<Object>} Route itinerary with schedule data
+     */
+    static async getItinerary(routeId) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/itinerary`);
+        if (!response.ok) {
+            throw new Error(`Failed to load itinerary: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * Update route-level schedule settings
+     * @param {number} routeId - Route ID
+     * @param {Object} dto - Schedule settings DTO
+     * @returns {Promise<void>}
+     */
+    static async updateRouteScheduleSettings(routeId, dto) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/schedule-settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update route schedule settings');
+        }
+    }
+
+    /**
+     * Update schedule data for a specific stop in the route
+     * @param {number} routeId - Route ID
+     * @param {number} routePlaceId - RoutePlace ID
+     * @param {Object} dto - Schedule update DTO
+     * @returns {Promise<Object|null>} Response object if contains conflict info, null otherwise
+     */
+    static async updateStopSchedule(routeId, routePlaceId, dto) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/places/${routePlaceId}/schedule`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update stop schedule');
+        }
+        // If response has content (conflict info), return it
+        const text = await response.text();
+        return text ? JSON.parse(text) : null;
+    }
+
+    /**
+     * Rebuild leg skeleton for a route (creates legs for consecutive stop pairs)
+     * @param {number} routeId - Route ID
+     * @returns {Promise<void>}
+     */
+    static async rebuildLegs(routeId) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/rebuild`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to rebuild legs');
+        }
+    }
+
+    /**
+     * Update distance and duration metrics for a specific leg
+     * @param {number} routeId - Route ID
+     * @param {number} legId - Leg ID
+     * @param {Object} dto - Leg metrics DTO {distanceMeters, durationSeconds}
+     * @returns {Promise<void>}
+     */
+    static async updateLegMetrics(routeId, legId, dto) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/${legId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update leg metrics');
+        }
+    }
+
+    /**
+     * Recalculate route legs from OSRM (distance, duration, geometry)
+     * @param {number} routeId - Route ID
+     * @returns {Promise<Object>} - Success message
+     */
+    static async recalculateLegsFromOsrm(routeId) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/recalculate`, {
+            method: 'POST'
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to recalculate route legs');
+        }
+        return await response.json();
+    }
+
+    // ===== Conflict Management Methods =====
+
+    /**
+     * Get itinerary with conflict information
+     * @param {number} routeId - Route ID
+     * @returns {Promise<Object>} Itinerary with conflict info
+     */
+    static async getItineraryWithConflicts(routeId) {
+        const response = await this.authenticatedFetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/itinerary?includeConflicts=true`
+        );
+        if (!response.ok) {
+            throw new Error(`Failed to load itinerary: ${response.status}`);
+        }
+        return await response.json();
+    }
+
+    /**
+     * Check if a schedule change would create a conflict
+     * @param {number} routeId - Route ID
+     * @param {number} routePlaceId - RoutePlace ID
+     * @param {string} newStart - New planned start (ISO string)
+     * @param {string} newEnd - New planned end (ISO string)
+     * @returns {Promise<Object>} Conflict information
+     */
+    static async checkScheduleChangeConflict(routeId, routePlaceId, newStart, newEnd) {
+        const response = await this.authenticatedFetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/conflicts/check-schedule-change`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    routePlaceId,
+                    newPlannedStart: newStart,
+                    newPlannedEnd: newEnd
+                })
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to check conflicts');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Resolve conflicts by reordering route based on timeline
+     * @param {number} routeId - Route ID
+     * @param {boolean} recalculateSchedule - Whether to recalculate schedule after reordering
+     * @returns {Promise<Object>} Success message
+     */
+    static async resolveConflictByReorder(routeId, recalculateSchedule = false) {
+        const response = await this.authenticatedFetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/conflicts/resolve-by-reorder`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recalculateScheduleAfter: recalculateSchedule })
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to resolve conflicts');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Recalculate schedule after route reorder
+     * @param {number} routeId - Route ID
+     * @param {boolean} preserveLockedDays - Whether to preserve locked days
+     * @returns {Promise<Object>} Recalculation result
+     */
+    static async recalculateSchedule(routeId, preserveLockedDays = true) {
+        const response = await this.authenticatedFetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/schedule/recalculate?preserveLockedDays=${preserveLockedDays}`,
+            {
+                method: 'POST'
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to recalculate schedule');
+        }
+        return await response.json();
+    }
+
+    /**
+     * Reorder places with schedule recalculation options
+     * @param {number} routeId - Route ID
+     * @param {number[]} placeIds - Array of place IDs in new order
+     * @param {boolean} recalculateSchedule - Whether to recalculate schedule
+     * @param {boolean} preserveLockedDays - Whether to preserve locked days
+     * @returns {Promise<void>}
+     */
+    static async reorderPlacesWithSchedule(routeId, placeIds, recalculateSchedule = true, preserveLockedDays = true) {
+        const response = await this.authenticatedFetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/places/reorder`,
+            {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    placeIds,
+                    recalculateSchedule,
+                    preserveLockedDays
+                })
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to reorder places');
+        }
     }
 }

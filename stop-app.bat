@@ -1,5 +1,5 @@
 @echo off
-REM Stop Script for Roadtrip Route Planner
+setlocal enabledelayedexpansion
 
 echo ========================================
 echo Stopping Roadtrip Route Planner
@@ -8,19 +8,22 @@ echo.
 
 echo Stopping Nginx...
 if exist "C:\nginx\nginx.exe" (
-    cd C:\nginx
-    nginx.exe -s stop
-    echo Nginx stopped
+    cd /d C:\nginx
+    REM Wenn nginx nicht läuft, kommt ggf. die pid-Fehlermeldung - ist ok
+    nginx.exe -s stop >nul 2>&1
+    echo Nginx stop command sent
 ) else (
     echo Nginx not found at C:\nginx
 )
 echo.
 
-echo Stopping Backend API...
-echo Please close the Backend API window manually (if still running)
-echo.
+REM >>> Backend-Port hier eintragen:
+set BACKEND_PORT=5000
 
-echo ========================================
-echo Application stopped
-echo ========================================
-pause
+echo Stopping Backend API on port %BACKEND_PORT%...
+echo On problems use: taskkill /IM dotnet.exe /F
+
+REM Ermittelt PIDs, die auf dem Port "Listen"
+for /f "usebackq delims=" %%p in (`powershell -NoProfile -Command ^
+  "Get-NetTCPConnection -Lo
+

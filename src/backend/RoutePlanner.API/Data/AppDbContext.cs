@@ -1,18 +1,21 @@
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using RoutePlanner.API.Models;
 using NetTopologySuite.Geometries;
 
 namespace RoutePlanner.API.Data
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<int>, int>
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         // Core Entities
-        public DbSet<User> Users { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<Place> Places { get; set; }
         public DbSet<Models.Route> Routes { get; set; }
         public DbSet<RoutePlace> RoutePlaces { get; set; }
+        public DbSet<RouteLeg> RouteLegs { get; set; }
 
         // Google Maps Integration
         public DbSet<GooglePlaceData> GooglePlaceData { get; set; }
@@ -28,19 +31,37 @@ namespace RoutePlanner.API.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            base.OnModelCreating(modelBuilder);
+            base.OnModelCreating(modelBuilder); // CRITICAL: Call Identity's OnModelCreating first
 
-            // ===== User Configuration =====
-            modelBuilder.Entity<User>(entity =>
+            // ===== ApplicationUser Configuration =====
+            modelBuilder.Entity<ApplicationUser>(entity =>
+            {
+                entity.ToTable("Users"); // Use existing table name
+                entity.Property(e => e.Username).HasMaxLength(100);
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.UpdatedAt).IsRequired();
+            });
+
+            // ===== RefreshToken Configuration =====
+            modelBuilder.Entity<RefreshToken>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Username).HasMaxLength(100).IsRequired();
-                entity.Property(e => e.Email).HasMaxLength(255).IsRequired();
-                entity.Property(e => e.PasswordHash).HasMaxLength(500).IsRequired();
+                entity.Property(e => e.Token).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.JwtId).HasMaxLength(200).IsRequired();
+                entity.Property(e => e.CreatedAt).IsRequired();
+                entity.Property(e => e.ExpiresAt).IsRequired();
 
-                // Unique constraints
-                entity.HasIndex(e => e.Username).IsUnique();
-                entity.HasIndex(e => e.Email).IsUnique();
+                // Unique index on Token for security
+                entity.HasIndex(e => e.Token).IsUnique();
+                entity.HasIndex(e => e.JwtId);
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => e.ExpiresAt);
+
+                // Relationship to ApplicationUser
+                entity.HasOne(e => e.User)
+                      .WithMany(u => u.RefreshTokens)
+                      .HasForeignKey(e => e.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // ===== GooglePlaceData Configuration =====
@@ -128,6 +149,14 @@ namespace RoutePlanner.API.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Name).HasMaxLength(200).IsRequired();
                 entity.Property(e => e.Description).HasMaxLength(1000);
+
+                // Schedule Settings
+                entity.Property(e => e.TimeZoneId).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.StartDateTime).HasColumnType("timestamptz");
+                entity.Property(e => e.EndDateTime).HasColumnType("timestamptz");
+                entity.Property(e => e.DefaultArrivalTime).HasColumnType("time without time zone");
+                entity.Property(e => e.DefaultDepartureTime).HasColumnType("time without time zone");
+
                 entity.Property(e => e.CreatedAt).IsRequired();
                 entity.Property(e => e.UpdatedAt).IsRequired();
 
@@ -156,11 +185,58 @@ namespace RoutePlanner.API.Data
                       .HasForeignKey(rp => rp.PlaceId)
                       .OnDelete(DeleteBehavior.Restrict); // Verhindert Löschen von Places, die in Routes verwendet werden
 
+                // Schedule Properties
+                entity.Property(rp => rp.StopType).IsRequired().HasDefaultValue(StopType.Overnight);
+                entity.Property(rp => rp.TimeZoneId).HasMaxLength(100);
+                entity.Property(rp => rp.PlannedStart).HasColumnType("timestamptz");
+                entity.Property(rp => rp.PlannedEnd).HasColumnType("timestamptz");
+                entity.Property(rp => rp.IsStartLocked).HasDefaultValue(false);
+                entity.Property(rp => rp.IsEndLocked).HasDefaultValue(false);
+
                 // Index für Performance
                 entity.HasIndex(rp => new { rp.RouteId, rp.OrderIndex })
                       .IsUnique(); // Ein Ort kann nur einmal pro Position in einer Route sein
 
+                // Indexes for schedule queries
+                entity.HasIndex(rp => rp.PlannedStart);
+                entity.HasIndex(rp => rp.PlannedEnd);
+
                 entity.Property(rp => rp.OrderIndex).IsRequired();
+            });
+
+            // ===== RouteLeg Configuration =====
+            modelBuilder.Entity<RouteLeg>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Provider).HasMaxLength(50).IsRequired();
+
+                // Configure Geometry column for OSRM road-following route
+                entity.Property(e => e.Geometry)
+                      .HasColumnType("geometry (linestring, 4326)");
+
+                // Spatial index on Geometry for performance
+                entity.HasIndex(e => e.Geometry).HasMethod("gist");
+
+                // Unique index on (RouteId, OrderIndex)
+                entity.HasIndex(e => new { e.RouteId, e.OrderIndex }).IsUnique();
+
+                // Relationship to Route (cascade delete)
+                entity.HasOne(e => e.Route)
+                      .WithMany(r => r.Legs)
+                      .HasForeignKey(e => e.RouteId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Relationships to RoutePlace (restrict - manual cleanup on reorder)
+                entity.HasOne(e => e.FromRoutePlace)
+                      .WithMany()
+                      .HasForeignKey(e => e.FromRoutePlaceId)
+                      .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne(e => e.ToRoutePlace)
+                      .WithMany()
+                      .HasForeignKey(e => e.ToRoutePlaceId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
             // GoogleMapsCache Konfiguration
@@ -306,13 +382,20 @@ namespace RoutePlanner.API.Data
             var geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
 
             // Seed Default User (for existing data and testing)
-            modelBuilder.Entity<User>().HasData(
-                new User
+            // Note: This will be migrated to ApplicationUser with Identity fields
+            modelBuilder.Entity<ApplicationUser>().HasData(
+                new ApplicationUser
                 {
                     Id = 1,
                     Username = "default",
+                    UserName = "default",
+                    NormalizedUserName = "DEFAULT",
                     Email = "default@roadtrip.local",
-                    PasswordHash = "placeholder", // Will be replaced with real auth later
+                    NormalizedEmail = "DEFAULT@ROADTRIP.LOCAL",
+                    EmailConfirmed = true, // Pre-confirmed for backward compatibility
+                    PasswordHash = "AQAAAAIAAYagAAAAEGZvb3RvdXJpc3RzZWVkZGF0YQ==", // Placeholder - will need proper password
+                    SecurityStamp = "8f8c6a62-5b4d-4f8e-9c3a-1d7e4b2f9a8c", // Static GUID for seed data
+                    ConcurrencyStamp = "7a9b5c81-4e3f-2d1a-8c6b-9e4f3a2d1c8b", // Static GUID for seed data
                     CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                     UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 }

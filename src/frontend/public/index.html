@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./styles/timeline.css">
     <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
@@ -41,6 +42,10 @@
                         <i class="fas fa-campground"></i>
                         <span>Campsites</span>
                     </button>
+                    <button class="mobile-nav-item" data-mode="timeline" onclick="switchMobileMode('timeline')">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Timeline</span>
+                    </button>
                     <button class="desktop-nav-item" data-mode="controls" onclick="switchDesktopMode('controls')">
                         <i class="fas fa-cog"></i>
                         <span>Tools</span>
@@ -64,6 +69,9 @@
                 <div class="route-actions">
                     <button class="btn btn-sm" onclick="showRenameRouteModal()" title="Rename route">
                         <i class="fas fa-edit"></i> Rename
+                    </button>
+                    <button class="btn btn-sm" onclick="recalculateCurrentRoute()" title="Recalculate route from OSRM">
+                        <i class="fas fa-route"></i> Recalculate
                     </button>
                     <button class="btn btn-sm btn-danger" onclick="deleteCurrentRoute()" title="Delete route">
                         <i class="fas fa-trash"></i> Delete
@@ -134,6 +142,10 @@
                 </button>
                 <button class="btn btn-danger" onclick="clearRoute()">
                     <i class="fas fa-trash"></i> Clear
+                </button>
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+                <button class="btn btn-secondary" onclick="handleLogout()" title="Logout from your account">
+                            <i class="fas fa-sign-out-alt"></i> Logout
                 </button>
             </div>
             
@@ -225,6 +237,49 @@
             </div>
         </div>
 
+        <!-- Timeline Panel (Collapsible Overlay) -->
+        <div class="timeline-panel collapsed visible" id="timelinePanel">
+            <div class="timeline-panel-header" onclick="toggleTimeline()">
+                <button class="timeline-toggle" id="timelineToggle">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Timeline</span>
+                    <i class="fas fa-chevron-down" id="timelineChevron"></i>
+                </button>
+                <div class="timeline-info">
+                    <div id="selectedPlaceTime" class="selected-place-time" style="display: none;">
+                        <i class="fas fa-clock"></i>
+                        <span id="selectedPlaceName"></span>
+                        <span id="selectedPlaceTimeRange"></span>
+                    </div>
+                    <div class="timeline-current">
+                        <div class="current-day-label" id="currentDayLabel">Day 1</div>
+                        <div class="current-places" id="currentPlaces"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="timeline-content" id="timelineContent">
+                <div class="gantt-wrapper">
+                    <div class="day-labels" id="dayLabels"></div>
+                    <div class="gantt-grid" id="ganttGrid"></div>
+                    <div class="gantt-content">
+                        <div class="gantt-bars" id="ganttBars"></div>
+
+                        <!-- Track + Progress + Slider -->
+                        <div class="timeline-track">
+                            <div class="timeline-progress" id="timelineProgress"></div>
+                        </div>
+                        <input type="range" id="timelineSlider" />
+                    </div>
+
+                    <!-- Cursor -->
+                    <div class="timeline-cursor" id="timelineCursor">
+                        <div class="timeline-cursor-label" id="timelineCursorLabel"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Mobile Navigation -->
         <div class="mobile-nav" id="mobileNav">
             <div class="mobile-nav-items">
@@ -237,6 +292,10 @@
                     <span>Save</span>
                 </button>
                 <button class="mobile-nav-item" data-mode="places" onclick="switchMobileMode('places')">
+                <button class="mobile-nav-item" data-mode="timeline" onclick="switchMobileMode('timeline')">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Timeline</span>
+                </button>
                     <i class="fas fa-list"></i>
                     <span>Route</span>
                 </button>
@@ -353,6 +412,18 @@
 
                 <!-- Campsites List Section -->
                 <div class="mobile-section campsites-list" data-section="campsites" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                <!-- Timeline Section (Mobile) -->
+                <div class="mobile-section timeline-mobile-section" data-section="timeline" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <div class="timeline-mobile-wrapper">
+                        <!-- Timeline will be cloned here for mobile or rendered separately -->
+                        <div class="mobile-timeline-info">
+                            <p>Switch to the desktop view for the interactive timeline, or view the schedule below:</p>
+                        </div>
+                        <div id="mobileTimelineContent">
+                            <!-- Timeline content will be rendered here -->
+                        </div>
+                    </div>
+                </div>
                     <!-- Campsites will be populated here -->
                 </div>
 
@@ -373,6 +444,10 @@
                         </button>
                         <button class="btn btn-danger" onclick="clearRoute()">
                             <i class="fas fa-trash"></i> Clear
+                        </button>
+                        <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+                        <button class="btn btn-secondary" onclick="handleLogout()" title="Logout from your account">
+                            <i class="fas fa-sign-out-alt"></i> Logout
                         </button>
                     </div>
                 </div>
@@ -861,6 +936,40 @@
     </div>
 
     <input type="file" id="importFile" style="display: none;" accept=".json">
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal login-modal-container" style="display: none;">
+        <div class="login-modal-content">
+            <div class="login-modal-header">
+                <div>
+                    <h1><i class="fas fa-map-marked-alt"></i> Roadtrip Route Planner</h1>
+                    <p>Smart route planning for your adventure</p>
+                </div>
+            </div>
+            <div class="modal-content modal-small">
+                <div class="modal-header">
+                    <h3><i class="fas fa-sign-in-alt"></i> Login</h3>
+                </div>
+                <div class="modal-body">
+                    <div id="login-error" class="error-message" style="display: none;"></div>
+                    <div class="form-group">
+                        <label for="login-email"><i class="fas fa-envelope"></i> Email:</label>
+                        <input type="email" id="login-email" class="form-input" placeholder="Enter your email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password"><i class="fas fa-lock"></i> Password:</label>
+                        <input type="password" id="login-password" class="form-input" placeholder="Enter your password" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary btn-block" id="login-submit">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay"></div>
+    </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>

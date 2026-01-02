@@ -5,6 +5,7 @@ export class RouteManager {
     constructor(filterManager = null) {
         this.routes = [];
         this.currentRouteId = null;
+        this.currentRouteLegs = null; // Store route legs with geometry
         this.isEditingRoute = false;
         this.filterManager = filterManager;
     }
@@ -67,6 +68,16 @@ export class RouteManager {
             console.log('Loading current route:', this.currentRouteId);
             const route = await ApiService.getRoute(this.currentRouteId);
             console.log('Current route loaded:', route);
+
+            // Fetch itinerary to get route legs with geometry
+            try {
+                const itinerary = await ApiService.getItinerary(this.currentRouteId);
+                this.currentRouteLegs = itinerary.legs || [];
+                console.log('Route legs loaded:', this.currentRouteLegs.length, 'legs');
+            } catch (error) {
+                console.warn('Failed to load itinerary, legs not available:', error);
+                this.currentRouteLegs = null;
+            }
 
             // Enrich places with full data from filterManager
             if (this.filterManager && this.filterManager.allPlaces) {
