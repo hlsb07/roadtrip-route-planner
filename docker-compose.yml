@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with PostGIS
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: routeplanner-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: routeplanner
+      POSTGRES_USER: routeplanner_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}REDACTED
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - proxy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routeplanner_user -d routeplanner"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: routeplanner-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: override-with-env@example.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "8081:80"
+    depends_on:
+      - postgres
+    networks:
+      - proxy-network
+
+  # ASP.NET Core Backend API
+  backend:
+    build:
+      context: ./src/backend/RoutePlanner.API
+      dockerfile: Dockerfile
+    container_name: routeplanner-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override environment for production
+      ASPNETCORE_ENVIRONMENT: Production
+      # Database connection (using service name 'postgres')
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=routeplanner;Username=routeplanner_user;Password=${POSTGRES_PASSWORD};Include Error Detail=true"
+    ports:
+      - "5166:5166"
+    volumes:
+      # Cache NuGet packages for faster rebuilds
+      - ~/.nuget/packages:/root/.nuget/packages
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - proxy-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  # External network managed by your nginx reverse proxy
+  proxy-network:
+    external: true
