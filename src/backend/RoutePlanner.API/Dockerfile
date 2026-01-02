@@ -3,7 +3,7 @@ WORKDIR /app
 
 COPY ./publish/ .
 
-ENV ASPNETCORE_URLS=http://+:5166
-EXPOSE 5166
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
 
 ENTRYPOINT ["dotnet", "RoutePlanner.API.dll"]

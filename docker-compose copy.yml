@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: routeplanner-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: routeplanner
+      POSTGRES_USER: routeplanner_user
+      POSTGRES_PASSWORD: REDACTED
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - proxy-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: routeplanner-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: override-with-env@example.com
+      PGADMIN_DEFAULT_PASSWORD: REDACTED
+    ports:
+      - "8081:80"
+    depends_on:
+      - postgres
+    networks:
+      - proxy-network
+  backend:
+    build: ./backend
+    container_name: routeplanner-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    volumes:
+      - ~/.nuget/packages:/root/.nuget/packages
+    networks:
+      - proxy-network
+
+    ports:
+      - "5166:5000"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      # ConnectionString to DB in same compose-network
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=routeplanner;Username=routeplanner_user;Password=REDACTED"
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  proxy-network:
+    external: true
