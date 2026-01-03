@@ -285,13 +285,12 @@ namespace RoutePlanner.API.Controllers
             // European landmarks with real Google Place IDs
             var demoPlaceData = new[]
             {
-                new { GooglePlaceId = "ChIJD7fiBh9u5kcRYJSMaMOCCwQ", Name = "Eiffel Tower, Paris" },
-                new { GooglePlaceId = "ChIJdd4hrwug2EcRmSrV3Vo6llI", Name = "Colosseum, Rome" },
-                new { GooglePlaceId = "ChIJybDUc_9vqokRTEfmR5egr4g", Name = "Sagrada Familia, Barcelona" },
-                new { GooglePlaceId = "ChIJa76xwh5ymkcRW-WRjmtd6HU", Name = "Brandenburg Gate, Berlin" },
-                new { GooglePlaceId = "ChIJ51cu8IcbVkcRw-0kqPRJHAE", Name = "Anne Frank House, Amsterdam" },
-                new { GooglePlaceId = "ChIJG2LvQNAEdkgRY9wMq6RMBw8", Name = "Tower of London" },
-                new { GooglePlaceId = "ChIJi8MeVwPZwokRTte9extfLvQ", Name = "Charles Bridge, Prague" }
+                new { GooglePlaceId = "ChIJG2LvQNAEdkgRY9wMq6RMBw8", Name = "Hamburg" },
+                new { GooglePlaceId = "ChIJiQnyVcZRqEcRY0xnhE77uyY", Name = "Brandenburg Gate, Berlin" },
+                new { GooglePlaceId = "ChIJ2V-Mo_l1nkcRfZixfUq4DAE", Name = "Munich" },
+                new { GooglePlaceId = "ChIJGaK-SZcLkEcRA9wf5_GNbuY", Name = "Zurich" },
+                new { GooglePlaceId = "ChIJD7fiBh9u5kcRYJSMaMOCCwQ", Name = "Paris" },
+                new { GooglePlaceId = "ChIJdd4hrwug2EcRmSrV3Vo6llI", Name = "London" }
             };
 
             var places = new List<Place>();
