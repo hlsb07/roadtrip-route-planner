@@ -10,6 +10,7 @@ export class LoginModal {
         this.emailInput = null;
         this.passwordInput = null;
         this.loginButton = null;
+        this.demoButton = null;
         this.errorMessage = null;
         this.closeButton = null;
         this.onLoginSuccess = null;
@@ -25,6 +26,7 @@ export class LoginModal {
         this.emailInput = document.getElementById('login-email');
         this.passwordInput = document.getElementById('login-password');
         this.loginButton = document.getElementById('login-submit');
+        this.demoButton = document.getElementById('demo-submit');
         this.errorMessage = document.getElementById('login-error');
         this.closeButton = document.getElementById('login-close');
 
@@ -43,6 +45,11 @@ export class LoginModal {
         // Login button click
         if (this.loginButton) {
             this.loginButton.addEventListener('click', () => this.handleLogin());
+        }
+
+        // Demo button click
+        if (this.demoButton) {
+            this.demoButton.addEventListener('click', () => this.handleDemoLogin());
         }
 
         // Enter key in password field
@@ -115,6 +122,48 @@ export class LoginModal {
             if (this.loginButton) {
                 this.loginButton.disabled = false;
                 this.loginButton.textContent = 'Login';
+            }
+        }
+    }
+
+    /**
+     * Handle demo login - creates demo user and auto-logs in
+     */
+    async handleDemoLogin() {
+        // Disable both buttons during demo creation
+        if (this.loginButton) {
+            this.loginButton.disabled = true;
+        }
+        if (this.demoButton) {
+            this.demoButton.disabled = true;
+            this.demoButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Demo...';
+        }
+
+        this.clearError();
+
+        try {
+            // Call demo endpoint
+            await AuthManager.createDemo();
+
+            // Success - hide modal and call success callback
+            this.hide();
+            this.clearForm();
+
+            if (this.onLoginSuccess) {
+                this.onLoginSuccess();
+            }
+
+        } catch (error) {
+            console.error('Demo creation failed:', error);
+            this.showError(error.message || 'Failed to create demo. Please try again.');
+        } finally {
+            // Re-enable buttons
+            if (this.loginButton) {
+                this.loginButton.disabled = false;
+            }
+            if (this.demoButton) {
+                this.demoButton.disabled = false;
+                this.demoButton.innerHTML = '<i class="fas fa-rocket"></i> Try Demo';
             }
         }
     }

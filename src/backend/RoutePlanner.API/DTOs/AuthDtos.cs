@@ -80,4 +80,24 @@ namespace RoutePlanner.API.DTOs
         [Required]
         public required string Token { get; set; }
     }
+
+    /// <summary>
+    /// Demo user creation response
+    /// </summary>
+    public class DemoUserResponseDto
+    {
+        public required AuthResponseDto AuthData { get; set; }
+        public required DemoRouteInfoDto DemoRoute { get; set; }
+    }
+
+    /// <summary>
+    /// Demo route information
+    /// </summary>
+    public class DemoRouteInfoDto
+    {
+        public int RouteId { get; set; }
+        public required string RouteName { get; set; }
+        public int PlaceCount { get; set; }
+        public List<string> PlaceNames { get; set; } = new();
+    }
 }

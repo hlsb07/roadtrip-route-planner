@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using RoutePlanner.API.Data;
 using RoutePlanner.API.DTOs;
 using RoutePlanner.API.Models;
 using RoutePlanner.API.Services;
@@ -16,19 +17,25 @@ namespace RoutePlanner.API.Controllers
         private readonly IEmailService _emailService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<AuthController> _logger;
+        private readonly AppDbContext _context;
+        private readonly IPlaceService _placeService;
 
         public AuthController(
             IAuthService authService,
             UserManager<ApplicationUser> userManager,
             IEmailService emailService,
             IConfiguration configuration,
-            ILogger<AuthController> logger)
+            ILogger<AuthController> logger,
+            AppDbContext context,
+            IPlaceService placeService)
         {
             _authService = authService;
             _userManager = userManager;
             _emailService = emailService;
             _configuration = configuration;
             _logger = logger;
+            _context = context;
+            _placeService = placeService;
         }
 
         /// <summary>
@@ -202,6 +209,148 @@ namespace RoutePlanner.API.Controllers
                 username = user.UserName,
                 emailConfirmed = user.EmailConfirmed
             });
+        }
+
+        /// <summary>
+        /// Create demo user with pre-populated European road trip
+        /// PUBLIC ENDPOINT - Creates unique demo user each time
+        /// </summary>
+        [HttpPost("demo")]
+        [AllowAnonymous]
+        public async Task<ActionResult<DemoUserResponseDto>> CreateDemoUser()
+        {
+            try
+            {
+                // 1. Generate unique demo credentials
+                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var demoEmail = $"demo_{timestamp}@demo.com";
+                var demoUsername = $"demo_user_{timestamp}";
+                var demoPassword = "Demo123!@#"; // Meets complexity requirements
+
+                _logger.LogInformation("Creating demo user: {Email}", demoEmail);
+
+                // 2. Create demo user
+                var user = new ApplicationUser
+                {
+                    UserName = demoUsername,
+                    Email = demoEmail,
+                    EmailConfirmed = true, // CRITICAL: Must be true to allow login
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                var result = await _userManager.CreateAsync(user, demoPassword);
+                if (!result.Succeeded)
+                {
+                    var errors = result.Errors.Select(e => e.Description);
+                    _logger.LogError("Demo user creation failed: {Errors}", string.Join(", ", errors));
+                    return BadRequest(new { message = "Demo user creation failed", errors });
+                }
+
+                // 3. Create demo places (European road trip)
+                var demoPlaces = await CreateDemoPlaces(user.Id);
+
+                // 4. Create demo route and link places
+                var demoRoute = await CreateDemoRoute(user.Id, demoPlaces);
+
+                // 5. Generate JWT tokens
+                var authResponse = await _authService.LoginAsync(new LoginDto
+                {
+                    Email = demoEmail,
+                    Password = demoPassword
+                });
+
+                _logger.LogInformation("Demo user created successfully: {UserId}, Route: {RouteId}",
+                    user.Id, demoRoute.RouteId);
+
+                return Ok(new DemoUserResponseDto
+                {
+                    AuthData = authResponse,
+                    DemoRoute = demoRoute
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating demo user");
+                return StatusCode(500, new { message = "An error occurred creating demo user" });
+            }
+        }
+
+        // Helper method to create demo places with Google Place IDs
+        private async Task<List<Place>> CreateDemoPlaces(int userId)
+        {
+            // European landmarks with real Google Place IDs
+            var demoPlaceData = new[]
+            {
+                new { GooglePlaceId = "ChIJD7fiBh9u5kcRYJSMaMOCCwQ", Name = "Eiffel Tower, Paris" },
+                new { GooglePlaceId = "ChIJdd4hrwug2EcRmSrV3Vo6llI", Name = "Colosseum, Rome" },
+                new { GooglePlaceId = "ChIJybDUc_9vqokRTEfmR5egr4g", Name = "Sagrada Familia, Barcelona" },
+                new { GooglePlaceId = "ChIJa76xwh5ymkcRW-WRjmtd6HU", Name = "Brandenburg Gate, Berlin" },
+                new { GooglePlaceId = "ChIJ51cu8IcbVkcRw-0kqPRJHAE", Name = "Anne Frank House, Amsterdam" },
+                new { GooglePlaceId = "ChIJG2LvQNAEdkgRY9wMq6RMBw8", Name = "Tower of London" },
+                new { GooglePlaceId = "ChIJi8MeVwPZwokRTte9extfLvQ", Name = "Charles Bridge, Prague" }
+            };
+
+            var places = new List<Place>();
+
+            foreach (var placeData in demoPlaceData)
+            {
+                try
+                {
+                    var place = await _placeService.CreatePlaceFromGoogle(
+                        placeData.GooglePlaceId,
+                        userId,
+                        "Demo location - part of European highlights tour");
+                    places.Add(place);
+                    _logger.LogInformation("Created demo place: {Name}", placeData.Name);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to create demo place from Google: {PlaceId}", placeData.GooglePlaceId);
+                    // Continue with other places even if one fails
+                }
+            }
+
+            return places;
+        }
+
+        // Helper method to create demo route
+        private async Task<DemoRouteInfoDto> CreateDemoRoute(int userId, List<Place> places)
+        {
+            var route = new Models.Route
+            {
+                UserId = userId,
+                Name = "European Highlights Tour",
+                Description = "A spectacular journey through Europe's most iconic landmarks - from the Eiffel Tower to the Colosseum, experience the best of European culture and history!",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.Routes.Add(route);
+            await _context.SaveChangesAsync();
+
+            // Add places to route in order
+            for (int i = 0; i < places.Count; i++)
+            {
+                var routePlace = new RoutePlace
+                {
+                    RouteId = route.Id,
+                    PlaceId = places[i].Id,
+                    OrderIndex = i,
+                    StopType = StopType.Overnight // All demo stops are overnight stays
+                };
+                _context.RoutePlaces.Add(routePlace);
+            }
+
+            await _context.SaveChangesAsync();
+
+            return new DemoRouteInfoDto
+            {
+                RouteId = route.Id,
+                RouteName = route.Name,
+                PlaceCount = places.Count,
+                PlaceNames = places.Select(p => p.Name).ToList()
+            };
         }
     }
 }

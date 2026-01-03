@@ -85,6 +85,29 @@ export class AuthManager {
     }
 
     /**
+     * Create demo user with pre-populated route
+     * @returns {Promise<Object>} Demo user info, tokens, and route data
+     */
+    static async createDemo() {
+        const response = await fetch(`${CONFIG.API_BASE}/auth/demo`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: 'Demo creation failed' }));
+            throw new Error(error.message || 'Failed to create demo user');
+        }
+
+        const data = await response.json();
+
+        // Store auth tokens from the nested authData
+        this.storeAuthData(data.authData);
+
+        return data;
+    }
+
+    /**
      * Store authentication data in localStorage
      * @param {Object} data - Auth response with tokens and user info
      */
