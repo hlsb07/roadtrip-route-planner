@@ -19,6 +19,7 @@ namespace RoutePlanner.API.Controllers
         private readonly ILogger<AuthController> _logger;
         private readonly AppDbContext _context;
         private readonly IPlaceService _placeService;
+        private readonly IRouteLegService _legService;
 
         public AuthController(
             IAuthService authService,
@@ -27,7 +28,8 @@ namespace RoutePlanner.API.Controllers
             IConfiguration configuration,
             ILogger<AuthController> logger,
             AppDbContext context,
-            IPlaceService placeService)
+            IPlaceService placeService,
+            IRouteLegService legService)
         {
             _authService = authService;
             _userManager = userManager;
@@ -36,6 +38,7 @@ namespace RoutePlanner.API.Controllers
             _logger = logger;
             _context = context;
             _placeService = placeService;
+            _legService = legService;
         }
 
         /// <summary>
@@ -292,6 +295,7 @@ namespace RoutePlanner.API.Controllers
             };
 
             var places = new List<Place>();
+            var failedPlaces = new List<string>();
 
             foreach (var placeData in demoPlaceData)
             {
@@ -306,11 +310,19 @@ namespace RoutePlanner.API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to create demo place from Google: {PlaceId}", placeData.GooglePlaceId);
-                    // Continue with other places even if one fails
+                    _logger.LogWarning(ex, "Failed to create demo place from Google: {Name} ({PlaceId})", placeData.Name, placeData.GooglePlaceId);
+                    failedPlaces.Add(placeData.Name);
                 }
             }
 
+            // Ensure we have at least some places created
+            if (places.Count < 3)
+            {
+                var failedList = string.Join(", ", failedPlaces);
+                throw new InvalidOperationException($"Failed to create enough demo places. Only {places.Count} of {demoPlaceData.Length} succeeded. Failed: {failedList}");
+            }
+
+            _logger.LogInformation("Successfully created {Count} demo places", places.Count);
             return places;
         }
 
@@ -343,6 +355,18 @@ namespace RoutePlanner.API.Controllers
             }
 
             await _context.SaveChangesAsync();
+
+            // IMPORTANT: Recalculate route legs from OSRM to generate the timeline/distance/duration
+            try
+            {
+                await _legService.RecalculateLegsFromOsrm(route.Id);
+                _logger.LogInformation("Successfully calculated route legs for demo route {RouteId}", route.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to calculate route legs for demo route {RouteId}", route.Id);
+                // Don't fail the demo creation if leg calculation fails
+            }
 
             return new DemoRouteInfoDto
             {
