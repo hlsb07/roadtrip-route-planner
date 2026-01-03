@@ -25,7 +25,7 @@ body:has(.place-details-sidebar.active) .timeline-panel {
 }
 
 .timeline-panel.collapsed {
-    transform: translateY(calc(100% - 50px)); /* Show only header */
+    transform: translateY(calc(100% - 60px)); /* Show only header */
 }
 
 .timeline-panel-header {

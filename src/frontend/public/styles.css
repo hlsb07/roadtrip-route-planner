@@ -5834,8 +5834,8 @@ textarea.form-input {
 /* Route Info Panel - Floating panel showing distance and duration */
 .route-info-panel {
     position: absolute;
-    bottom: 30px;
-    right: 20px;
+    top: 15px;
+    right: 70px;
     background: rgba(255, 255, 255, 0.98);
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);

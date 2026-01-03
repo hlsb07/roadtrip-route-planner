@@ -792,7 +792,7 @@ class App {
         }
     }
 
-    selectPlace(index) {
+    async selectPlace(index) {
         this.placeManager.selectPlace(index);
         this.mapService.selectedMarkerIndex = index;
         this.updateUI(false); // Don't re-center map when selecting a place
@@ -806,7 +806,29 @@ class App {
         // Show place details in sidebar (desktop only)
         const place = this.placeManager.getPlaces()[index];
         if (place && window.innerWidth > 768) {
-            this.mapService.showPlaceDetailsInSidebar(place, index, false);
+            // Load Google data if available (like map marker click does)
+            if (place.hasGoogleData && place.id) {
+                try {
+                    const enrichedPlace = await ApiService.getEnrichedPlace(place.id);
+                    if (enrichedPlace && enrichedPlace.googleData) {
+                        const enrichedPlaceWithCoords = {
+                            ...place,
+                            googleData: enrichedPlace.googleData
+                        };
+                        this.mapService.showPlaceDetailsInSidebar(enrichedPlaceWithCoords, index, false);
+                    } else {
+                        // No Google data returned, show basic info
+                        this.mapService.showPlaceDetailsInSidebar(place, index, false);
+                    }
+                } catch (error) {
+                    console.error('Failed to load Google data for sidebar:', error);
+                    // Fall back to showing basic info
+                    this.mapService.showPlaceDetailsInSidebar(place, index, false);
+                }
+            } else {
+                // No Google data available, show basic info
+                this.mapService.showPlaceDetailsInSidebar(place, index, false);
+            }
         }
 
         // Collapse mobile panel if it's expanded

@@ -32,6 +32,8 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: override-with-env@example.com
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     ports:
       - "8081:80"
     depends_on:
