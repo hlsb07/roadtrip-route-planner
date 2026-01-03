@@ -1,12 +1,11 @@
 {
   "runtimeTarget": {
-    "name": ".NETCoreApp,Version=v9.0/linux-x64",
+    "name": ".NETCoreApp,Version=v9.0",
     "signature": ""
   },
   "compilationOptions": {},
   "targets": {
-    ".NETCoreApp,Version=v9.0": {},
-    ".NETCoreApp,Version=v9.0/linux-x64": {
+    ".NETCoreApp,Version=v9.0": {
       "RoutePlanner.API/1.0.0": {
         "dependencies": {
           "AutoMapper.Extensions.Microsoft.DependencyInjection": "12.0.1",
