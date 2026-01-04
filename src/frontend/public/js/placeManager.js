@@ -245,10 +245,7 @@ export class PlaceManager {
                 this.selectedIndex--;
             }
 
-            // Update the places list UI
-            this.updatePlacesList();
-
-            // Update map and other UI components (including timeline)
+            // Update UI (map, list, and other components)
             if (this.onUpdate) {
                 this.onUpdate();
             }
