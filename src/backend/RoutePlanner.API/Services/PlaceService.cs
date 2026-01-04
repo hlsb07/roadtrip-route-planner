@@ -87,7 +87,7 @@ namespace RoutePlanner.API.Services
                         {
                             GooglePlaceId = googlePlaceId,
                             PhotoReference = photoDto.PhotoReference,
-                            PhotoUrl = photoDto.PhotoUrl ?? string.Empty,
+                            PhotoUrl = string.Empty, // Don't store URL - generate dynamically from PhotoReference
                             Width = photoDto.Width,
                             Height = photoDto.Height,
                             IsPrimary = googleData.Photos.Count == 0, // First photo is primary
@@ -255,7 +255,7 @@ namespace RoutePlanner.API.Services
                 {
                     GooglePlaceId = place.GoogleData.GooglePlaceId,
                     PhotoReference = photoDto.PhotoReference,
-                    PhotoUrl = photoDto.PhotoUrl ?? string.Empty,
+                    PhotoUrl = string.Empty, // Don't store URL - generate dynamically from PhotoReference
                     Width = photoDto.Width,
                     Height = photoDto.Height,
                     IsPrimary = false,
@@ -387,7 +387,7 @@ namespace RoutePlanner.API.Services
                                 {
                                     GooglePlaceId = reverseResult.PlaceId,
                                     PhotoReference = photoDto.PhotoReference,
-                                    PhotoUrl = photoDto.PhotoUrl ?? string.Empty,
+                                    PhotoUrl = string.Empty, // Don't store URL - generate dynamically from PhotoReference
                                     Width = photoDto.Width,
                                     Height = photoDto.Height,
                                     IsPrimary = googleData.Photos.Count == 0,
@@ -523,7 +523,9 @@ namespace RoutePlanner.API.Services
                     Photos = place.GoogleData.Photos.Select(p => new PlacePhotoDto
                     {
                         PhotoReference = p.PhotoReference ?? string.Empty,
-                        PhotoUrl = p.PhotoUrl,
+                        PhotoUrl = !string.IsNullOrEmpty(p.PhotoReference)
+                            ? _googleMapsService.GeneratePhotoUrl(p.PhotoReference, p.Width ?? 400)
+                            : null,
                         Width = p.Width ?? 0,
                         Height = p.Height ?? 0
                     }).ToList()

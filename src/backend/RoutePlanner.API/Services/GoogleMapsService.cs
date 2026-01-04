@@ -332,9 +332,9 @@ namespace RoutePlanner.API.Services
         }
 
         /// <summary>
-        /// Generate Google Photos URL from photo reference
+        /// Generate Google Photos URL from photo reference (public for use by other services)
         /// </summary>
-        private string GeneratePhotoUrl(string photoReference, int maxWidth = 400)
+        public string GeneratePhotoUrl(string photoReference, int maxWidth = 400)
         {
             var apiKey = _configuration["GoogleMaps:ApiKey"];
             return $"https://maps.googleapis.com/maps/api/place/photo?maxwidth={maxWidth}&photo_reference={photoReference}&key={apiKey}";
