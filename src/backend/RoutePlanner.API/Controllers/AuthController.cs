@@ -285,8 +285,7 @@ namespace RoutePlanner.API.Controllers
             // European landmarks with real Google Place IDs
             var demoPlaceData = new[]
             {
-                new { GooglePlaceId = "ChIJG2LvQNAEdkgRY9wMq6RMBw8", Name = "Hamburg" },
-                new { GooglePlaceId = "ChIJiQnyVcZRqEcRY0xnhE77uyY", Name = "Brandenburg Gate, Berlin" },
+                new { GooglePlaceId = "ChIJxZZwR28JvUcRAMawKVBDIgQ", Name = "Frankfurt" },
                 new { GooglePlaceId = "ChIJ2V-Mo_l1nkcRfZixfUq4DAE", Name = "Munich" },
                 new { GooglePlaceId = "ChIJGaK-SZcLkEcRA9wf5_GNbuY", Name = "Zurich" },
                 new { GooglePlaceId = "ChIJD7fiBh9u5kcRYJSMaMOCCwQ", Name = "Paris" },
