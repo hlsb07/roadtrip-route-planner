@@ -245,6 +245,19 @@ export class PlaceManager {
                 this.selectedIndex--;
             }
 
+            // Update the places list UI
+            this.updatePlacesList();
+
+            // Update map and other UI components (including timeline)
+            if (this.onUpdate) {
+                this.onUpdate();
+            }
+
+            // Trigger timeline reload after place removal
+            if (this.onReordered) {
+                await this.onReordered();
+            }
+
             showSuccess(`Removed "${place.name}" from route`);
             return true;
 
