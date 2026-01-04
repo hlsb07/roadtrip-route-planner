@@ -263,6 +263,17 @@ namespace RoutePlanner.API.Controllers
             if (routePlace == null)
                 return NotFound("Place not found in route");
 
+            // Delete all RouteLegs that reference this RoutePlace
+            // This is necessary because the foreign key constraint is set to Restrict
+            var relatedLegs = await _context.RouteLegs
+                .Where(rl => rl.FromRoutePlaceId == routePlace.Id || rl.ToRoutePlaceId == routePlace.Id)
+                .ToListAsync();
+
+            if (relatedLegs.Any())
+            {
+                _context.RouteLegs.RemoveRange(relatedLegs);
+            }
+
             _context.RoutePlaces.Remove(routePlace);
 
             // UpdatedAt der Route aktualisieren
