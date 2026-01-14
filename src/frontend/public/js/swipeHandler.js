@@ -66,8 +66,13 @@ export class SwipeHandler {
 
         // Initialize
         this.setupEventListeners();
+
+        // Apply initial state to DOM
+        this.setState(this.currentState);
+
         console.log('SwipeHandler initialized for element:', this.element.id,
-                    this.handleElement !== this.element ? `(handle: ${this.handleElement.className})` : '');
+                    this.handleElement !== this.element ? `(handle: ${this.handleElement.className})` : '',
+                    'Initial state:', this.currentState);
     }
 
     /**
@@ -482,6 +487,8 @@ export class SwipeHandler {
      * Programmatically change state
      */
     changeState(stateName) {
+        console.log(`SwipeHandler.changeState called: ${this.currentState} → ${stateName} for element:`, this.element.id);
+
         const state = this.getState(stateName);
         if (!state) {
             console.warn('SwipeHandler: Invalid state name:', stateName);
@@ -494,6 +501,7 @@ export class SwipeHandler {
         this.element.style.opacity = '';
 
         this.setState(stateName);
+        console.log('State change complete. Current classes:', this.element.className);
     }
 
     /**

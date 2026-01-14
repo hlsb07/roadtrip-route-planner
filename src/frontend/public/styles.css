@@ -1192,15 +1192,18 @@ textarea.form-input {
 }
 
 .mobile-content-panel.hidden {
+    /* display: none; */
     max-height: 0;
 }
 
 .mobile-content-panel.active {
+    /* display: flex; */
     max-height: 40vh;
     box-shadow: 0 -4px 15px rgba(0,0,0,0.15);
 }
 
 .mobile-content-panel.expanded {
+    /* display: flex; */
     max-height: 80vh;
     box-shadow: 0 -8px 25px rgba(0,0,0,0.2);
 }

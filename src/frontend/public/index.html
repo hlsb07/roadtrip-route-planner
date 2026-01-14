@@ -412,6 +412,9 @@
 
                 <!-- Campsites List Section -->
                 <div class="mobile-section campsites-list" data-section="campsites" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <!-- Campsites will be populated here -->
+                </div>
+
                 <!-- Timeline Section (Mobile) -->
                 <div class="mobile-section timeline-mobile-section" data-section="timeline" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
                     <div class="timeline-mobile-wrapper">
@@ -423,8 +426,6 @@
                             <!-- Timeline content will be rendered here -->
                         </div>
                     </div>
-                </div>
-                    <!-- Campsites will be populated here -->
                 </div>
 
                 <!-- Controls Section -->
@@ -1032,57 +1033,8 @@
             }
         };
 
-        // Mobile navigation system
+        // Mobile navigation system (function defined in app.js)
         let currentMobileMode = 'routes';
-
-        window.switchMobileMode = function(mode) {
-            currentMobileMode = mode;
-
-            // Update active nav item
-            document.querySelectorAll('.mobile-nav-item').forEach(item => {
-                item.classList.toggle('active', item.dataset.mode === mode);
-            });
-
-            // Update panel
-            const panel = document.getElementById('mobilePanel');
-            const title = document.getElementById('mobilePanelTitle');
-            const content = document.getElementById('mobilePanelContent');
-
-            panel.dataset.mode = mode;
-
-            // Show panel in 'active' state when navigation item is clicked
-            // Remove hidden/expanded and set to active
-            panel.classList.remove('hidden', 'expanded');
-            panel.classList.add('active');
-
-            // Update SwipeHandler state if available
-            if (window.app && window.app.panelSwipeHandler) {
-                window.app.panelSwipeHandler.currentState = 'active';
-            }
-
-            // Set title and show appropriate section
-            const modes = {
-                routes: 'Route Management',
-                search: 'Save Place',
-                places: 'Route Places',
-                allplaces: 'All Places',
-                campsites: 'Campsites',
-                controls: 'Tools'
-            };
-
-            title.textContent = modes[mode];
-
-            // Hide all sections
-            content.querySelectorAll('.mobile-section').forEach(section => {
-                section.style.display = 'none';
-            });
-
-            // Show selected section
-            const activeSection = content.querySelector(`[data-section="${mode}"]`);
-            if (activeSection) {
-                activeSection.style.display = 'block';
-            }
-        };
 
         // Panel functions now handled by SwipeHandler in app.js
         // Keep stub for backwards compatibility
@@ -1117,7 +1069,12 @@
                 if (panel.classList.contains('expanded') &&
                     !panel.contains(e.target) &&
                     !nav.contains(e.target)) {
-                    panel.classList.remove('expanded');
+                    // Use SwipeHandler if available
+                    if (window.app && window.app.panelSwipeHandler) {
+                        window.app.panelSwipeHandler.changeState('active');
+                    } else {
+                        panel.classList.remove('expanded');
+                    }
                     // Update icon
                     const expandBtn = panel.querySelector('.mobile-panel-expand i');
                     if (expandBtn) {

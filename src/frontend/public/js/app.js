@@ -1648,7 +1648,7 @@ window.addEventListener('load', () => {
 // Mobile mode switching function
 window.switchMobileMode = function(mode) {
     console.log('Switching to mobile mode:', mode);
-    
+
     // Update nav items
     const navItems = document.querySelectorAll('.mobile-nav-item');
     navItems.forEach(item => {
@@ -1658,7 +1658,22 @@ window.switchMobileMode = function(mode) {
             item.classList.remove('active');
         }
     });
-    
+
+    // Get panel element
+    const panel = document.getElementById('mobilePanel');
+
+    // Show panel in 'active' state when navigation item is clicked
+    // Use SwipeHandler's changeState method if available (proper way)
+    if (window.app && window.app.panelSwipeHandler) {
+        window.app.panelSwipeHandler.changeState('active');
+    } else {
+        // Fallback: Direct class manipulation if SwipeHandler not yet initialized
+        if (panel) {
+            panel.classList.remove('hidden', 'expanded');
+            panel.classList.add('active');
+        }
+    }
+
     // Update mobile sections
     const sections = document.querySelectorAll('.mobile-section');
     sections.forEach(section => {
@@ -1668,7 +1683,7 @@ window.switchMobileMode = function(mode) {
             section.style.display = 'none';
         }
     });
-    
+
     // Update panel title
     const titles = {
         routes: 'Route Selection',
@@ -1679,12 +1694,12 @@ window.switchMobileMode = function(mode) {
         controls: 'Tools',
         timeline: 'Route Timeline'
     };
-    
+
     const titleEl = document.getElementById('mobilePanelTitle');
     if (titleEl && titles[mode]) {
         titleEl.textContent = titles[mode];
     }
-    
+
     // If timeline mode, ensure timeline is rendered for mobile
     if (mode === 'timeline' && window.app) {
         // The timeline will use the same TimelineService instance
