@@ -28,7 +28,14 @@ export class TimelineService {
         this.conflictUI = new ConflictUIManager();
         this.currentConflicts = null;
 
+        // Zoom level: 1.0 = 100%, 0.5 = 50%, 2.0 = 200%
+        this.zoomLevel = 1.0;
+        this.minZoom = 0.5;
+        this.maxZoom = 3.0;
+        this.zoomStep = 0.25;
+
         this.initDOM();
+        this.initZoomControls();
     }
 
     initDOM() {
@@ -50,6 +57,51 @@ export class TimelineService {
 
         this.attachSliderListeners();
         this.attachHorizontalScrollListener();
+    }
+
+    initZoomControls() {
+        const zoomInBtn = document.getElementById('timelineZoomIn');
+        const zoomOutBtn = document.getElementById('timelineZoomOut');
+        const zoomLabel = document.getElementById('timelineZoomLabel');
+
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => this.zoomIn());
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => this.zoomOut());
+        }
+
+        this.zoomLabel = zoomLabel;
+        this.updateZoomLabel();
+    }
+
+    zoomIn() {
+        if (this.zoomLevel < this.maxZoom) {
+            this.zoomLevel = Math.min(this.maxZoom, this.zoomLevel + this.zoomStep);
+            this.rerender();
+            this.updateZoomLabel();
+        }
+    }
+
+    zoomOut() {
+        if (this.zoomLevel > this.minZoom) {
+            this.zoomLevel = Math.max(this.minZoom, this.zoomLevel - this.zoomStep);
+            this.rerender();
+            this.updateZoomLabel();
+        }
+    }
+
+    updateZoomLabel() {
+        if (this.zoomLabel) {
+            this.zoomLabel.textContent = `${Math.round(this.zoomLevel * 100)}%`;
+        }
+    }
+
+    rerender() {
+        // Re-render without fetching new data
+        if (this.timelineStops.length > 0 || this.timelineLegs.length > 0) {
+            this.render(this.timelineStops, this.totalDays, this.routeStartUtc, this.timelineLegs);
+        }
     }
 
     render(timelineStops, totalDays, routeStartUtc, timelineLegs = []) {
@@ -152,11 +204,9 @@ export class TimelineService {
     }
 
     getDayWidth() {
-        // Return day width based on screen size
-        if (window.innerWidth <= 768) {
-            return 80; // Mobile
-        }
-        return 120; // Desktop
+        // Return day width based on screen size, multiplied by zoom level
+        const baseWidth = window.innerWidth <= 768 ? 80 : 120;
+        return baseWidth * this.zoomLevel;
     }
 
     /**
@@ -188,11 +238,14 @@ export class TimelineService {
 
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const dayWidth = this.getDayWidth();
 
         this.dayLabelsContainer.innerHTML = '';
         for (let day = 1; day <= this.totalDays; day++) {
             const label = document.createElement('div');
             label.className = 'day-label';
+            label.style.width = `${dayWidth}px`;
+            label.style.minWidth = `${dayWidth}px`;
 
             // Show calendar date instead of "Day N"
             if (this.routeStartUtc) {
@@ -212,10 +265,14 @@ export class TimelineService {
     renderDayGrid() {
         if (!this.ganttGrid) return;
 
+        const dayWidth = this.getDayWidth();
+
         this.ganttGrid.innerHTML = '';
         for (let day = 1; day <= this.totalDays; day++) {
             const col = document.createElement('div');
             col.className = 'day-column';
+            col.style.width = `${dayWidth}px`;
+            col.style.minWidth = `${dayWidth}px`;
             col.dataset.day = day;
             this.ganttGrid.appendChild(col);
         }

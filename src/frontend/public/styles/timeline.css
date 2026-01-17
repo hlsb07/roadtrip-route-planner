@@ -64,6 +64,51 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     transform: rotate(180deg);
 }
 
+/* Timeline Zoom Controls */
+.timeline-zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    cursor: default;
+}
+
+.timeline-zoom-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #666;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.timeline-zoom-btn:hover {
+    background: #e0e0e0;
+    color: #333;
+    border-color: #ccc;
+}
+
+.timeline-zoom-btn:active {
+    background: #d0d0d0;
+}
+
+.timeline-zoom-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    min-width: 40px;
+    text-align: center;
+}
+
 .timeline-info {
     display: flex;
     flex-direction: column;

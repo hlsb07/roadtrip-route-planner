@@ -245,6 +245,15 @@
                     <span>Timeline</span>
                     <i class="fas fa-chevron-down" id="timelineChevron"></i>
                 </button>
+                <div class="timeline-zoom-controls" onclick="event.stopPropagation()">
+                    <button class="timeline-zoom-btn" id="timelineZoomOut" title="Zoom out">
+                        <i class="fas fa-minus"></i>
+                    </button>
+                    <span class="timeline-zoom-label" id="timelineZoomLabel">100%</span>
+                    <button class="timeline-zoom-btn" id="timelineZoomIn" title="Zoom in">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
                 <div class="timeline-info">
                     <div id="selectedPlaceTime" class="selected-place-time" style="display: none;">
                         <i class="fas fa-clock"></i>
