@@ -13,8 +13,11 @@ import { ApiService } from '../api.js';
 export async function initializeScheduleIfNeeded(routeId, route) {
     console.log('Checking if schedule initialization is needed for route:', routeId);
 
-    // Check if route has StartDateTime
-    if (!route.startDateTime) {
+    // Load itinerary first to check if schedule settings exist
+    let itinerary = await ApiService.getItinerary(routeId);
+
+    // Check if route has StartDateTime in schedule settings
+    if (!itinerary.scheduleSettings?.startDateTime) {
         console.log('Route has no start date time, initializing...');
         const startDateTime = calculateDefaultStart(route);
         await ApiService.updateRouteScheduleSettings(routeId, {
@@ -24,10 +27,9 @@ export async function initializeScheduleIfNeeded(routeId, route) {
             defaultArrivalTime: route.defaultArrivalTime || null,
             defaultDepartureTime: route.defaultDepartureTime || null
         });
+        // Reload itinerary to get updated schedule settings
+        itinerary = await ApiService.getItinerary(routeId);
     }
-
-    // Load itinerary to get RoutePlace IDs (not Place IDs)
-    const itinerary = await ApiService.getItinerary(routeId);
 
     // Check if places have schedule data
     const placesNeedSchedule = itinerary.places && itinerary.places.some(p => !p.plannedStart);

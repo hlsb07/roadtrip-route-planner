@@ -34,6 +34,9 @@ class App {
         this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
         this.tagManager = new TagManager();
 
+        // Track original start date for change detection
+        this.originalStartDate = null;
+
         // Initialize Timeline Service
         this.timelineService = new TimelineService({
             onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),
@@ -142,6 +145,14 @@ class App {
                 if (e.key === 'Enter') {
                     this.handleSearch();
                 }
+            });
+        }
+
+        // Route start date picker
+        const dateInput = document.getElementById('routeStartDate');
+        if (dateInput) {
+            dateInput.addEventListener('change', () => {
+                this.updateApplyDateButtonState();
             });
         }
 
@@ -1173,6 +1184,7 @@ class App {
             if (panel) {
                 panel.classList.remove('visible');
             }
+            this.updateRouteStartDatePicker(); // Clear date picker
             return;
         }
 
@@ -1192,6 +1204,9 @@ class App {
             // Load itinerary WITH conflict information
             const itinerary = await ApiService.getItineraryWithConflicts(routeId);
 
+            // Populate the start date picker with current value
+            this.populateStartDateFromItinerary(itinerary);
+
             // Map to timeline coordinates
             const timelineStops = mapItineraryToTimelineStops(itinerary);
             const timelineLegs = mapItineraryToTimelineLegs(itinerary, timelineStops);
@@ -1209,6 +1224,130 @@ class App {
         } catch (error) {
             console.error('Failed to load timeline:', error);
             showError('Failed to load timeline');
+        }
+    }
+
+    /**
+     * Update the route start date picker state (enable/disable based on route selection)
+     */
+    updateRouteStartDatePicker() {
+        const dateInput = document.getElementById('routeStartDate');
+        const applyBtn = document.getElementById('applyStartDateBtn');
+
+        if (!dateInput) return;
+
+        if (!this.routeManager.currentRouteId) {
+            dateInput.value = '';
+            dateInput.disabled = true;
+            if (applyBtn) applyBtn.disabled = true;
+            this.originalStartDate = null;
+            return;
+        }
+
+        dateInput.disabled = false;
+    }
+
+    /**
+     * Populate date picker with route's current start date
+     * @param {Object} itinerary - Route itinerary with schedule settings
+     */
+    populateStartDateFromItinerary(itinerary) {
+        const dateInput = document.getElementById('routeStartDate');
+        if (!dateInput) return;
+
+        const startDateTime = itinerary?.scheduleSettings?.startDateTime;
+        if (startDateTime) {
+            // Convert to local date format (YYYY-MM-DD)
+            const date = new Date(startDateTime);
+            const localDate = date.toISOString().split('T')[0];
+            dateInput.value = localDate;
+            this.originalStartDate = localDate;
+        } else {
+            // Default to today if no start date set
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+            this.originalStartDate = today;
+        }
+
+        dateInput.disabled = false;
+        this.updateApplyDateButtonState();
+    }
+
+    /**
+     * Update the apply button state based on whether date has changed
+     */
+    updateApplyDateButtonState() {
+        const dateInput = document.getElementById('routeStartDate');
+        const applyBtn = document.getElementById('applyStartDateBtn');
+
+        if (!dateInput || !applyBtn) return;
+
+        const hasChanged = dateInput.value !== this.originalStartDate;
+        applyBtn.disabled = !hasChanged;
+    }
+
+    /**
+     * Apply the route start date change - update backend and recalculate schedules
+     */
+    async applyRouteStartDateChange() {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) return;
+
+        const dateInput = document.getElementById('routeStartDate');
+        const applyBtn = document.getElementById('applyStartDateBtn');
+
+        if (!dateInput || !dateInput.value) return;
+
+        // Parse the new date and set time to 09:00 (default arrival time)
+        const newDate = new Date(dateInput.value);
+        newDate.setHours(9, 0, 0, 0);
+
+        try {
+            // Show loading state
+            if (applyBtn) {
+                applyBtn.classList.add('loading');
+                applyBtn.querySelector('i').className = 'fas fa-spinner';
+            }
+
+            // Get current route to preserve other schedule settings
+            const route = await ApiService.getRoute(routeId);
+
+            // Update route schedule settings with new start date
+            await ApiService.updateRouteScheduleSettings(routeId, {
+                timeZoneId: route.timeZoneId || "Europe/Berlin",
+                startDateTime: newDate.toISOString(),
+                endDateTime: route.endDateTime || null,
+                defaultArrivalTime: route.defaultArrivalTime || null,
+                defaultDepartureTime: route.defaultDepartureTime || null
+            });
+
+            console.log(`Updated route ${routeId} start date to: ${newDate.toISOString()}`);
+
+            // Recalculate all stop schedules relative to new start date
+            await ApiService.recalculateSchedule(routeId, false);
+
+            console.log('Schedule recalculated successfully');
+
+            // Reload timeline to show updated schedule
+            await this.loadTimelineForCurrentRoute();
+
+            showSuccess('Trip start date updated and schedules recalculated');
+
+        } catch (error) {
+            console.error('Failed to update route start date:', error);
+            showError('Failed to update start date: ' + error.message);
+
+            // Restore original date on error
+            if (dateInput && this.originalStartDate) {
+                dateInput.value = this.originalStartDate;
+            }
+        } finally {
+            // Reset button state
+            if (applyBtn) {
+                applyBtn.classList.remove('loading');
+                applyBtn.querySelector('i').className = 'fas fa-check';
+            }
+            this.updateApplyDateButtonState();
         }
     }
 
@@ -1725,4 +1864,16 @@ window.switchMobileMode = function(mode) {
             window.app.renderMobileTimeline();
         }, 100);
     }
+};
+
+/**
+ * Global handler for applying route start date changes
+ */
+window.applyRouteStartDate = async function() {
+    if (!window.app) {
+        console.error('App not initialized');
+        return;
+    }
+
+    await window.app.applyRouteStartDateChange();
 };

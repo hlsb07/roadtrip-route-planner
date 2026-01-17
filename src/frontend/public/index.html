@@ -42,10 +42,6 @@
                         <i class="fas fa-campground"></i>
                         <span>Campsites</span>
                     </button>
-                    <button class="mobile-nav-item" data-mode="timeline" onclick="switchMobileMode('timeline')">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>Timeline</span>
-                    </button>
                     <button class="desktop-nav-item" data-mode="controls" onclick="switchDesktopMode('controls')">
                         <i class="fas fa-cog"></i>
                         <span>Tools</span>
@@ -65,7 +61,19 @@
                         </button>
                     </div>
                 </div>
-                
+
+                <div class="route-start-date">
+                    <label for="routeStartDate">
+                        <i class="fas fa-calendar-alt"></i> Trip Start Date:
+                    </label>
+                    <div class="date-input-group">
+                        <input type="date" id="routeStartDate" class="form-input date-input" title="Select trip start date">
+                        <button class="btn-icon btn-apply-date" id="applyStartDateBtn" onclick="applyRouteStartDate()" title="Apply and recalculate" disabled>
+                            <i class="fas fa-check"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <div class="route-actions">
                     <button class="btn btn-sm" onclick="showRenameRouteModal()" title="Rename route">
                         <i class="fas fa-edit"></i> Rename
