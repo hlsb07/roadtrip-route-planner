@@ -12,7 +12,7 @@ import { CONFIG } from './config.js';
 import { SwipeHandler } from './swipeHandler.js';
 import { TimelineService } from './timeline/TimelineService.js';
 import { initializeScheduleIfNeeded } from './timeline/scheduleInitializer.js';
-import { mapItineraryToTimelineStops, calculateTotalDays } from './timeline/timelineMapper.js';
+import { mapItineraryToTimelineStops, mapItineraryToTimelineLegs, calculateTotalDays } from './timeline/timelineMapper.js';
 import { AuthManager } from './authManager.js';
 import { LoginModal } from './loginModal.js';
 
@@ -38,6 +38,7 @@ class App {
         this.timelineService = new TimelineService({
             onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),
             onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),
+            onLegScheduleChanged: (legId, dto) => this.handleLegScheduleChanged(legId, dto),
             onNeedRecalculateLegs: () => this.handleRecalculateLegs(),
             onResolveConflictByReorder: () => this.handleResolveConflictByReorder()
         });
@@ -1193,15 +1194,17 @@ class App {
 
             // Map to timeline coordinates
             const timelineStops = mapItineraryToTimelineStops(itinerary);
+            const timelineLegs = mapItineraryToTimelineLegs(itinerary, timelineStops);
             const totalDays = calculateTotalDays(timelineStops);
             const routeStartUtc = itinerary.scheduleSettings?.startDateTime;
 
-            // Render with conflict information
+            // Render with conflict information and legs
             this.timelineService.renderWithConflicts(
                 timelineStops,
                 totalDays,
                 routeStartUtc,
-                itinerary.conflictInfo
+                itinerary.conflictInfo,
+                timelineLegs
             );
         } catch (error) {
             console.error('Failed to load timeline:', error);
@@ -1229,6 +1232,20 @@ class App {
         } catch (error) {
             console.error('Failed to update stop schedule:', error);
             showError('Failed to update schedule');
+            throw error;
+        }
+    }
+
+    async handleLegScheduleChanged(legId, dto) {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) return;
+
+        try {
+            await ApiService.updateLegSchedule(routeId, legId, dto);
+            console.log(`Successfully updated leg ${legId} schedule`);
+        } catch (error) {
+            console.error('Failed to update leg schedule:', error);
+            showError('Failed to update leg schedule');
             throw error;
         }
     }

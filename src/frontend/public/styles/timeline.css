@@ -738,3 +738,86 @@ body:has(.place-details-sidebar.active) .timeline-panel {
         transform: translateY(0);
     }
 }
+
+/* ===== Route Leg Bar Styles ===== */
+
+.gantt-leg-bar {
+    height: 24px !important; /* Thinner than place bars (36px) */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 4px;
+    opacity: 0.9;
+    border: none;
+    box-shadow: 0 1px 3px rgba(102, 126, 234, 0.3);
+    padding: 0 8px;
+}
+
+.gantt-leg-bar:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+    border-color: transparent;
+}
+
+.gantt-leg-bar.active {
+    background: linear-gradient(135deg, #5a6fd6 0%, #6a4192 100%);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.gantt-leg-bar.moving {
+    opacity: 1;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    z-index: 10;
+    transition: none !important;
+}
+
+.gantt-leg-bar .bar-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.gantt-leg-bar .bar-label i {
+    margin-right: 4px;
+    font-size: 10px;
+}
+
+/* No resize handles for legs - duration is fixed by OSRM */
+.gantt-leg-bar .resize-handle {
+    display: none;
+}
+
+/* Leg bar tooltip on hover */
+.gantt-leg-bar[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    margin-bottom: 4px;
+    z-index: 100;
+}
+
+.gantt-leg-bar[data-tooltip]:hover::after {
+    opacity: 1;
+}
+
+/* Mobile adjustments for leg bars */
+@media (max-width: 768px) {
+    .gantt-leg-bar {
+        height: 20px !important;
+    }
+
+    .gantt-leg-bar .bar-label {
+        font-size: 10px;
+    }
+}

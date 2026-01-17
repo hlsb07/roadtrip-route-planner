@@ -594,6 +594,25 @@ export class ApiService {
     }
 
     /**
+     * Update schedule (start/end times) for a specific leg
+     * @param {number} routeId - Route ID
+     * @param {number} legId - Leg ID
+     * @param {Object} dto - Leg schedule DTO {plannedStart, plannedEnd}
+     * @returns {Promise<void>}
+     */
+    static async updateLegSchedule(routeId, legId, dto) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/${legId}/schedule`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dto)
+        });
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to update leg schedule');
+        }
+    }
+
+    /**
      * Recalculate route legs from OSRM (distance, duration, geometry)
      * @param {number} routeId - Route ID
      * @returns {Promise<Object>} - Success message

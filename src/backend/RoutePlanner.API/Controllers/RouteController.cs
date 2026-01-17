@@ -689,6 +689,30 @@ namespace RoutePlanner.API.Controllers
             }
         }
 
+        // PUT: api/routes/{routeId}/legs/{legId}/schedule - Update leg schedule (times)
+        [HttpPut("{routeId}/legs/{legId}/schedule")]
+        public async Task<IActionResult> UpdateLegSchedule(int routeId, int legId, [FromBody] RouteLegScheduleUpdateDto dto)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                // Verify route belongs to user
+                if (!await _context.Routes.AnyAsync(r => r.Id == routeId && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                await _legService.UpdateLegSchedule(routeId, legId, dto.PlannedStart, dto.PlannedEnd);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error updating leg schedule", error = ex.Message });
+            }
+        }
+
         // POST: api/routes/{id}/legs/recalculate - Recalculate legs from OSRM
         [HttpPost("{id}/legs/recalculate")]
         public async Task<IActionResult> RecalculateLegsFromOsrm(int id)

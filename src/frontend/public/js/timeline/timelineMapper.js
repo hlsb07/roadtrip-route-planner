@@ -80,6 +80,76 @@ export function mapItineraryToTimelineStops(itinerary) {
 }
 
 /**
+ * Map itinerary legs to timeline bars with coordinates
+ * @param {Object} itinerary - Route itinerary from backend
+ * @param {Array} timelineStops - Already mapped stops (for reference to connected places)
+ * @returns {Array} Timeline legs with startT/endT coordinates
+ */
+export function mapItineraryToTimelineLegs(itinerary, timelineStops) {
+    if (!itinerary || !itinerary.legs || itinerary.legs.length === 0) {
+        console.log('No legs in itinerary');
+        return [];
+    }
+
+    const routeStart = itinerary.scheduleSettings?.startDateTime
+        ? new Date(itinerary.scheduleSettings.startDateTime)
+        : new Date();
+
+    // Get the calendar date of route start (at midnight UTC)
+    const routeStartDate = new Date(Date.UTC(
+        routeStart.getUTCFullYear(),
+        routeStart.getUTCMonth(),
+        routeStart.getUTCDate(),
+        0, 0, 0, 0
+    ));
+
+    console.log(`Mapping ${itinerary.legs.length} legs`);
+
+    return itinerary.legs.map((leg, idx) => {
+        // Find connected places from timeline stops
+        const fromStop = timelineStops.find(s => s.routePlaceId === leg.fromRoutePlaceId);
+        const toStop = timelineStops.find(s => s.routePlaceId === leg.toRoutePlaceId);
+
+        // Calculate coordinates
+        // If leg has PlannedStart/End, use those; otherwise derive from places
+        let startT, endT;
+
+        if (leg.plannedStart && leg.plannedEnd) {
+            const start = new Date(leg.plannedStart);
+            const end = new Date(leg.plannedEnd);
+            startT = (start.getTime() - routeStartDate.getTime()) / MS_PER_DAY;
+            endT = (end.getTime() - routeStartDate.getTime()) / MS_PER_DAY;
+        } else {
+            // Derive from adjacent places: leg starts when fromPlace ends
+            startT = fromStop ? fromStop.endT : idx;
+            // Calculate leg duration in days from durationSeconds
+            const legDurationDays = leg.durationSeconds / (24 * 60 * 60);
+            endT = toStop ? toStop.startT : startT + legDurationDays;
+        }
+
+        const timelineLeg = {
+            legId: leg.id,
+            orderIndex: leg.orderIndex,
+            fromRoutePlaceId: leg.fromRoutePlaceId,
+            toRoutePlaceId: leg.toRoutePlaceId,
+            fromPlaceName: fromStop?.name || 'Unknown',
+            toPlaceName: toStop?.name || 'Unknown',
+            distanceMeters: leg.distanceMeters,
+            durationSeconds: leg.durationSeconds,
+            startT: Math.max(0, startT),
+            endT: Math.max(startT + 0.01, endT), // Ensure minimum duration
+            originalStart: leg.plannedStart,
+            originalEnd: leg.plannedEnd,
+            isLeg: true // Flag to distinguish from place bars
+        };
+
+        console.log(`  Leg ${idx}: ${timelineLeg.fromPlaceName} -> ${timelineLeg.toPlaceName}, startT=${timelineLeg.startT.toFixed(2)}, endT=${timelineLeg.endT.toFixed(2)}`);
+
+        return timelineLeg;
+    });
+}
+
+/**
  * Calculate total days for the timeline based on stops
  * @param {Array} timelineStops - Array of timeline stops
  * @returns {number} Total days (rounded up)

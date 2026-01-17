@@ -32,6 +32,18 @@ namespace RoutePlanner.API.Models
 
         public DateTime CalculatedAt { get; set; } = DateTime.UtcNow;
 
+        /// <summary>
+        /// Scheduled start time for this leg (when travel begins)
+        /// Nullable for backward compatibility with existing legs
+        /// </summary>
+        public DateTimeOffset? PlannedStart { get; set; }
+
+        /// <summary>
+        /// Scheduled end time for this leg (when travel ends/arrival)
+        /// Nullable for backward compatibility with existing legs
+        /// </summary>
+        public DateTimeOffset? PlannedEnd { get; set; }
+
         // Navigation Properties
         public Route Route { get; set; } = null!;
         public RoutePlace FromRoutePlace { get; set; } = null!;

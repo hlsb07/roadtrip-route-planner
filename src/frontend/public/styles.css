@@ -5894,8 +5894,8 @@ textarea.form-input {
 /* Mobile adjustments for route info panel */
 @media (max-width: 768px) {
     .route-info-panel {
-        bottom: 80px;
-        right: 10px;
+        top: 15px;
+        right: 70px;
         left: auto;
         min-width: 160px;
         padding: 12px;

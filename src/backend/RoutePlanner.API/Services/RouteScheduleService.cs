@@ -271,7 +271,9 @@ namespace RoutePlanner.API.Services
                 leg.DurationSeconds,
                 leg.Provider,
                 leg.CalculatedAt,
-                geometryCoords
+                geometryCoords,
+                leg.PlannedStart,
+                leg.PlannedEnd
             );
         }
     }
