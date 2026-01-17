@@ -587,6 +587,53 @@ export class MapService {
         `;
     }
 
+    /**
+     * Show segment popup for a specific leg (triggered from timeline)
+     * @param {number} legIndex - Index of the leg/segment
+     */
+    showSegmentPopupForLeg(legIndex) {
+        if (!this.routeSegments || legIndex >= this.routeSegments.length) {
+            console.warn('No route segment found for leg index:', legIndex);
+            return;
+        }
+
+        const segment = this.routeSegments[legIndex];
+        if (!segment || !segment.coordinates || segment.coordinates.length === 0) {
+            console.warn('Segment has no coordinates:', segment);
+            return;
+        }
+
+        // Calculate midpoint of the segment
+        const midIndex = Math.floor(segment.coordinates.length / 2);
+        const midpoint = segment.coordinates[midIndex];
+
+        // Create popup content
+        const popupContent = this.createSegmentPopup(
+            segment.startPlace,
+            segment.endPlace,
+            segment.distance,
+            segment.duration,
+            legIndex
+        );
+
+        // Open popup at midpoint and pan map to it
+        L.popup()
+            .setLatLng(midpoint)
+            .setContent(popupContent)
+            .openOn(this.map);
+
+        // Optionally highlight the segment polyline
+        if (this.segmentPolylines && this.segmentPolylines[legIndex]) {
+            const polyline = this.segmentPolylines[legIndex];
+            polyline.setStyle({ weight: 8, opacity: 0.9, color: '#f90e0eff' });
+
+            // Reset style after a delay
+            setTimeout(() => {
+                polyline.setStyle({ weight: 6, opacity: 0.7, color: '#0E54F9' });
+            }, 3000);
+        }
+    }
+
     centerMap(places) {
         if (places.length === 0) return;
         const bounds = L.latLngBounds(places.map(place => place.coords));

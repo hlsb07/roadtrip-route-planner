@@ -64,6 +64,12 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     transform: rotate(180deg);
 }
 
+/* Hide header content when collapsed - only show toggle button */
+.timeline-panel.collapsed .timeline-zoom-controls,
+.timeline-panel.collapsed .timeline-info {
+    display: none;
+}
+
 /* Timeline Zoom Controls */
 .timeline-zoom-controls {
     display: flex;

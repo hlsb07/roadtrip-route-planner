@@ -11,7 +11,8 @@ export class TimelineService {
             onStopScheduleChanged: callbacks.onStopScheduleChanged || (() => {}),
             onLegScheduleChanged: callbacks.onLegScheduleChanged || (() => {}),
             onNeedRecalculateLegs: callbacks.onNeedRecalculateLegs || (() => {}),
-            onResolveConflictByReorder: callbacks.onResolveConflictByReorder || (() => {})
+            onResolveConflictByReorder: callbacks.onResolveConflictByReorder || (() => {}),
+            onLegClicked: callbacks.onLegClicked || (() => {})
         };
 
         this.timelineStops = [];
@@ -329,6 +330,12 @@ export class TimelineService {
 
         // Drag handler (move only - no resize for legs)
         this.attachLegDragHandler(bar, leg, index);
+
+        // Click to show segment popup on map
+        bar.addEventListener('click', () => {
+            if (bar.classList.contains('moving')) return;
+            this.callbacks.onLegClicked(index, leg);
+        });
 
         return bar;
     }

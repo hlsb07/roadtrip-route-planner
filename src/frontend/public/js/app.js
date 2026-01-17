@@ -43,7 +43,8 @@ class App {
             onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),
             onLegScheduleChanged: (legId, dto) => this.handleLegScheduleChanged(legId, dto),
             onNeedRecalculateLegs: () => this.handleRecalculateLegs(),
-            onResolveConflictByReorder: () => this.handleResolveConflictByReorder()
+            onResolveConflictByReorder: () => this.handleResolveConflictByReorder(),
+            onLegClicked: (index, leg) => this.handleTimelineLegClicked(index, leg)
         });
 
         // Set callback for search result selection (save to database, don't add to route)
@@ -1354,6 +1355,11 @@ class App {
     async handleTimelineStopSelected(index, stop) {
         // Select place on map (which will also update timeline)
         this.selectPlace(index);
+    }
+
+    handleTimelineLegClicked(index) {
+        // Show segment popup on map when leg bar is clicked in timeline
+        this.mapService.showSegmentPopupForLeg(index);
     }
 
     async handleStopScheduleChanged(routePlaceId, dto) {
