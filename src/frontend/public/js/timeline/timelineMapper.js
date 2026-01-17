@@ -62,7 +62,7 @@ export function mapItineraryToTimelineStops(itinerary) {
             longitude: stop.longitude,
             orderIndex: stop.orderIndex,
             stopType: stop.stopType || 0,
-            color: `color-${(idx % 5) + 1}`,
+            color: 'color-2',
             startT: Math.max(0, startT), // Clamp to valid range
             endT: Math.max(startT + 0.05, endT), // Ensure minimum duration (~1.2 hours)
 
@@ -111,20 +111,21 @@ export function mapItineraryToTimelineLegs(itinerary, timelineStops) {
         const toStop = timelineStops.find(s => s.routePlaceId === leg.toRoutePlaceId);
 
         // Calculate coordinates
-        // If leg has PlannedStart/End, use those; otherwise derive from places
+        // Leg duration is FIXED based on OSRM driving time (durationSeconds)
+        const legDurationDays = leg.durationSeconds / (24 * 60 * 60);
         let startT, endT;
 
         if (leg.plannedStart && leg.plannedEnd) {
+            // Use saved schedule times
             const start = new Date(leg.plannedStart);
             const end = new Date(leg.plannedEnd);
             startT = (start.getTime() - routeStartDate.getTime()) / MS_PER_DAY;
             endT = (end.getTime() - routeStartDate.getTime()) / MS_PER_DAY;
         } else {
             // Derive from adjacent places: leg starts when fromPlace ends
+            // Duration is FIXED based on driving time, not the gap between places
             startT = fromStop ? fromStop.endT : idx;
-            // Calculate leg duration in days from durationSeconds
-            const legDurationDays = leg.durationSeconds / (24 * 60 * 60);
-            endT = toStop ? toStop.startT : startT + legDurationDays;
+            endT = startT + legDurationDays;
         }
 
         const timelineLeg = {
@@ -151,18 +152,20 @@ export function mapItineraryToTimelineLegs(itinerary, timelineStops) {
 
 /**
  * Calculate total days for the timeline based on stops
+ * Adds 1 extra day at the end to allow extending the trip
  * @param {Array} timelineStops - Array of timeline stops
- * @returns {number} Total days (rounded up)
+ * @returns {number} Total days (rounded up + 1 extra day for extension)
  */
 export function calculateTotalDays(timelineStops) {
     if (!timelineStops || timelineStops.length === 0) {
-        return 1;
+        return 2; // 1 day minimum + 1 extra day for extension
     }
 
     const maxEndT = Math.max(...timelineStops.map(s => s.endT));
-    const totalDays = Math.ceil(maxEndT);
+    const baseDays = Math.ceil(maxEndT);
+    const totalDays = baseDays + 1; // Add 1 extra day for trip extension
 
-    console.log(`Calculated total days: ${totalDays} (from max endT: ${maxEndT.toFixed(2)})`);
+    console.log(`Calculated total days: ${totalDays} (base: ${baseDays} + 1 extra day for extension, from max endT: ${maxEndT.toFixed(2)})`);
 
     return totalDays;
 }

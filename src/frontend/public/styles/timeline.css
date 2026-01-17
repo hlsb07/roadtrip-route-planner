@@ -181,6 +181,16 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     min-width: 120px;
     flex-shrink: 0; /* Prevent shrinking */
     border-left: 1px solid #e0e0e0;
+    /* Time-of-day bands: midnight-6am (25%), 6am-6pm (50%), 6pm-midnight (25%) */
+    background: linear-gradient(
+        to right,
+        rgba(0, 0, 0, 0.08) 0%,      /* Midnight - night */
+        rgba(0, 0, 0, 0.08) 25%,     /* 6 AM - end of night */
+        rgba(0, 0, 0, 0) 25%,        /* 6 AM - daytime starts */
+        rgba(0, 0, 0, 0) 75%,        /* 6 PM - daytime ends */
+        rgba(0, 0, 0, 0.08) 75%,     /* 6 PM - evening starts */
+        rgba(0, 0, 0, 0.08) 100%     /* Midnight */
+    );
 }
 
 .day-column:first-child {
@@ -188,7 +198,15 @@ body:has(.place-details-sidebar.active) .timeline-panel {
 }
 
 .day-column.current {
-    background: rgba(33, 150, 243, 0.05);
+    background: linear-gradient(
+        to right,
+        rgba(33, 150, 243, 0.15) 0%,
+        rgba(33, 150, 243, 0.15) 25%,
+        rgba(33, 150, 243, 0.05) 25%,
+        rgba(33, 150, 243, 0.05) 75%,
+        rgba(33, 150, 243, 0.15) 75%,
+        rgba(33, 150, 243, 0.15) 100%
+    );
 }
 
 .gantt-content {
@@ -303,7 +321,7 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     pointer-events: none; /* Let slider handle interactions */
 }
 
-.timeline-cursor::before {
+/* .timeline-cursor::before {
     content: '';
     position: absolute;
     top: -8px;
@@ -328,7 +346,7 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     border: 3px solid #fff;
     border-radius: 50%;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
+} */
 
 .timeline-cursor:active {
     cursor: grabbing;
@@ -336,12 +354,12 @@ body:has(.place-details-sidebar.active) .timeline-panel {
 
 .timeline-cursor-label {
     position: absolute;
-    top: -34px;
+    top: 3px;
     left: 10px;
     padding: 4px 8px;
     font-size: 12px;
     border-radius: 12px;
-    background: rgba(0, 0, 0, 0.75);
+    background: #2196f3;
     color: #fff;
     white-space: nowrap;
     pointer-events: none;
@@ -352,7 +370,7 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 8px;
+    bottom: 0px;
     height: 4px;
     border-radius: 999px;
     background: rgba(0, 0, 0, 0.10);
@@ -378,8 +396,8 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: -6px;
-    z-index: 6;
+    bottom: -25px;
+    z-index:20;
 }
 
 #timelineSlider:focus {
@@ -567,6 +585,16 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     .day-column {
         width: 80px;
         min-width: 80px;
+        /* Time-of-day bands for mobile */
+        background: linear-gradient(
+            to right,
+            rgba(0, 0, 0, 0.08) 0%,
+            rgba(0, 0, 0, 0.08) 25%,
+            rgba(0, 0, 0, 0) 25%,
+            rgba(0, 0, 0, 0) 75%,
+            rgba(0, 0, 0, 0.08) 75%,
+            rgba(0, 0, 0, 0.08) 100%
+        );
     }
 }
 

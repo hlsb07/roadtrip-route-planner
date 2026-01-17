@@ -704,7 +704,7 @@ export class TimelineService {
     updateCursor(t) {
         this.currentT = t;
         const dayWidth = this.getDayWidth();
-        const leftPx = t * dayWidth;
+        const leftPx = ((t) * dayWidth*0.9973)+(dayWidth*0.063);
         const totalWidthPx = this.totalDays * dayWidth;
 
         if (this.cursor) {
