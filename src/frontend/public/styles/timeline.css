@@ -597,6 +597,44 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     font-size: 14px;
 }
 
+/* Mobile Timeline Leg Divider */
+.mobile-timeline-leg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 15px;
+    color: #667eea;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.mobile-timeline-leg::before,
+.mobile-timeline-leg::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #667eea 20%, #667eea 80%, transparent);
+}
+
+.mobile-timeline-leg span {
+    padding: 0 12px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mobile-timeline-leg span i {
+    font-size: 11px;
+}
+
+.mobile-timeline-leg:active {
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 4px;
+}
+
 .timeline-mobile-section .gantt-wrapper {
     min-height: 200px;
 }

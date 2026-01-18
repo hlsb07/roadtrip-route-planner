@@ -4929,6 +4929,83 @@ textarea.form-input {
     max-width: 600px;
 }
 
+/* ============================================
+   MOBILE SCHEDULE EDIT MODAL
+   ============================================ */
+.schedule-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.schedule-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.schedule-field label {
+    font-weight: 600;
+    color: #333;
+    font-size: 14px;
+}
+
+.datetime-inputs {
+    display: flex;
+    gap: 10px;
+}
+
+.datetime-inputs input[type="date"],
+.datetime-inputs input[type="time"] {
+    flex: 1;
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: white;
+}
+
+.datetime-inputs input[type="date"]:focus,
+.datetime-inputs input[type="time"]:focus {
+    outline: none;
+    border-color: #2A9D8F;
+    box-shadow: 0 0 0 3px rgba(42, 157, 143, 0.15);
+}
+
+/* Tappable time elements in mobile timeline */
+.mobile-timeline-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    margin: -4px -8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.mobile-timeline-time:active {
+    background-color: rgba(42, 157, 143, 0.15);
+}
+
+.mobile-timeline-time i.fa-edit {
+    font-size: 10px;
+    color: #2A9D8F;
+    opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+    .datetime-inputs {
+        flex-direction: column;
+    }
+
+    .datetime-inputs input[type="date"],
+    .datetime-inputs input[type="time"] {
+        font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+}
+
 /* Empty State for Tags */
 .tags-list .empty-state {
     padding: 40px 20px;

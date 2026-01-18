@@ -995,6 +995,39 @@
         <div class="modal-overlay"></div>
     </div>
 
+    <!-- Mobile Schedule Edit Modal -->
+    <div id="mobileScheduleModal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h3 id="scheduleModalTitle">Edit Schedule</h3>
+                <button class="modal-close" onclick="closeMobileScheduleModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="schedule-edit-form">
+                    <div class="schedule-field">
+                        <label for="scheduleArrivalDate">Arrival</label>
+                        <div class="datetime-inputs">
+                            <input type="date" id="scheduleArrivalDate" class="schedule-input">
+                            <input type="time" id="scheduleArrivalTime" class="schedule-input">
+                        </div>
+                    </div>
+                    <div class="schedule-field">
+                        <label for="scheduleDepartureDate">Departure</label>
+                        <div class="datetime-inputs">
+                            <input type="date" id="scheduleDepartureDate" class="schedule-input">
+                            <input type="time" id="scheduleDepartureTime" class="schedule-input">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeMobileScheduleModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveMobileSchedule()">Save</button>
+            </div>
+        </div>
+        <div class="modal-overlay" onclick="closeMobileScheduleModal()"></div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
