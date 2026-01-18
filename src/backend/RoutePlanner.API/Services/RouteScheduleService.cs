@@ -120,17 +120,72 @@ namespace RoutePlanner.API.Services
                 return new RecalculateScheduleResultDto { UpdatedStops = 0 };
             }
 
-            // If no move detected, return early (no changes needed)
-            if (!movedPlaceId.HasValue || !oldIndex.HasValue || !newIndex.HasValue)
-            {
-                _logger.LogInformation($"No move detected for route {routeId}, skipping schedule recalculation");
-                return new RecalculateScheduleResultDto { UpdatedStops = 0 };
-            }
-
             int updatedCount = 0;
             var changes = new List<ScheduleChangeDetail>();
 
-            // Calculate affected range
+            // Store original times for all places (before any updates)
+            var originalTimes = orderedStops
+                .ToDictionary(rp => rp.PlaceId, rp => new { Start = rp.PlannedStart, End = rp.PlannedEnd });
+
+            // If no move detected, recalculate all places based on route's StartDateTime
+            // This handles the case when start date changes
+            if (!movedPlaceId.HasValue || !oldIndex.HasValue || !newIndex.HasValue)
+            {
+                _logger.LogInformation($"No move detected for route {routeId}, recalculating all places based on start date");
+
+                var startDateForRecalc = route.StartDateTime ?? DateTimeOffset.UtcNow;
+                var baseDateForRecalc = new DateTimeOffset(startDateForRecalc.Date, startDateForRecalc.Offset);
+
+                for (int i = 0; i < orderedStops.Count; i++)
+                {
+                    var stop = orderedStops[i];
+                    var originalStart = originalTimes[stop.PlaceId].Start;
+                    var originalEnd = originalTimes[stop.PlaceId].End;
+
+                    if (originalStart.HasValue)
+                    {
+                        // Position i should be on day i (relative to route start)
+                        var dayOffset = i;
+                        var newDate = baseDateForRecalc.Date.AddDays(dayOffset);
+                        var timeOfDay = originalStart.Value.TimeOfDay;
+                        var newDateTime = newDate.Add(timeOfDay);
+
+                        stop.PlannedStart = new DateTimeOffset(newDateTime, originalStart.Value.Offset);
+
+                        if (originalEnd.HasValue)
+                        {
+                            var duration = originalEnd.Value - originalStart.Value;
+                            stop.PlannedEnd = stop.PlannedStart.Value.Add(duration);
+                        }
+
+                        _logger.LogInformation($"  Position {i}: {stop.Place?.Name} - {originalStart:yyyy-MM-dd} -> {stop.PlannedStart:yyyy-MM-dd}");
+                        updatedCount++;
+                    }
+
+                    changes.Add(new ScheduleChangeDetail
+                    {
+                        RoutePlaceId = stop.Id,
+                        PlaceName = stop.Place?.Name ?? "",
+                        OldStart = originalStart,
+                        OldEnd = originalEnd,
+                        NewStart = stop.PlannedStart,
+                        NewEnd = stop.PlannedEnd,
+                        WasLocked = stop.IsStartLocked || stop.IsEndLocked
+                    });
+                }
+
+                route.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                return new RecalculateScheduleResultDto
+                {
+                    UpdatedStops = updatedCount,
+                    Changes = changes,
+                    PreservedLockedDays = preserveLockedDays
+                };
+            }
+
+            // Calculate affected range for move operations
             int minIndex = Math.Min(oldIndex.Value, newIndex.Value);
             int maxIndex = Math.Max(oldIndex.Value, newIndex.Value);
             bool movedUp = newIndex.Value < oldIndex.Value;  // Moved to lower index
@@ -142,10 +197,6 @@ namespace RoutePlanner.API.Services
                 _logger.LogWarning($"Moved place {movedPlaceId.Value} not found in route {routeId}");
                 return new RecalculateScheduleResultDto { UpdatedStops = 0 };
             }
-
-            // Store original times for all places (before any updates)
-            var originalTimes = orderedStops
-                .ToDictionary(rp => rp.PlaceId, rp => new { Start = rp.PlannedStart, End = rp.PlannedEnd });
 
             _logger.LogInformation($"RecalculateScheduleAfterReorder: movedPlaceId={movedPlaceId}, oldIndex={oldIndex}, newIndex={newIndex}");
 
@@ -271,7 +322,9 @@ namespace RoutePlanner.API.Services
                 leg.DurationSeconds,
                 leg.Provider,
                 leg.CalculatedAt,
-                geometryCoords
+                geometryCoords,
+                leg.PlannedStart,
+                leg.PlannedEnd
             );
         }
     }

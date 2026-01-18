@@ -9,23 +9,34 @@ export class TimelineService {
         this.callbacks = {
             onStopSelected: callbacks.onStopSelected || (() => {}),
             onStopScheduleChanged: callbacks.onStopScheduleChanged || (() => {}),
+            onLegScheduleChanged: callbacks.onLegScheduleChanged || (() => {}),
             onNeedRecalculateLegs: callbacks.onNeedRecalculateLegs || (() => {}),
-            onResolveConflictByReorder: callbacks.onResolveConflictByReorder || (() => {})
+            onResolveConflictByReorder: callbacks.onResolveConflictByReorder || (() => {}),
+            onLegClicked: callbacks.onLegClicked || (() => {})
         };
 
         this.timelineStops = [];
+        this.timelineLegs = [];
         this.totalDays = 1;
         this.routeStartUtc = null;
         this.currentT = 0;
 
         this.barElsByIndex = new Map();
+        this.legBarElsByIndex = new Map();
         this.rafId = null;
         this.isScrubbing = false;
 
         this.conflictUI = new ConflictUIManager();
         this.currentConflicts = null;
 
+        // Zoom level: 1.0 = 100%, 0.5 = 50%, 2.0 = 200%
+        this.zoomLevel = 1.0;
+        this.minZoom = 0.5;
+        this.maxZoom = 3.0;
+        this.zoomStep = 0.25;
+
         this.initDOM();
+        this.initZoomControls();
     }
 
     initDOM() {
@@ -49,8 +60,53 @@ export class TimelineService {
         this.attachHorizontalScrollListener();
     }
 
-    render(timelineStops, totalDays, routeStartUtc) {
-        console.log(`Timeline render: ${timelineStops.length} stops, ${totalDays} days`);
+    initZoomControls() {
+        const zoomInBtn = document.getElementById('timelineZoomIn');
+        const zoomOutBtn = document.getElementById('timelineZoomOut');
+        const zoomLabel = document.getElementById('timelineZoomLabel');
+
+        if (zoomInBtn) {
+            zoomInBtn.addEventListener('click', () => this.zoomIn());
+        }
+        if (zoomOutBtn) {
+            zoomOutBtn.addEventListener('click', () => this.zoomOut());
+        }
+
+        this.zoomLabel = zoomLabel;
+        this.updateZoomLabel();
+    }
+
+    zoomIn() {
+        if (this.zoomLevel < this.maxZoom) {
+            this.zoomLevel = Math.min(this.maxZoom, this.zoomLevel + this.zoomStep);
+            this.rerender();
+            this.updateZoomLabel();
+        }
+    }
+
+    zoomOut() {
+        if (this.zoomLevel > this.minZoom) {
+            this.zoomLevel = Math.max(this.minZoom, this.zoomLevel - this.zoomStep);
+            this.rerender();
+            this.updateZoomLabel();
+        }
+    }
+
+    updateZoomLabel() {
+        if (this.zoomLabel) {
+            this.zoomLabel.textContent = `${Math.round(this.zoomLevel * 100)}%`;
+        }
+    }
+
+    rerender() {
+        // Re-render without fetching new data
+        if (this.timelineStops.length > 0 || this.timelineLegs.length > 0) {
+            this.render(this.timelineStops, this.totalDays, this.routeStartUtc, this.timelineLegs);
+        }
+    }
+
+    render(timelineStops, totalDays, routeStartUtc, timelineLegs = []) {
+        console.log(`Timeline render: ${timelineStops.length} stops, ${timelineLegs.length} legs, ${totalDays} days`);
 
         // Check if DOM elements are available
         if (!this.ganttWrapper || !this.ganttBarsContainer) {
@@ -59,6 +115,7 @@ export class TimelineService {
         }
 
         this.timelineStops = timelineStops;
+        this.timelineLegs = timelineLegs;
         this.totalDays = totalDays;
         this.routeStartUtc = routeStartUtc;
 
@@ -96,6 +153,7 @@ export class TimelineService {
         this.renderDayLabels();
         this.renderDayGrid();
         this.renderBars();
+        this.renderLegBars();
         this.configureSlider();
         this.updateCursor(0);
     }
@@ -106,10 +164,11 @@ export class TimelineService {
      * @param {number} totalDays - Total number of days
      * @param {string} routeStartUtc - Route start date/time in UTC
      * @param {Object} conflictInfo - Conflict information from backend
+     * @param {Array} timelineLegs - Array of timeline leg data (optional)
      */
-    renderWithConflicts(timelineStops, totalDays, routeStartUtc, conflictInfo) {
+    renderWithConflicts(timelineStops, totalDays, routeStartUtc, conflictInfo, timelineLegs = []) {
         // Call existing render method
-        this.render(timelineStops, totalDays, routeStartUtc);
+        this.render(timelineStops, totalDays, routeStartUtc, timelineLegs);
 
         // Store conflict info
         this.currentConflicts = conflictInfo;
@@ -146,11 +205,9 @@ export class TimelineService {
     }
 
     getDayWidth() {
-        // Return day width based on screen size
-        if (window.innerWidth <= 768) {
-            return 80; // Mobile
-        }
-        return 120; // Desktop
+        // Return day width based on screen size, multiplied by zoom level
+        const baseWidth = window.innerWidth <= 768 ? 80 : 120;
+        return baseWidth * this.zoomLevel;
     }
 
     /**
@@ -182,11 +239,14 @@ export class TimelineService {
 
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const dayWidth = this.getDayWidth();
 
         this.dayLabelsContainer.innerHTML = '';
         for (let day = 1; day <= this.totalDays; day++) {
             const label = document.createElement('div');
             label.className = 'day-label';
+            label.style.width = `${dayWidth}px`;
+            label.style.minWidth = `${dayWidth}px`;
 
             // Show calendar date instead of "Day N"
             if (this.routeStartUtc) {
@@ -206,10 +266,14 @@ export class TimelineService {
     renderDayGrid() {
         if (!this.ganttGrid) return;
 
+        const dayWidth = this.getDayWidth();
+
         this.ganttGrid.innerHTML = '';
         for (let day = 1; day <= this.totalDays; day++) {
             const col = document.createElement('div');
             col.className = 'day-column';
+            col.style.width = `${dayWidth}px`;
+            col.style.minWidth = `${dayWidth}px`;
             col.dataset.day = day;
             this.ganttGrid.appendChild(col);
         }
@@ -220,6 +284,7 @@ export class TimelineService {
 
         this.ganttBarsContainer.innerHTML = '';
         this.barElsByIndex.clear();
+        this.legBarElsByIndex.clear();
 
         this.timelineStops.forEach((stop, index) => {
             const bar = this.createBar(stop, index);
@@ -227,7 +292,196 @@ export class TimelineService {
             this.barElsByIndex.set(index, bar);
         });
 
+        // Note: relayoutRows is called after renderLegBars
+    }
+
+    renderLegBars() {
+        if (!this.ganttBarsContainer || !this.timelineLegs.length) return;
+
+        console.log(`Rendering ${this.timelineLegs.length} leg bars`);
+
+        this.timelineLegs.forEach((leg, index) => {
+            const bar = this.createLegBar(leg, index);
+            this.ganttBarsContainer.appendChild(bar);
+            this.legBarElsByIndex.set(index, bar);
+        });
+
         this.relayoutRows();
+    }
+
+    createLegBar(leg, index) {
+        const bar = document.createElement('div');
+        bar.className = 'gantt-bar gantt-leg-bar';
+        bar.dataset.index = index;
+        bar.dataset.isLeg = 'true';
+
+        // Tooltip with route details
+        const distanceKm = (leg.distanceMeters / 1000).toFixed(1);
+        bar.dataset.tooltip = `${leg.fromPlaceName} → ${leg.toPlaceName} (${distanceKm} km)`;
+
+        // Label with car icon and duration
+        const label = document.createElement('div');
+        label.className = 'bar-label';
+        label.innerHTML = `<i class="fas fa-car"></i> ${this.formatDuration(leg.durationSeconds)}`;
+        bar.appendChild(label);
+
+        // Position bar
+        this.updateBarPosition(bar, leg);
+
+        // Drag handler (move only - no resize for legs)
+        this.attachLegDragHandler(bar, leg, index);
+
+        // Click to show segment popup on map
+        bar.addEventListener('click', () => {
+            if (bar.classList.contains('moving')) return;
+            this.callbacks.onLegClicked(index, leg);
+        });
+
+        return bar;
+    }
+
+    formatDuration(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        }
+        return `${minutes}m`;
+    }
+
+    attachLegDragHandler(barEl, leg, index) {
+        let startX = 0;
+        let startStartT = 0;
+        let startEndT = 0;
+        let hasMoved = false;
+
+        // Store original place positions for restoring on cancel
+        let originalFromStopEndT = null;
+        let originalToStopStartT = null;
+
+        const pxToT = (deltaPx) => {
+            const rect = this.ganttWrapper.getBoundingClientRect();
+            return (deltaPx / rect.width) * this.totalDays;
+        };
+
+        const onPointerMove = (e) => {
+            const dx = e.clientX - startX;
+            const dt = pxToT(dx);
+
+            if (Math.abs(dx) > 2) {
+                hasMoved = true;
+            }
+
+            // Leg duration stays constant - only shifts in time
+            const duration = startEndT - startStartT;
+            let newStart = startStartT + dt;
+
+            // Find connected places
+            const fromStop = this.timelineStops.find(s => s.routePlaceId === leg.fromRoutePlaceId);
+            const toStop = this.timelineStops.find(s => s.routePlaceId === leg.toRoutePlaceId);
+
+            // Clamp leg to valid range
+            // Leg can't start before fromPlace starts (minimum the beginning of fromPlace)
+            const minStart = fromStop ? fromStop.startT + 0.01 : 0;
+            // Leg can't end after toPlace ends (maximum the end of toPlace)
+            const maxEnd = toStop ? toStop.endT - 0.01 : this.totalDays;
+
+            newStart = Math.max(minStart, Math.min(newStart, maxEnd - duration));
+            const newEnd = newStart + duration;
+
+            leg.startT = newStart;
+            leg.endT = newEnd;
+
+            // NO-GAPS ENFORCEMENT: Update connected places in real-time
+            if (fromStop) {
+                fromStop.endT = leg.startT; // fromPlace ends when leg starts
+                const fromBarIndex = this.timelineStops.findIndex(s => s === fromStop);
+                const fromBar = this.barElsByIndex.get(fromBarIndex);
+                if (fromBar) this.updateBarPosition(fromBar, fromStop);
+            }
+
+            if (toStop) {
+                toStop.startT = leg.endT; // toPlace starts when leg ends
+                const toBarIndex = this.timelineStops.findIndex(s => s === toStop);
+                const toBar = this.barElsByIndex.get(toBarIndex);
+                if (toBar) this.updateBarPosition(toBar, toStop);
+            }
+
+            this.updateBarPosition(barEl, leg);
+        };
+
+        const onPointerUp = async () => {
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+
+            barEl.classList.remove('moving');
+
+            if (hasMoved) {
+                console.log(`Saving leg and connected places`);
+                await this.saveLegAndConnectedPlaces(leg);
+                this.relayoutRows();
+            }
+
+            hasMoved = false;
+        };
+
+        barEl.addEventListener('pointerdown', (e) => {
+            // Don't start drag on label click
+            if (e.target.classList.contains('bar-label')) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            startX = e.clientX;
+            startStartT = leg.startT;
+            startEndT = leg.endT;
+            hasMoved = false;
+
+            // Store original positions for connected places
+            const fromStop = this.timelineStops.find(s => s.routePlaceId === leg.fromRoutePlaceId);
+            const toStop = this.timelineStops.find(s => s.routePlaceId === leg.toRoutePlaceId);
+            originalFromStopEndT = fromStop ? fromStop.endT : null;
+            originalToStopStartT = toStop ? toStop.startT : null;
+
+            barEl.classList.add('moving');
+            barEl.setPointerCapture(e.pointerId);
+
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+        });
+    }
+
+    async saveLegAndConnectedPlaces(leg) {
+        const fromStop = this.timelineStops.find(s => s.routePlaceId === leg.fromRoutePlaceId);
+        const toStop = this.timelineStops.find(s => s.routePlaceId === leg.toRoutePlaceId);
+
+        try {
+            // Save connected places first (they have the no-gaps times)
+            if (fromStop) {
+                await this.saveStopSchedule(fromStop);
+            }
+            if (toStop) {
+                await this.saveStopSchedule(toStop);
+            }
+
+            // Then save leg schedule
+            const { startUtc, endUtc } = timelineCoordsToUTC(
+                leg.startT,
+                leg.endT,
+                this.routeStartUtc
+            );
+
+            await this.callbacks.onLegScheduleChanged(leg.legId, {
+                plannedStart: startUtc,
+                plannedEnd: endUtc
+            });
+
+            console.log(`Successfully saved leg and connected places`);
+        } catch (error) {
+            console.error('Failed to save leg schedule:', error);
+        }
     }
 
     createBar(stop, index) {
@@ -408,6 +662,7 @@ export class TimelineService {
         const dayOccupancy = {};
         let maxRow = 0;
 
+        // First, layout place bars (full height rows)
         this.timelineStops.forEach((stop, index) => {
             const startDay = Math.floor(stop.startT) + 1;
             const endDay = Math.max(startDay, Math.ceil(stop.endT));
@@ -440,7 +695,23 @@ export class TimelineService {
             }
         });
 
-        this.ganttBarsContainer.style.height = ((maxRow + 1) * 45 + 10) + 'px';
+        // Then, layout leg bars in a dedicated row below place bars
+        // Leg bars are thinner (24px) so they get their own row with less spacing
+        if (this.timelineLegs.length > 0) {
+            const legRowTop = (maxRow + 1) * 45 + 8; // 8px gap after place bars
+
+            this.timelineLegs.forEach((leg, index) => {
+                const barEl = this.legBarElsByIndex.get(index);
+                if (barEl) {
+                    barEl.style.top = `${legRowTop}px`;
+                }
+            });
+
+            // Adjust container height to include leg row
+            this.ganttBarsContainer.style.height = (legRowTop + 34) + 'px'; // 24px bar + 10px padding
+        } else {
+            this.ganttBarsContainer.style.height = ((maxRow + 1) * 45 + 10) + 'px';
+        }
     }
 
     configureSlider() {
@@ -497,7 +768,7 @@ export class TimelineService {
     updateCursor(t) {
         this.currentT = t;
         const dayWidth = this.getDayWidth();
-        const leftPx = t * dayWidth;
+        const leftPx = ((t) * dayWidth*0.9973)+(dayWidth*0.063);
         const totalWidthPx = this.totalDays * dayWidth;
 
         if (this.cursor) {

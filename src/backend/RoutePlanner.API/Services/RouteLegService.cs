@@ -96,6 +96,30 @@ namespace RoutePlanner.API.Services
             _logger.LogInformation($"Updated metrics for leg {legId}: {distanceMeters}m, {durationSeconds}s");
         }
 
+        public async Task UpdateLegSchedule(int routeId, int legId, DateTimeOffset? plannedStart, DateTimeOffset? plannedEnd)
+        {
+            var leg = await _context.RouteLegs
+                .FirstOrDefaultAsync(l => l.Id == legId && l.RouteId == routeId);
+
+            if (leg == null)
+            {
+                throw new InvalidOperationException($"Leg with ID {legId} not found in route {routeId}");
+            }
+
+            leg.PlannedStart = plannedStart;
+            leg.PlannedEnd = plannedEnd;
+
+            // Update route's UpdatedAt timestamp
+            var route = await _context.Routes.FindAsync(routeId);
+            if (route != null)
+            {
+                route.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation($"Updated schedule for leg {legId}: {plannedStart} - {plannedEnd}");
+        }
+
         public async Task RecalculateLegsFromOsrm(int routeId)
         {
             _logger.LogInformation($"Recalculating legs from OSRM for route {routeId}");

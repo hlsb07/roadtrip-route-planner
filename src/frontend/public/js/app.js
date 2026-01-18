@@ -12,7 +12,7 @@ import { CONFIG } from './config.js';
 import { SwipeHandler } from './swipeHandler.js';
 import { TimelineService } from './timeline/TimelineService.js';
 import { initializeScheduleIfNeeded } from './timeline/scheduleInitializer.js';
-import { mapItineraryToTimelineStops, calculateTotalDays } from './timeline/timelineMapper.js';
+import { mapItineraryToTimelineStops, mapItineraryToTimelineLegs, calculateTotalDays } from './timeline/timelineMapper.js';
 import { AuthManager } from './authManager.js';
 import { LoginModal } from './loginModal.js';
 
@@ -34,12 +34,17 @@ class App {
         this.allPlacesManager = new AllPlacesManager(this.filterManager, this.placeManager);
         this.tagManager = new TagManager();
 
+        // Track original start date for change detection
+        this.originalStartDate = null;
+
         // Initialize Timeline Service
         this.timelineService = new TimelineService({
             onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),
             onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),
+            onLegScheduleChanged: (legId, dto) => this.handleLegScheduleChanged(legId, dto),
             onNeedRecalculateLegs: () => this.handleRecalculateLegs(),
-            onResolveConflictByReorder: () => this.handleResolveConflictByReorder()
+            onResolveConflictByReorder: () => this.handleResolveConflictByReorder(),
+            onLegClicked: (index, leg) => this.handleTimelineLegClicked(index, leg)
         });
 
         // Set callback for search result selection (save to database, don't add to route)
@@ -141,6 +146,14 @@ class App {
                 if (e.key === 'Enter') {
                     this.handleSearch();
                 }
+            });
+        }
+
+        // Route start date picker
+        const dateInput = document.getElementById('routeStartDate');
+        if (dateInput) {
+            dateInput.addEventListener('change', () => {
+                this.updateApplyDateButtonState();
             });
         }
 
@@ -1172,6 +1185,7 @@ class App {
             if (panel) {
                 panel.classList.remove('visible');
             }
+            this.updateRouteStartDatePicker(); // Clear date picker
             return;
         }
 
@@ -1191,17 +1205,22 @@ class App {
             // Load itinerary WITH conflict information
             const itinerary = await ApiService.getItineraryWithConflicts(routeId);
 
+            // Populate the start date picker with current value
+            this.populateStartDateFromItinerary(itinerary);
+
             // Map to timeline coordinates
             const timelineStops = mapItineraryToTimelineStops(itinerary);
+            const timelineLegs = mapItineraryToTimelineLegs(itinerary, timelineStops);
             const totalDays = calculateTotalDays(timelineStops);
             const routeStartUtc = itinerary.scheduleSettings?.startDateTime;
 
-            // Render with conflict information
+            // Render with conflict information and legs
             this.timelineService.renderWithConflicts(
                 timelineStops,
                 totalDays,
                 routeStartUtc,
-                itinerary.conflictInfo
+                itinerary.conflictInfo,
+                timelineLegs
             );
         } catch (error) {
             console.error('Failed to load timeline:', error);
@@ -1209,9 +1228,138 @@ class App {
         }
     }
 
+    /**
+     * Update the route start date picker state (enable/disable based on route selection)
+     */
+    updateRouteStartDatePicker() {
+        const dateInput = document.getElementById('routeStartDate');
+        const applyBtn = document.getElementById('applyStartDateBtn');
+
+        if (!dateInput) return;
+
+        if (!this.routeManager.currentRouteId) {
+            dateInput.value = '';
+            dateInput.disabled = true;
+            if (applyBtn) applyBtn.disabled = true;
+            this.originalStartDate = null;
+            return;
+        }
+
+        dateInput.disabled = false;
+    }
+
+    /**
+     * Populate date picker with route's current start date
+     * @param {Object} itinerary - Route itinerary with schedule settings
+     */
+    populateStartDateFromItinerary(itinerary) {
+        const dateInput = document.getElementById('routeStartDate');
+        if (!dateInput) return;
+
+        const startDateTime = itinerary?.scheduleSettings?.startDateTime;
+        if (startDateTime) {
+            // Convert to local date format (YYYY-MM-DD)
+            const date = new Date(startDateTime);
+            const localDate = date.toISOString().split('T')[0];
+            dateInput.value = localDate;
+            this.originalStartDate = localDate;
+        } else {
+            // Default to today if no start date set
+            const today = new Date().toISOString().split('T')[0];
+            dateInput.value = today;
+            this.originalStartDate = today;
+        }
+
+        dateInput.disabled = false;
+        this.updateApplyDateButtonState();
+    }
+
+    /**
+     * Update the apply button state based on whether date has changed
+     */
+    updateApplyDateButtonState() {
+        const dateInput = document.getElementById('routeStartDate');
+        const applyBtn = document.getElementById('applyStartDateBtn');
+
+        if (!dateInput || !applyBtn) return;
+
+        const hasChanged = dateInput.value !== this.originalStartDate;
+        applyBtn.disabled = !hasChanged;
+    }
+
+    /**
+     * Apply the route start date change - update backend and recalculate schedules
+     */
+    async applyRouteStartDateChange() {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) return;
+
+        const dateInput = document.getElementById('routeStartDate');
+        const applyBtn = document.getElementById('applyStartDateBtn');
+
+        if (!dateInput || !dateInput.value) return;
+
+        // Parse the new date and set time to 09:00 (default arrival time)
+        const newDate = new Date(dateInput.value);
+        newDate.setHours(9, 0, 0, 0);
+
+        try {
+            // Show loading state
+            if (applyBtn) {
+                applyBtn.classList.add('loading');
+                applyBtn.querySelector('i').className = 'fas fa-spinner';
+            }
+
+            // Get current route to preserve other schedule settings
+            const route = await ApiService.getRoute(routeId);
+
+            // Update route schedule settings with new start date
+            await ApiService.updateRouteScheduleSettings(routeId, {
+                timeZoneId: route.timeZoneId || "Europe/Berlin",
+                startDateTime: newDate.toISOString(),
+                endDateTime: route.endDateTime || null,
+                defaultArrivalTime: route.defaultArrivalTime || null,
+                defaultDepartureTime: route.defaultDepartureTime || null
+            });
+
+            console.log(`Updated route ${routeId} start date to: ${newDate.toISOString()}`);
+
+            // Recalculate all stop schedules relative to new start date
+            await ApiService.recalculateSchedule(routeId, false);
+
+            console.log('Schedule recalculated successfully');
+
+            // Reload timeline to show updated schedule
+            await this.loadTimelineForCurrentRoute();
+
+            showSuccess('Trip start date updated and schedules recalculated');
+
+        } catch (error) {
+            console.error('Failed to update route start date:', error);
+            showError('Failed to update start date: ' + error.message);
+
+            // Restore original date on error
+            if (dateInput && this.originalStartDate) {
+                dateInput.value = this.originalStartDate;
+            }
+        } finally {
+            // Reset button state
+            if (applyBtn) {
+                applyBtn.classList.remove('loading');
+                applyBtn.querySelector('i').className = 'fas fa-check';
+            }
+            this.updateApplyDateButtonState();
+        }
+    }
+
     async handleTimelineStopSelected(index, stop) {
         // Select place on map (which will also update timeline)
         this.selectPlace(index);
+    }
+
+    handleTimelineLegClicked(index) {
+        // Show segment popup on map when leg bar is clicked in timeline
+        this.mapService.showSegmentPopupForLeg(index);
     }
 
     async handleStopScheduleChanged(routePlaceId, dto) {
@@ -1229,6 +1377,20 @@ class App {
         } catch (error) {
             console.error('Failed to update stop schedule:', error);
             showError('Failed to update schedule');
+            throw error;
+        }
+    }
+
+    async handleLegScheduleChanged(legId, dto) {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) return;
+
+        try {
+            await ApiService.updateLegSchedule(routeId, legId, dto);
+            console.log(`Successfully updated leg ${legId} schedule`);
+        } catch (error) {
+            console.error('Failed to update leg schedule:', error);
+            showError('Failed to update leg schedule');
             throw error;
         }
     }
@@ -1287,14 +1449,23 @@ class App {
                 return;
             }
 
-            // Render simple list view
-            const html = itinerary.places.map((place, idx) => {
+            const legs = itinerary.legs || [];
+
+            // Render list view with places and leg dividers
+            let html = '';
+            itinerary.places.forEach((place, idx) => {
                 const startDate = place.plannedStart ? new Date(place.plannedStart).toLocaleString() : 'Not scheduled';
                 const endDate = place.plannedEnd ? new Date(place.plannedEnd).toLocaleString() : 'Not scheduled';
                 const stopTypeLabel = place.stopType === 0 ? 'Overnight' : place.stopType === 1 ? 'Day Stop' : 'Waypoint';
 
-                return `
-                    <div class="mobile-timeline-place" style="background: white; padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                // Store ISO strings for editing
+                const startISO = place.plannedStart || '';
+                const endISO = place.plannedEnd || '';
+
+                // Place card (use place.id as routePlaceId - that's how the API returns it)
+                html += `
+                    <div class="mobile-timeline-place" style="background: white; padding: 15px; margin-bottom: 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                         data-route-place-id="${place.id}" data-place-name="${place.placeName}">
                         <div style="display: flex; align-items: center; margin-bottom: 8px;">
                             <div style="background: linear-gradient(135deg, ${this.getColorForIndex(idx)}); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 10px;">${idx + 1}</div>
                             <h4 style="margin: 0; flex: 1;">${place.placeName}</h4>
@@ -1302,23 +1473,150 @@ class App {
                         </div>
                         <div style="font-size: 13px; color: #666;">
                             <div style="margin-bottom: 4px;">
-                                <i class="fas fa-sign-in-alt" style="width: 16px;"></i> <strong>Arrival:</strong> ${startDate}
+                                <i class="fas fa-sign-in-alt" style="width: 16px;"></i> <strong>Arrival:</strong>
+                                <span class="mobile-timeline-time" data-field="arrival" data-start="${startISO}" data-end="${endISO}">
+                                    ${startDate} <i class="fas fa-edit"></i>
+                                </span>
                             </div>
                             <div>
-                                <i class="fas fa-sign-out-alt" style="width: 16px;"></i> <strong>Departure:</strong> ${endDate}
+                                <i class="fas fa-sign-out-alt" style="width: 16px;"></i> <strong>Departure:</strong>
+                                <span class="mobile-timeline-time" data-field="departure" data-start="${startISO}" data-end="${endISO}">
+                                    ${endDate} <i class="fas fa-edit"></i>
+                                </span>
                             </div>
                         </div>
                     </div>
                 `;
-            }).join('');
+
+                // Leg divider (if there's a next place)
+                if (idx < legs.length) {
+                    const leg = legs[idx];
+                    const duration = this.formatMobileDuration(leg.durationSeconds);
+                    const distance = (leg.distanceMeters / 1000).toFixed(0);
+
+                    html += `
+                        <div class="mobile-timeline-leg" data-leg-index="${idx}">
+                            <span><i class="fas fa-car"></i> ${duration} &bull; ${distance} km</span>
+                        </div>
+                    `;
+                }
+            });
 
             container.innerHTML = html;
+
+            // Attach click handlers for leg dividers
+            container.querySelectorAll('.mobile-timeline-leg').forEach(el => {
+                el.addEventListener('click', () => {
+                    const legIndex = parseInt(el.dataset.legIndex, 10);
+                    this.mapService.showSegmentPopupForLeg(legIndex);
+                });
+            });
+
+            // Attach click handlers for schedule editing
+            container.querySelectorAll('.mobile-timeline-time').forEach(el => {
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const placeCard = el.closest('.mobile-timeline-place');
+                    const routePlaceId = placeCard.dataset.routePlaceId;
+                    const placeName = placeCard.dataset.placeName;
+                    const startISO = el.dataset.start;
+                    const endISO = el.dataset.end;
+                    this.openMobileScheduleModal(routePlaceId, placeName, startISO, endISO);
+                });
+            });
         } catch (error) {
             console.error('Failed to render mobile timeline:', error);
             const container = document.getElementById('mobileTimelineContent');
             if (container) {
                 container.innerHTML = '<p style="text-align: center; padding: 20px; color: #f44336;">Failed to load timeline</p>';
             }
+        }
+    }
+
+    formatMobileDuration(seconds) {
+        if (!seconds || seconds <= 0) return '0m';
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) {
+            return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+        }
+        return `${mins}m`;
+    }
+
+    // Mobile Schedule Edit Modal handlers
+    openMobileScheduleModal(routePlaceId, placeName, startISO, endISO) {
+        this.editingScheduleRoutePlaceId = routePlaceId;
+
+        // Set modal title
+        document.getElementById('scheduleModalTitle').textContent = `Edit Schedule: ${placeName}`;
+
+        // Parse dates and populate inputs
+        const arrivalDateInput = document.getElementById('scheduleArrivalDate');
+        const arrivalTimeInput = document.getElementById('scheduleArrivalTime');
+        const departureDateInput = document.getElementById('scheduleDepartureDate');
+        const departureTimeInput = document.getElementById('scheduleDepartureTime');
+
+        if (startISO) {
+            const startDate = new Date(startISO);
+            arrivalDateInput.value = startDate.toISOString().split('T')[0];
+            arrivalTimeInput.value = startDate.toTimeString().slice(0, 5);
+        } else {
+            arrivalDateInput.value = '';
+            arrivalTimeInput.value = '';
+        }
+
+        if (endISO) {
+            const endDate = new Date(endISO);
+            departureDateInput.value = endDate.toISOString().split('T')[0];
+            departureTimeInput.value = endDate.toTimeString().slice(0, 5);
+        } else {
+            departureDateInput.value = '';
+            departureTimeInput.value = '';
+        }
+
+        // Show modal
+        document.getElementById('mobileScheduleModal').classList.add('active');
+    }
+
+    closeMobileScheduleModal() {
+        document.getElementById('mobileScheduleModal').classList.remove('active');
+        this.editingScheduleRoutePlaceId = null;
+    }
+
+    async saveMobileSchedule() {
+        const routePlaceId = this.editingScheduleRoutePlaceId;
+        if (!routePlaceId) return;
+
+        const arrivalDate = document.getElementById('scheduleArrivalDate').value;
+        const arrivalTime = document.getElementById('scheduleArrivalTime').value;
+        const departureDate = document.getElementById('scheduleDepartureDate').value;
+        const departureTime = document.getElementById('scheduleDepartureTime').value;
+
+        // Validate inputs
+        if (!arrivalDate || !arrivalTime || !departureDate || !departureTime) {
+            showError('Please fill in all date and time fields');
+            return;
+        }
+
+        // Construct ISO strings
+        const plannedStart = new Date(`${arrivalDate}T${arrivalTime}`).toISOString();
+        const plannedEnd = new Date(`${departureDate}T${departureTime}`).toISOString();
+
+        // Validate that departure is after arrival
+        if (new Date(plannedEnd) <= new Date(plannedStart)) {
+            showError('Departure must be after arrival');
+            return;
+        }
+
+        try {
+            await this.handleStopScheduleChanged(routePlaceId, { plannedStart, plannedEnd });
+            this.closeMobileScheduleModal();
+            // Refresh mobile timeline
+            await this.renderMobileTimeline();
+            showSuccess('Schedule updated');
+        } catch (error) {
+            console.error('Failed to save schedule:', error);
+            showError('Failed to save schedule');
         }
     }
 
@@ -1623,6 +1921,10 @@ window.closePhotosGallery = () => window.app?.mapService?.hideFullscreenImageGal
 window.navigateToNextPlace = () => window.app?.navigateToNextPlace();
 window.navigateToPreviousPlace = () => window.app?.navigateToPreviousPlace();
 
+// Mobile schedule edit modal
+window.closeMobileScheduleModal = () => window.app?.closeMobileScheduleModal();
+window.saveMobileSchedule = () => window.app?.saveMobileSchedule();
+
 // Global access for managers
 window.placeManager = null; // Will be set by app
 window.routeManager = null; // Will be set by app
@@ -1708,4 +2010,16 @@ window.switchMobileMode = function(mode) {
             window.app.renderMobileTimeline();
         }, 100);
     }
+};
+
+/**
+ * Global handler for applying route start date changes
+ */
+window.applyRouteStartDate = async function() {
+    if (!window.app) {
+        console.error('App not initialized');
+        return;
+    }
+
+    await window.app.applyRouteStartDateChange();
 };

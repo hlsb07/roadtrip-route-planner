@@ -13,8 +13,11 @@ import { ApiService } from '../api.js';
 export async function initializeScheduleIfNeeded(routeId, route) {
     console.log('Checking if schedule initialization is needed for route:', routeId);
 
-    // Check if route has StartDateTime
-    if (!route.startDateTime) {
+    // Load itinerary first to check if schedule settings exist
+    let itinerary = await ApiService.getItinerary(routeId);
+
+    // Check if route has StartDateTime in schedule settings
+    if (!itinerary.scheduleSettings?.startDateTime) {
         console.log('Route has no start date time, initializing...');
         const startDateTime = calculateDefaultStart(route);
         await ApiService.updateRouteScheduleSettings(routeId, {
@@ -24,10 +27,9 @@ export async function initializeScheduleIfNeeded(routeId, route) {
             defaultArrivalTime: route.defaultArrivalTime || null,
             defaultDepartureTime: route.defaultDepartureTime || null
         });
+        // Reload itinerary to get updated schedule settings
+        itinerary = await ApiService.getItinerary(routeId);
     }
-
-    // Load itinerary to get RoutePlace IDs (not Place IDs)
-    const itinerary = await ApiService.getItinerary(routeId);
 
     // Check if places have schedule data
     const placesNeedSchedule = itinerary.places && itinerary.places.some(p => !p.plannedStart);
@@ -90,12 +92,21 @@ async function generateDefaultStopSchedules(routeId, itinerary) {
         : new Date();
     console.log(`Generating schedules starting from: ${startDateTime.toISOString()}`);
 
-    for (let i = 0; i < itinerary.places.length; i++) {
-        const place = itinerary.places[i];
-        const routePlaceId = place.id; // ✅ Now this is the RoutePlace ID from itinerary
+    // Only initialize places that don't have a schedule yet
+    const placesWithoutSchedule = itinerary.places.filter(p => !p.plannedStart);
 
-        // Simple logic: 1 day per stop
-        const dayOffset = i; // Day 1 = index 0
+    if (placesWithoutSchedule.length === 0) {
+        console.log('All places already have schedules, skipping');
+        return;
+    }
+
+    console.log(`Initializing schedules for ${placesWithoutSchedule.length} places without schedule`);
+
+    for (const place of placesWithoutSchedule) {
+        const routePlaceId = place.id;
+        // Use the place's orderIndex for day offset
+        const dayOffset = place.orderIndex;
+
         const plannedStart = new Date(startDateTime);
         plannedStart.setDate(plannedStart.getDate() + dayOffset);
         plannedStart.setHours(9, 0, 0, 0); // 09:00 arrival
@@ -111,7 +122,7 @@ async function generateDefaultStopSchedules(routeId, itinerary) {
             plannedEnd.setHours(plannedEnd.getHours() + 2); // 2 hours later
         }
 
-        console.log(`Setting schedule for place ${i + 1} (${place.placeName}): ${plannedStart.toISOString()} to ${plannedEnd.toISOString()}`);
+        console.log(`Setting schedule for place ${place.orderIndex + 1} (${place.placeName}): ${plannedStart.toISOString()} to ${plannedEnd.toISOString()}`);
 
         try {
             await ApiService.updateStopSchedule(routeId, routePlaceId, {

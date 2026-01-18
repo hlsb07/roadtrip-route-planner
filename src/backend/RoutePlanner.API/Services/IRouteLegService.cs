@@ -21,5 +21,10 @@ namespace RoutePlanner.API.Services
         /// Loads ordered stops, calls OSRM once for entire route, updates legs with metrics and geometry
         /// </summary>
         Task RecalculateLegsFromOsrm(int routeId);
+
+        /// <summary>
+        /// Updates the schedule (PlannedStart/PlannedEnd) for a specific leg
+        /// </summary>
+        Task UpdateLegSchedule(int routeId, int legId, DateTimeOffset? plannedStart, DateTimeOffset? plannedEnd);
     }
 }

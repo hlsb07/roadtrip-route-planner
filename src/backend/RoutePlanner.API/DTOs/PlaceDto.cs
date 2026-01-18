@@ -349,8 +349,19 @@ namespace RoutePlanner.API.DTOs
         int DurationSeconds,
         string Provider,
         DateTime CalculatedAt,
-        List<List<double>>? GeometryCoordinates // [[lon, lat], ...] for frontend visualization
+        List<List<double>>? GeometryCoordinates, // [[lon, lat], ...] for frontend visualization
+        DateTimeOffset? PlannedStart,
+        DateTimeOffset? PlannedEnd
     );
+
+    /// <summary>
+    /// Update leg schedule (start/end times)
+    /// </summary>
+    public class RouteLegScheduleUpdateDto
+    {
+        public DateTimeOffset? PlannedStart { get; set; }
+        public DateTimeOffset? PlannedEnd { get; set; }
+    }
 
     /// <summary>
     /// Update leg metrics (distance/time)
