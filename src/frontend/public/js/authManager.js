@@ -9,6 +9,7 @@ export class AuthManager {
     static REFRESH_TOKEN_KEY = 'auth_refresh_token';
     static TOKEN_EXPIRY_KEY = 'auth_token_expiry';
     static USER_KEY = 'auth_user';
+    static _refreshPromise = null;
 
     /**
      * Check if user is authenticated (has valid token)
@@ -124,9 +125,32 @@ export class AuthManager {
 
     /**
      * Refresh access token using refresh token
+     * Uses a mutex pattern to prevent concurrent refresh attempts
      * @returns {Promise<boolean>} Success status
      */
     static async refreshAccessToken() {
+        // If a refresh is already in progress, wait for it
+        if (this._refreshPromise) {
+            return this._refreshPromise;
+        }
+
+        // Start new refresh and store the promise
+        this._refreshPromise = this._performTokenRefresh();
+
+        try {
+            return await this._refreshPromise;
+        } finally {
+            // Clear the promise when done (success or failure)
+            this._refreshPromise = null;
+        }
+    }
+
+    /**
+     * Internal method that actually performs the token refresh
+     * @private
+     * @returns {Promise<boolean>} Success status
+     */
+    static async _performTokenRefresh() {
         const refreshToken = this.getRefreshToken();
         const accessToken = this.getAccessToken();
 
@@ -145,16 +169,12 @@ export class AuthManager {
             });
 
             if (!response.ok) {
-                // Refresh failed - clear auth data
                 this.logout();
                 return false;
             }
 
             const data = await response.json();
-
-            // Store new tokens
             this.storeAuthData(data);
-
             return true;
         } catch (error) {
             console.error('Token refresh failed:', error);
