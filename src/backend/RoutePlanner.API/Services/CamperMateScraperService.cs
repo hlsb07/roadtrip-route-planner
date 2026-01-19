@@ -168,6 +168,53 @@ namespace RoutePlanner.API.Services
             return name;
         }
 
+        private static string? ExtractFreePaidTypeFromUrl(string url)
+        {
+            if (url.Contains("/paid-campsites/", StringComparison.OrdinalIgnoreCase)) return "Paid Campsites";
+            if (url.Contains("/free-campsites/", StringComparison.OrdinalIgnoreCase)) return "Free Campsites";
+            return null;
+        }
+
+        private static string? ExtractFreePaidType(HtmlDocument doc)
+        {
+            // Find the first "badge" inside the hero location paragraph
+            // Structure: <p ...><span class="me-2"><span class="... badge">... SVG ... Free Campsites</span></span> ...
+            var badge = doc.DocumentNode.SelectSingleNode(
+                "//p[contains(@class,'Poi_heroLocation__')]" +
+                "//span[contains(@class,'badge')]"
+            );
+
+            if (badge == null)
+            {
+                // Fallback: any badge that contains 'Campsites'
+                badge = doc.DocumentNode.SelectSingleNode(
+                    "//*[contains(@class,'badge') and contains(normalize-space(.), 'Campsites')]"
+                );
+            }
+
+            if (badge == null) return null;
+
+            // InnerText includes SVG text nodes sometimes; HtmlAgilityPack usually returns only readable text.
+            var text = HtmlEntity.DeEntitize(badge.InnerText).Trim();
+
+            // Cleanup: collapse whitespace
+            text = Regex.Replace(text, "\\s+", " ");
+
+            // Normalize:
+            if (text.Contains("Free Campsites", StringComparison.OrdinalIgnoreCase))
+                return "Free Campsites";
+            if (text.Contains("Paid Campsites", StringComparison.OrdinalIgnoreCase))
+                return "Paid Campsites";
+
+            // If CamperMate adds variants like "Free Camping" etc., broaden:
+            if (text.Contains("Free", StringComparison.OrdinalIgnoreCase) && text.Contains("Camp", StringComparison.OrdinalIgnoreCase))
+                return "Free Campsites";
+            if (text.Contains("Paid", StringComparison.OrdinalIgnoreCase) && text.Contains("Camp", StringComparison.OrdinalIgnoreCase))
+                return "Paid Campsites";
+
+            return text; // keep whatever it is
+        }
+
         private (double lat, double lon) ExtractCoordinates(HtmlDocument doc, string html)
         {
             // 1) JSON-LD geo (best)
