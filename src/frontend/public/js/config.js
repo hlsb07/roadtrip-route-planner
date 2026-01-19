@@ -5,9 +5,11 @@ export const CONFIG = {
     // - Nginx proxies /api/ to backend at localhost:5166
     // - Nginx serves /images/ from shared directory
     API_BASE: '/roadtriprouteplanner/api',  // Proxied by Nginx to http://localhost:5166/api
+    IMAGE_BASE_PATH: '/roadtriprouteplanner',  // Base path for images (empty string for dev without Nginx)
 
-    // For development without Nginx, uncomment this:
+    // For development without Nginx, uncomment these:
     // API_BASE: 'http://localhost:5166/api',
+    // IMAGE_BASE_PATH: '',
 
     MAP_CENTER: [-41.2865, 174.7762], // New Zealand
     MAP_ZOOM: 6,

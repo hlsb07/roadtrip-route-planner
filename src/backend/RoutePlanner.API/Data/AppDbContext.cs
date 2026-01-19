@@ -269,7 +269,18 @@ namespace RoutePlanner.API.Data
             modelBuilder.Entity<Campsite>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Park4NightId).HasMaxLength(50).IsRequired();
+
+                // Source enum - stored as integer
+                entity.Property(e => e.Source)
+                      .HasConversion<int>()
+                      .HasDefaultValue(CampsiteSource.Park4Night);
+
+                // Park4NightId is now nullable (only set for Park4Night sources)
+                entity.Property(e => e.Park4NightId).HasMaxLength(50);
+
+                // CamperMateId for CamperMate sources
+                entity.Property(e => e.CamperMateId).HasMaxLength(50);
+
                 entity.Property(e => e.Name).HasMaxLength(300).IsRequired();
                 entity.Property(e => e.Price).HasMaxLength(200);
                 entity.Property(e => e.SourceUrl).HasMaxLength(500).IsRequired();
@@ -289,8 +300,18 @@ namespace RoutePlanner.API.Data
                 entity.Property(e => e.Descriptions).HasColumnType("jsonb");
 
                 // Indexes for performance and uniqueness
-                entity.HasIndex(e => e.Park4NightId).IsUnique();
+                // Filtered unique index for Park4NightId (only where not null)
+                entity.HasIndex(e => e.Park4NightId)
+                      .IsUnique()
+                      .HasFilter("\"Park4NightId\" IS NOT NULL");
+
+                // Filtered unique index for CamperMateId (only where not null)
+                entity.HasIndex(e => e.CamperMateId)
+                      .IsUnique()
+                      .HasFilter("\"CamperMateId\" IS NOT NULL");
+
                 entity.HasIndex(e => e.SourceUrl).IsUnique();
+                entity.HasIndex(e => e.Source); // Index for filtering by source
                 entity.HasIndex(e => e.Name);
                 entity.HasIndex(e => e.Location).HasMethod("gist");
                 entity.HasIndex(e => e.Rating);

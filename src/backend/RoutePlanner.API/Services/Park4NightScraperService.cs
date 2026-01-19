@@ -72,7 +72,9 @@ namespace RoutePlanner.API.Services
                 // Create campsite object
                 var campsite = new Campsite
                 {
+                    Source = CampsiteSource.Park4Night,
                     Park4NightId = park4NightId,
+                    CamperMateId = null, // Not applicable for Park4Night
                     SourceUrl = url,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow

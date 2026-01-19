@@ -9,7 +9,7 @@ using System.Text.Json;
 namespace RoutePlanner.API.Controllers
 {
     /// <summary>
-    /// Controller for managing campsites and scraping Park4Night data
+    /// Controller for managing campsites and scraping campsite data from various sources
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
@@ -17,23 +17,43 @@ namespace RoutePlanner.API.Controllers
     public class CampsitesController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly Park4NightScraperService _scraperService;
+        private readonly Park4NightScraperService _park4NightScraperService;
+        private readonly CamperMateScraperService _camperMateScraperService;
         private readonly ILogger<CampsitesController> _logger;
 
         public CampsitesController(
             AppDbContext context,
-            Park4NightScraperService scraperService,
+            Park4NightScraperService park4NightScraperService,
+            CamperMateScraperService camperMateScraperService,
             ILogger<CampsitesController> logger)
         {
             _context = context;
-            _scraperService = scraperService;
+            _park4NightScraperService = park4NightScraperService;
+            _camperMateScraperService = camperMateScraperService;
             _logger = logger;
         }
 
         /// <summary>
-        /// Scrape a campsite from Park4Night and save it to the database
+        /// Detects the campsite source from the URL
         /// </summary>
-        /// <param name="url">Park4Night URL (e.g., https://park4night.com/de/place/561613)</param>
+        private CampsiteSource? DetectSource(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return null;
+
+            if (url.Contains("park4night.com", StringComparison.OrdinalIgnoreCase))
+                return CampsiteSource.Park4Night;
+
+            if (url.Contains("campermate.com", StringComparison.OrdinalIgnoreCase))
+                return CampsiteSource.CamperMate;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Scrape a campsite from Park4Night or CamperMate and save it to the database
+        /// </summary>
+        /// <param name="url">Campsite URL (Park4Night or CamperMate)</param>
         /// <returns>Scraped and saved campsite data</returns>
         /// <response code="200">Campsite successfully scraped and saved</response>
         /// <response code="400">Invalid URL or scraping failed</response>
@@ -48,41 +68,68 @@ namespace RoutePlanner.API.Controllers
         {
             try
             {
-                // Validate URL
-                if (string.IsNullOrWhiteSpace(url) || !url.Contains("park4night.com"))
+                // Detect source from URL
+                var source = DetectSource(url);
+
+                if (source == null)
                 {
                     return BadRequest(new ScrapeCampsiteResponse
                     {
                         Success = false,
-                        Message = "Invalid Park4Night URL. Please provide a valid URL (e.g., https://park4night.com/de/place/561613)"
+                        Message = "Invalid URL. Please provide a valid Park4Night URL (e.g., https://park4night.com/de/place/561613) or CamperMate URL (e.g., https://campermate.com/en/location/...)"
                     });
                 }
 
-                _logger.LogInformation("Received request to scrape Park4Night URL: {Url}", url);
+                _logger.LogInformation("Received request to scrape {Source} URL: {Url}", source, url);
 
-                // Scrape the campsite
-                var campsite = await _scraperService.ScrapeCampsiteAsync(url);
+                // Scrape the campsite using the appropriate scraper
+                Campsite? campsite = source switch
+                {
+                    CampsiteSource.Park4Night => await _park4NightScraperService.ScrapeCampsiteAsync(url),
+                    CampsiteSource.CamperMate => await _camperMateScraperService.ScrapeCampsiteAsync(url),
+                    _ => null
+                };
 
                 if (campsite == null)
                 {
                     return BadRequest(new ScrapeCampsiteResponse
                     {
                         Success = false,
-                        Message = "Failed to scrape campsite data. The URL may be invalid or the page structure has changed."
+                        Message = $"Failed to scrape campsite data from {source}. The URL may be invalid or the page structure has changed."
                     });
                 }
 
-                // Check for duplicate (by Park4Night ID or URL)
-                var existingCampsite = await _context.Campsites
-                    .FirstOrDefaultAsync(c => c.Park4NightId == campsite.Park4NightId || c.SourceUrl == campsite.SourceUrl);
+                // Check for duplicate based on source-specific ID or URL
+                Campsite? existingCampsite = null;
+
+                if (source == CampsiteSource.Park4Night && !string.IsNullOrEmpty(campsite.Park4NightId))
+                {
+                    existingCampsite = await _context.Campsites
+                        .FirstOrDefaultAsync(c => c.Park4NightId == campsite.Park4NightId || c.SourceUrl == campsite.SourceUrl);
+                }
+                else if (source == CampsiteSource.CamperMate && !string.IsNullOrEmpty(campsite.CamperMateId))
+                {
+                    existingCampsite = await _context.Campsites
+                        .FirstOrDefaultAsync(c => c.CamperMateId == campsite.CamperMateId || c.SourceUrl == campsite.SourceUrl);
+                }
+                else
+                {
+                    // Fallback: check by URL only
+                    existingCampsite = await _context.Campsites
+                        .FirstOrDefaultAsync(c => c.SourceUrl == campsite.SourceUrl);
+                }
 
                 if (existingCampsite != null)
                 {
-                    _logger.LogWarning("Campsite already exists: {Id}", existingCampsite.Park4NightId);
+                    var externalId = existingCampsite.Source == CampsiteSource.Park4Night
+                        ? existingCampsite.Park4NightId
+                        : existingCampsite.CamperMateId;
+
+                    _logger.LogWarning("Campsite already exists: {Source} ID {ExternalId}", existingCampsite.Source, externalId);
                     return Conflict(new ScrapeCampsiteResponse
                     {
                         Success = false,
-                        Message = $"Campsite already exists in database (ID: {existingCampsite.Id}, Park4Night ID: {existingCampsite.Park4NightId})",
+                        Message = $"Campsite already exists in database (ID: {existingCampsite.Id}, {existingCampsite.Source} ID: {externalId})",
                         Campsite = MapToDto(existingCampsite)
                     });
                 }
@@ -91,12 +138,12 @@ namespace RoutePlanner.API.Controllers
                 _context.Campsites.Add(campsite);
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Successfully saved campsite: {Name} (ID: {Id})", campsite.Name, campsite.Id);
+                _logger.LogInformation("Successfully saved {Source} campsite: {Name} (ID: {Id})", source, campsite.Name, campsite.Id);
 
                 return Ok(new ScrapeCampsiteResponse
                 {
                     Success = true,
-                    Message = $"Successfully scraped and saved campsite: {campsite.Name}",
+                    Message = $"Successfully scraped and saved campsite from {source}: {campsite.Name}",
                     Campsite = MapToDto(campsite)
                 });
             }
@@ -106,7 +153,7 @@ namespace RoutePlanner.API.Controllers
                 return BadRequest(new ScrapeCampsiteResponse
                 {
                     Success = false,
-                    Message = "Failed to fetch the Park4Night page. Please check the URL and try again."
+                    Message = "Failed to fetch the page. Please check the URL and try again."
                 });
             }
             catch (Exception ex)
@@ -242,7 +289,9 @@ namespace RoutePlanner.API.Controllers
             return new CampsiteDto
             {
                 Id = campsite.Id,
+                Source = campsite.Source.ToString(),
                 Park4NightId = campsite.Park4NightId,
+                CamperMateId = campsite.CamperMateId,
                 Name = campsite.Name,
                 Latitude = campsite.Latitude,
                 Longitude = campsite.Longitude,

@@ -5,13 +5,35 @@ using System.Text.Json;
 
 namespace RoutePlanner.API.Models
 {
+    /// <summary>
+    /// Enum to identify the source of campsite data
+    /// </summary>
+    public enum CampsiteSource
+    {
+        Park4Night = 0,
+        CamperMate = 1
+    }
+
     public class Campsite
     {
         public int Id { get; set; }
 
-        [Required]
+        /// <summary>
+        /// Source of the campsite data (Park4Night or CamperMate)
+        /// </summary>
+        public CampsiteSource Source { get; set; } = CampsiteSource.Park4Night;
+
+        /// <summary>
+        /// Park4Night ID (numeric string) - only set for Park4Night sources
+        /// </summary>
         [MaxLength(50)]
-        public string Park4NightId { get; set; } = string.Empty;
+        public string? Park4NightId { get; set; }
+
+        /// <summary>
+        /// CamperMate UUID - only set for CamperMate sources
+        /// </summary>
+        [MaxLength(50)]
+        public string? CamperMateId { get; set; }
 
         [Required]
         [MaxLength(300)]
