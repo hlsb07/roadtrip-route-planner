@@ -122,9 +122,48 @@ class App {
             // Initialize All Places Manager
             this.allPlacesManager.updateAllPlacesList();
 
+            // Handle shared URL from PWA share target
+            this.handleSharedUrl();
+
         } catch (error) {
             console.error('Failed to initialize app:', error);
             showError('Failed to initialize application');
+        }
+    }
+
+    /**
+     * Handle URL shared via PWA share target
+     * Extracts URL from query params and fills the campsite input
+     */
+    handleSharedUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sharedUrl = urlParams.get('url') || urlParams.get('text');
+
+        if (sharedUrl) {
+            console.log('Received shared URL:', sharedUrl);
+
+            // Switch to Save Place tab (desktop and mobile)
+            if (window.innerWidth > 768) {
+                if (typeof switchDesktopMode === 'function') {
+                    switchDesktopMode('search');
+                }
+            } else {
+                if (typeof switchMobileMode === 'function') {
+                    switchMobileMode('search');
+                }
+            }
+
+            // Auto-fill the campsite URL inputs
+            const input = document.getElementById('campsiteUrlInput');
+            const mobileInput = document.getElementById('mobileCampsiteUrlInput');
+            if (input) input.value = sharedUrl;
+            if (mobileInput) mobileInput.value = sharedUrl;
+
+            // Clean URL to remove query params
+            window.history.replaceState({}, '', window.location.pathname);
+
+            // Show success notification
+            showSuccess('URL received! Click + to add the campsite.');
         }
     }
 
