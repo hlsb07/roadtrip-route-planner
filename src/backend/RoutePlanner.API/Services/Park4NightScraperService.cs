@@ -54,6 +54,9 @@ namespace RoutePlanner.API.Services
         {
             try
             {
+                // Normalize URL (handles Android share format and other variations)
+                url = NormalizeUrl(url);
+
                 _logger.LogInformation("Starting to scrape Park4Night URL: {Url}", url);
 
                 // Extract Park4Night ID from URL
@@ -120,10 +123,47 @@ namespace RoutePlanner.API.Services
             }
         }
 
+        /// <summary>
+        /// Normalizes Park4Night URLs from various formats (desktop, Android share) to a standard format.
+        /// Android format: "@park4night : https://park4night.com/de/lieu/56018/open/" or "https://park4night.com/de/lieu/56018/open/"
+        /// Desktop format: "https://park4night.com/de/place/56018"
+        /// </summary>
+        private string NormalizeUrl(string url)
+        {
+            // Remove "@park4night : " prefix if present (Android share format)
+            if (url.Contains("@park4night"))
+            {
+                var urlMatch = Regex.Match(url, @"https?://[^\s]+");
+                if (urlMatch.Success)
+                {
+                    url = urlMatch.Value;
+                }
+            }
+
+            // Extract the ID from either "place" or "lieu" format
+            var idMatch = Regex.Match(url, @"/(?:place|lieu)/(\d+)");
+            if (idMatch.Success)
+            {
+                var id = idMatch.Groups[1].Value;
+
+                // Extract language code (e.g., "de", "en", "fr")
+                var langMatch = Regex.Match(url, @"park4night\.com/(\w{2})/");
+                var lang = langMatch.Success ? langMatch.Groups[1].Value : "en";
+
+                // Return normalized desktop format
+                var normalizedUrl = $"https://park4night.com/{lang}/place/{id}";
+                _logger.LogInformation("Normalized URL from '{OriginalUrl}' to '{NormalizedUrl}'", url, normalizedUrl);
+                return normalizedUrl;
+            }
+
+            // Return original URL if no normalization needed
+            return url;
+        }
+
         private string ExtractPark4NightId(string url)
         {
-            // Extract ID from URL like https://park4night.com/de/place/561613
-            var match = Regex.Match(url, @"/place/(\d+)");
+            // Extract ID from URL like https://park4night.com/de/place/561613 or https://park4night.com/de/lieu/56018/open/
+            var match = Regex.Match(url, @"/(?:place|lieu)/(\d+)");
             return match.Success ? match.Groups[1].Value : string.Empty;
         }
 
