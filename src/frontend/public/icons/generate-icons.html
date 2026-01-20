@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Generate PWA Icons</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        h1 { color: #2A9D8F; }
+        .icon-container { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+        .icon-item { text-align: center; }
+        canvas { border: 1px solid #ddd; margin-bottom: 10px; }
+        button { background: #2A9D8F; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; }
+        button:hover { background: #238b7e; }
+        .instructions { background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>PWA Icon Generator</h1>
+    <p>This tool generates the required PNG icons for the Roadtrip Route Planner PWA.</p>
+
+    <div class="instructions">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Click "Generate All Icons" below</li>
+            <li>Right-click each canvas and "Save image as..." with the correct filename</li>
+            <li>Save them in the <code>icons/</code> folder</li>
+        </ol>
+    </div>
+
+    <button onclick="generateAllIcons()">Generate All Icons</button>
+
+    <div class="icon-container" id="iconContainer"></div>
+
+    <script>
+        const TEAL = '#2A9D8F';
+
+        // Map marker SVG path
+        const MAP_PATH = "M408 120c0 54.6-73.1 151.9-105.2 192c-7.7 9.6-22 9.6-29.6 0C241.1 271.9 168 174.6 168 120C168 53.7 221.7 0 288 0s120 53.7 120 120zm8 80.4c3.5-6.9 6.7-13.8 9.6-20.6c.5-1.2 1-2.5 1.5-3.7l116-46.4C558.9 123.4 576 135 576 152V422.8c0 9.8-6 18.6-15.1 22.3L416 503V200.4zM137.6 138.3c2.4 14.1 7.2 28.3 12.8 41.5c2.9 6.8 6.1 13.7 9.6 20.6V451.8L32.9 502.7C17.1 509 0 497.4 0 480.4V209.6c0-9.8 6-18.6 15.1-22.3l122.6-49zM327.8 332c13.9-17.4 35.7-45.7 56.2-77V504.3L192 449.4V255c20.5 31.3 42.3 59.6 56.2 77c20.5 25.6 59.1 25.6 79.6 0zM288 152a40 40 0 1 0 0-80 40 40 0 1 0 0 80z";
+
+        function drawIcon(canvas, size, isMaskable = false) {
+            const ctx = canvas.getContext('2d');
+            canvas.width = size;
+            canvas.height = size;
+
+            // Background
+            ctx.fillStyle = TEAL;
+            if (isMaskable) {
+                // Maskable icons need content in safe zone (inner 80%)
+                ctx.fillRect(0, 0, size, size);
+            } else {
+                // Regular icons - circular background
+                ctx.beginPath();
+                ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw the map icon using Path2D
+            const path = new Path2D(MAP_PATH);
+
+            // Scale and position
+            const scale = isMaskable ? size / 576 * 0.6 : size / 576 * 0.5;
+            const offsetX = isMaskable ? size * 0.2 : size * 0.25;
+            const offsetY = isMaskable ? size * 0.15 : size * 0.2;
+
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(scale, scale);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill(path);
+            ctx.restore();
+        }
+
+        function createIconElement(name, size, isMaskable) {
+            const container = document.createElement('div');
+            container.className = 'icon-item';
+
+            const canvas = document.createElement('canvas');
+            drawIcon(canvas, size, isMaskable);
+
+            const label = document.createElement('div');
+            label.textContent = name;
+
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = 'Download';
+            downloadBtn.onclick = () => {
+                const link = document.createElement('a');
+                link.download = name;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            };
+
+            container.appendChild(canvas);
+            container.appendChild(label);
+            container.appendChild(downloadBtn);
+
+            return container;
+        }
+
+        function generateAllIcons() {
+            const container = document.getElementById('iconContainer');
+            container.innerHTML = '';
+
+            const icons = [
+                { name: 'icon-192.png', size: 192, maskable: false },
+                { name: 'icon-512.png', size: 512, maskable: false },
+                { name: 'icon-maskable-192.png', size: 192, maskable: true },
+                { name: 'icon-maskable-512.png', size: 512, maskable: true }
+            ];
+
+            icons.forEach(icon => {
+                container.appendChild(createIconElement(icon.name, icon.size, icon.maskable));
+            });
+        }
+
+        // Auto-generate on load
+        window.onload = generateAllIcons;
+    </script>
+</body>
+</html>

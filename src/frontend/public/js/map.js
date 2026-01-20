@@ -716,10 +716,10 @@ export class MapService {
 
             // Get the first type icon if available
             const firstType = campsite.types && campsite.types.length > 0 ? campsite.types[0] : null;
-            // iconPath already contains "/images/campsites/types/..." from backend
-            // Nginx serves these directly from shared directory at /images/
+            // iconPath contains "/images/campsites/types/..." from backend
+            // Prepend IMAGE_BASE_PATH for deployment (e.g., "/roadtriprouteplanner")
             const iconUrl = firstType && firstType.iconPath
-                ? firstType.iconPath  // e.g., "/images/campsites/types/camping.svg"
+                ? `${CONFIG.IMAGE_BASE_PATH}${firstType.iconPath}`
                 : 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
 
             // Create custom icon
@@ -747,7 +747,7 @@ export class MapService {
                            ${campsite.services.map(s => `
                                <div class="popup-icon-item" title="${s.name}">
                                    ${s.iconPath
-                                       ? `<img src="${s.iconPath}" alt="${s.name}" class="popup-icon">`
+                                       ? `<img src="${CONFIG.IMAGE_BASE_PATH}${s.iconPath}" alt="${s.name}" class="popup-icon">`
                                        : `<i class="fas fa-check-circle"></i>`
                                    }
                                </div>
@@ -764,7 +764,7 @@ export class MapService {
                            ${campsite.activities.map(a => `
                                <div class="popup-icon-item" title="${a.name}">
                                    ${a.iconPath
-                                       ? `<img src="${a.iconPath}" alt="${a.name}" class="popup-icon">`
+                                       ? `<img src="${CONFIG.IMAGE_BASE_PATH}${a.iconPath}" alt="${a.name}" class="popup-icon">`
                                        : `<i class="fas fa-hiking"></i>`
                                    }
                                </div>
@@ -778,7 +778,7 @@ export class MapService {
                 ? `<div class="popup-image-carousel">
                        <div class="carousel-container" id="carousel-${index}">
                            ${campsite.imagePaths.map((imgPath, idx) => `
-                               <img src="${imgPath}"
+                               <img src="${CONFIG.IMAGE_BASE_PATH}${imgPath}"
                                     alt="Campsite photo ${idx + 1}"
                                     class="carousel-image ${idx === 0 ? 'active' : ''}"
                                     data-index="${idx}">

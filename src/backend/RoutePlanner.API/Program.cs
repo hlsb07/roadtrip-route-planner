@@ -75,6 +75,10 @@ builder.Services.AddScoped<IRouteConflictService, RouteConflictService>();
 builder.Services.AddHttpClient<Park4NightScraperService>();
 builder.Services.AddScoped<Park4NightScraperService>();
 
+// HttpClient and Service for CamperMate Scraper
+builder.Services.AddHttpClient<CamperMateScraperService>();
+builder.Services.AddScoped<CamperMateScraperService>();
+
 // OSRM Routing Client
 builder.Services.AddHttpClient<IOsrmClient, OsrmClient>();
 

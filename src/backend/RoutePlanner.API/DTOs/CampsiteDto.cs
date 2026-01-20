@@ -8,7 +8,21 @@ namespace RoutePlanner.API.DTOs
     public class CampsiteDto
     {
         public int Id { get; set; }
-        public string Park4NightId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Source of the campsite data (Park4Night or CamperMate)
+        /// </summary>
+        public string Source { get; set; } = "Park4Night";
+
+        /// <summary>
+        /// Park4Night ID (only set for Park4Night sources)
+        /// </summary>
+        public string? Park4NightId { get; set; }
+
+        /// <summary>
+        /// CamperMate UUID (only set for CamperMate sources)
+        /// </summary>
+        public string? CamperMateId { get; set; }
         public string Name { get; set; } = string.Empty;
         public double Latitude { get; set; }
         public double Longitude { get; set; }
