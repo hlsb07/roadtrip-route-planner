@@ -61,6 +61,7 @@ services:
     volumes:
       # Cache NuGet packages for faster rebuilds
       - ~/.nuget/packages:/root/.nuget/packages
+      - ~/docker/reverseProxy/www/roadtriprouteplanner_shared:/shared
     depends_on:
       postgres:
         condition: service_healthy
