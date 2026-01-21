@@ -24,6 +24,7 @@ namespace RoutePlanner.API.Data
 
         // Other Entities
         public DbSet<Campsite> Campsites { get; set; }
+        public DbSet<UserCampsite> UserCampsites { get; set; }
         public DbSet<Category> Categories { get; set; }
         public DbSet<PlaceCategory> PlaceCategories { get; set; }
         public DbSet<Country> Countries { get; set; }
@@ -392,6 +393,32 @@ namespace RoutePlanner.API.Data
                 // Indexes for performance
                 entity.HasIndex(pc => pc.PlaceId);
                 entity.HasIndex(pc => pc.CountryId);
+            });
+
+            // UserCampsite Konfiguration (Many-to-Many Junction Table for Users and Campsites)
+            modelBuilder.Entity<UserCampsite>(entity =>
+            {
+                // Composite primary key
+                entity.HasKey(uc => new { uc.UserId, uc.CampsiteId });
+
+                // Relationship to ApplicationUser
+                entity.HasOne(uc => uc.User)
+                      .WithMany(u => u.UserCampsites)
+                      .HasForeignKey(uc => uc.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Relationship to Campsite
+                entity.HasOne(uc => uc.Campsite)
+                      .WithMany(c => c.UserCampsites)
+                      .HasForeignKey(uc => uc.CampsiteId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Indexes for performance
+                entity.HasIndex(uc => uc.UserId);
+                entity.HasIndex(uc => uc.CampsiteId);
+
+                // Default value for AddedAt
+                entity.Property(uc => uc.AddedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
             });
 
             // Seed Data (wird später per Migration hinzugefügt)

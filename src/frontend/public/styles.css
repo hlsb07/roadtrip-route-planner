@@ -2259,13 +2259,14 @@ textarea.form-input {
 
 .campsite-popup {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    min-width: 300px;
 }
 
 /* Image Carousel in Popup */
 .popup-image-carousel {
     position: relative;
     width: 100%;
-    height: 220px;
+    height: 160px;
     border-radius: 8px 8px 0 0;
     overflow: hidden;
     background: #f0f0f0;
@@ -2360,15 +2361,15 @@ textarea.form-input {
 /* Popup Info Section */
 .popup-info {
     font-size: 0.85rem;
-    margin-top: 8px;
+    margin-top: 6px;
     padding: 0 12px;
 }
 
 /* Services and Activities Sections */
 .popup-services,
 .popup-activities {
-    margin-top: 12px;
-    padding: 10px 12px;
+    margin-top: 8px;
+    padding: 8px 12px;
     background: #f8f9fa;
     border-radius: 8px;
 }
@@ -2392,7 +2393,7 @@ textarea.form-input {
 .popup-icons-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
 }
 
@@ -2400,29 +2401,24 @@ textarea.form-input {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 42px;
-    height: 42px;
-    padding: 8px;
-    background: white;
-    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    padding: 4px;
     transition: all 0.2s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     cursor: help;
 }
 
 .popup-icon-item:hover {
-    background: #2A9D8F;
-    transform: translateY(-3px) scale(1.1);
-    box-shadow: 0 4px 8px rgba(42,157,143,0.3);
+    transform: scale(1.15);
 }
 
 .popup-icon-item:hover .popup-icon {
-    filter: brightness(0) invert(1);
+    filter: brightness(0.7);
 }
 
 .popup-icon {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
     object-fit: contain;
     transition: filter 0.2s;
 }
@@ -2434,7 +2430,7 @@ textarea.form-input {
 }
 
 .popup-icon-item:hover i {
-    color: white;
+    color: #248075;
 }
 
 /* Adjust popup content padding */

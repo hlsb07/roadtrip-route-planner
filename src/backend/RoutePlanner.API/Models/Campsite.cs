@@ -170,5 +170,10 @@ namespace RoutePlanner.API.Models
 
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
+
+        /// <summary>
+        /// Navigation property for user-campsite relationships
+        /// </summary>
+        public List<UserCampsite> UserCampsites { get; set; } = new();
     }
 }

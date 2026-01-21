@@ -19,6 +19,7 @@ namespace RoutePlanner.API.Models
         // Navigation Properties (preserve existing relationships)
         public List<Place> Places { get; set; } = new();
         public List<Route> Routes { get; set; } = new();
+        public List<UserCampsite> UserCampsites { get; set; } = new();
 
         // Refresh Tokens
         public List<RefreshToken> RefreshTokens { get; set; } = new();

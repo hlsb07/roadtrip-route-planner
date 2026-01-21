@@ -151,16 +151,7 @@ async function triggerBackendLegRecalculation(routeId) {
     console.log(`Triggering backend leg recalculation for route ${routeId}...`);
 
     try {
-        const response = await fetch(`${CONFIG.API_BASE}/routes/${routeId}/legs/recalculate`, {
-            method: 'POST'
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Backend recalculation failed: ${errorText}`);
-        }
-
-        const result = await response.json();
+        const result = await ApiService.recalculateLegsFromOsrm(routeId);
         console.log('Backend leg recalculation complete:', result);
     } catch (error) {
         console.error('Failed to trigger backend leg recalculation:', error);

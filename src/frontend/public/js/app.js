@@ -584,28 +584,26 @@ class App {
         try {
             if (loading) loading.classList.add('active');
 
-            const response = await fetch(`${CONFIG.API_BASE}/campsites?url=${encodeURIComponent(url)}`);
-            const data = await response.json();
+            const data = await ApiService.addCampsite(url);
 
             if (loading) loading.classList.remove('active');
 
-            if (response.ok && data.success) {
+            if (data.success) {
                 showSuccess(data.message || 'Campsite added successfully!');
                 input.value = '';
 
                 // Refresh the map to show the new campsite
                 await this.campsiteManager.loadCampsites();
                 this.mapService.updateCampsiteMarkers(this.campsiteManager.getCampsites());
-            } else if (response.status === 409) {
-                // Campsite already exists
-                showError(data.message || 'This campsite already exists');
             } else {
                 showError(data.message || 'Failed to add campsite');
             }
         } catch (error) {
             if (loading) loading.classList.remove('active');
             console.error('Error adding campsite:', error);
-            showError('Failed to add campsite. Please check the URL and try again.');
+            // Handle specific error messages from the API
+            const errorMessage = error.message || 'Failed to add campsite. Please check the URL and try again.';
+            showError(errorMessage);
         }
     }
 
@@ -623,13 +621,7 @@ class App {
         }
 
         try {
-            const response = await fetch(`${CONFIG.API_BASE}/campsites/${campsiteId}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to delete campsite');
-            }
+            await ApiService.deleteCampsite(campsiteId);
 
             showSuccess(`Deleted "${campsiteName}"`);
 
@@ -985,17 +977,13 @@ class App {
 
         try {
             // Delete the place
-            const deleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}`, {
-                method: 'DELETE'
-            });
-
-            if (!deleteResponse.ok) {
-                // Parse error response for detailed information
-                const errorData = await deleteResponse.json().catch(() => null);
-
-                if (deleteResponse.status === 400 && errorData?.usedInRoutes) {
+            try {
+                await ApiService.deletePlace(placeId);
+            } catch (deleteError) {
+                // Check if place is used in routes
+                if (deleteError.status === 400 && deleteError.data?.usedInRoutes) {
                     // Place is used in routes - ask if user wants to force delete
-                    const routeList = errorData.usedInRoutes.join(', ');
+                    const routeList = deleteError.data.usedInRoutes.join(', ');
                     const forceDelete = await showConfirm({
                         title: 'Place In Use',
                         message: `"${placeName}" is used in the following route(s): ${routeList}\n\nDo you want to remove it from these routes and delete it?`,
@@ -1009,15 +997,9 @@ class App {
                     }
 
                     // Force delete the place
-                    const forceDeleteResponse = await fetch(`${CONFIG.API_BASE}/places/${placeId}/force`, {
-                        method: 'DELETE'
-                    });
-
-                    if (!forceDeleteResponse.ok) {
-                        throw new Error('Failed to force delete place');
-                    }
+                    await ApiService.forceDeletePlace(placeId);
                 } else {
-                    throw new Error(errorData?.message || 'Failed to delete place');
+                    throw deleteError;
                 }
             }
 
