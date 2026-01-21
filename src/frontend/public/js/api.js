@@ -123,6 +123,28 @@ export class ApiService {
         }
     }
 
+    static async deletePlace(placeId) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            const error = new Error(errorData?.message || 'Failed to delete place');
+            error.status = response.status;
+            error.data = errorData;
+            throw error;
+        }
+    }
+
+    static async forceDeletePlace(placeId) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/force`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to force delete place');
+        }
+    }
+
     static async addPlaceToRoute(routeId, placeId) {
         const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/routes/${routeId}/places`, {
             method: 'POST',
@@ -179,6 +201,15 @@ export class ApiService {
     }
 
     // Campsite API methods
+    static async addCampsite(url) {
+        const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/campsites?url=${encodeURIComponent(url)}`);
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || `Failed to add campsite: ${response.status}`);
+        }
+        return data;
+    }
+
     static async getAllCampsites() {
         const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/campsites/all`);
         if (!response.ok) {
