@@ -714,13 +714,20 @@ export class MapService {
 
             const isSelected = this.selectedCampsiteIndex === index;
 
-            // Get the first type icon if available
-            const firstType = campsite.types && campsite.types.length > 0 ? campsite.types[0] : null;
-            // iconPath contains "/images/campsites/types/..." from backend
-            // Prepend IMAGE_BASE_PATH for deployment (e.g., "/roadtriprouteplanner")
-            const iconUrl = firstType && firstType.iconPath
-                ? `${CONFIG.IMAGE_BASE_PATH}${firstType.iconPath}`
-                : 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+            // Determine if this is a Campermate or Park4night campsite
+            const isCampermate = campsite.source === 'CamperMate';
+
+            // Use source-specific marker icon for Campermate, type icon for Park4night
+            let iconUrl;
+            if (isCampermate) {
+                iconUrl = `${CONFIG.IMAGE_BASE_PATH}/images/campsites/sources/campermate.svg`;
+            } else {
+                // Park4night: use the first type icon if available
+                const firstType = campsite.types && campsite.types.length > 0 ? campsite.types[0] : null;
+                iconUrl = firstType && firstType.iconPath
+                    ? `${CONFIG.IMAGE_BASE_PATH}${firstType.iconPath}`
+                    : 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png';
+            }
 
             // Create custom icon
             const iconSize = isSelected ? [35, 35] : [28, 28];
@@ -739,37 +746,57 @@ export class MapService {
                 ? campsite.types.map(t => t.name).join(', ')
                 : 'No type specified';
 
-            // Build services list with icons (icon only, no text)
+            // Build services list - icons for Park4night, text list for Campermate
             const servicesList = campsite.services && campsite.services.length > 0
-                ? `<div class="popup-services">
+                ? `<div class="popup-services ${isCampermate ? 'campermate-services' : ''}">
                        <div class="popup-section-title"><i class="fas fa-wrench"></i> Services</div>
-                       <div class="popup-icons-row">
-                           ${campsite.services.map(s => `
-                               <div class="popup-icon-item" title="${s.name}">
-                                   ${s.iconPath
-                                       ? `<img src="${CONFIG.IMAGE_BASE_PATH}${s.iconPath}" alt="${s.name}" class="popup-icon">`
-                                       : `<i class="fas fa-check-circle"></i>`
-                                   }
-                               </div>
-                           `).join('')}
-                       </div>
+                       ${isCampermate
+                           ? `<div class="popup-text-list">
+                                  ${campsite.services.map(s => `
+                                      <div class="popup-text-item">
+                                          <i class="fas fa-check" style="color: #fce94e;"></i>
+                                          <span>${s.name}</span>
+                                      </div>
+                                  `).join('')}
+                              </div>`
+                           : `<div class="popup-icons-row">
+                                  ${campsite.services.map(s => `
+                                      <div class="popup-icon-item" title="${s.name}">
+                                          ${s.iconPath
+                                              ? `<img src="${CONFIG.IMAGE_BASE_PATH}${s.iconPath}" alt="${s.name}" class="popup-icon">`
+                                              : `<i class="fas fa-check-circle"></i>`
+                                          }
+                                      </div>
+                                  `).join('')}
+                              </div>`
+                       }
                    </div>`
                 : '';
 
-            // Build activities list with icons (icon only, no text)
+            // Build activities list - icons for Park4night, text list for Campermate
             const activitiesList = campsite.activities && campsite.activities.length > 0
-                ? `<div class="popup-activities">
+                ? `<div class="popup-activities ${isCampermate ? 'campermate-activities' : ''}">
                        <div class="popup-section-title"><i class="fas fa-hiking"></i> Activities</div>
-                       <div class="popup-icons-row">
-                           ${campsite.activities.map(a => `
-                               <div class="popup-icon-item" title="${a.name}">
-                                   ${a.iconPath
-                                       ? `<img src="${CONFIG.IMAGE_BASE_PATH}${a.iconPath}" alt="${a.name}" class="popup-icon">`
-                                       : `<i class="fas fa-hiking"></i>`
-                                   }
-                               </div>
-                           `).join('')}
-                       </div>
+                       ${isCampermate
+                           ? `<div class="popup-text-list">
+                                  ${campsite.activities.map(a => `
+                                      <div class="popup-text-item">
+                                          <i class="fas fa-check" style="color: #fce94e;"></i>
+                                          <span>${a.name}</span>
+                                      </div>
+                                  `).join('')}
+                              </div>`
+                           : `<div class="popup-icons-row">
+                                  ${campsite.activities.map(a => `
+                                      <div class="popup-icon-item" title="${a.name}">
+                                          ${a.iconPath
+                                              ? `<img src="${CONFIG.IMAGE_BASE_PATH}${a.iconPath}" alt="${a.name}" class="popup-icon">`
+                                              : `<i class="fas fa-hiking"></i>`
+                                          }
+                                      </div>
+                                  `).join('')}
+                              </div>`
+                       }
                    </div>`
                 : '';
 
@@ -817,7 +844,7 @@ export class MapService {
                 <div class="map-popup-content campsite-popup">
                     ${imageGallery}
                     <div class="map-popup-header">
-                        <i class="fas fa-campground" style="color: #2A9D8F;"></i>
+                        <i class="fas fa-campground" style="color: ${isCampermate ? '#fce94e' : '#2A9D8F'};"></i>
                         <strong style="margin-left: 5px;">${campsite.name || 'Unnamed Campsite'}</strong>
                     </div>
                     <div class="popup-info">
@@ -838,10 +865,9 @@ export class MapService {
                         ${campsite.sourceUrl ? `
                             <a href="${campsite.sourceUrl}"
                                target="_blank"
-                               class="link-btn"
-                               style="background: #3EBBA5; color: white;"
+                               class="link-btn ${isCampermate ? 'campermate-source' : 'park4night-source'}"
                                onclick="event.stopPropagation()">
-                                <i class="fas fa-external-link-alt"></i> Park4Night
+                                <i class="fas fa-external-link-alt"></i> ${isCampermate ? 'Campermate' : 'Park4Night'}
                             </a>
                         ` : ''}
                     </div>

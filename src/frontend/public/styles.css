@@ -2449,6 +2449,50 @@ textarea.form-input {
 }
 
 /* ============================================
+   CAMPERMATE-SPECIFIC POPUP STYLES
+   ============================================ */
+
+/* Campermate text list for services/activities */
+.popup-text-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.popup-text-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    color: #333;
+}
+
+.popup-text-item i {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+}
+
+/* Source link buttons */
+.link-btn.park4night-source {
+    background: #3EBBA5;
+    color: white;
+}
+
+.link-btn.park4night-source:hover {
+    background: #2a9d8f;
+}
+
+.link-btn.campermate-source {
+    background: #fce94e;
+    color: #333;
+}
+
+.link-btn.campermate-source:hover {
+    background: #e6d343;
+}
+
+/* ============================================
    FILTER SECTION STYLES
    ============================================ */
 
