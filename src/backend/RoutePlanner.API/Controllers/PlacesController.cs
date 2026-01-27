@@ -595,6 +595,65 @@ namespace RoutePlanner.API.Controllers
             }
         }
 
+        // POST: api/places/refresh-stale
+        /// <summary>
+        /// Refresh all stale places (not synced in X days) for the current user.
+        /// This updates expired Google photo references.
+        /// </summary>
+        [HttpPost("refresh-stale")]
+        public async Task<ActionResult> RefreshStalePlaces([FromQuery] int olderThanDays = 30)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                var cutoffDate = DateTime.UtcNow.AddDays(-olderThanDays);
+
+                // Find all user's places with Google data that haven't been synced recently
+                var stalePlaces = await _context.Places
+                    .Include(p => p.GoogleData)
+                    .Where(p => p.UserId == currentUserId
+                        && p.GoogleData != null
+                        && p.GoogleData.LastSyncedAt < cutoffDate)
+                    .ToListAsync();
+
+                _logger.LogInformation($"Found {stalePlaces.Count} stale places for user {currentUserId} (older than {olderThanDays} days)");
+
+                int refreshed = 0;
+                int failed = 0;
+                var errors = new List<string>();
+
+                foreach (var place in stalePlaces)
+                {
+                    try
+                    {
+                        await _placeService.RefreshGoogleData(place.Id);
+                        refreshed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        failed++;
+                        errors.Add($"Place {place.Id} ({place.Name}): {ex.Message}");
+                        _logger.LogWarning($"Failed to refresh place {place.Id}: {ex.Message}");
+                    }
+                }
+
+                _logger.LogInformation($"Refreshed {refreshed} places, {failed} failed");
+
+                return Ok(new
+                {
+                    refreshed,
+                    failed,
+                    total = stalePlaces.Count,
+                    errors = errors.Take(10).ToList() // Return first 10 errors for debugging
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error refreshing stale places");
+                return BadRequest(new { message = "Error refreshing stale places", error = ex.Message });
+            }
+        }
+
         // GET: api/places/{id}/enriched
         [HttpGet("{id}/enriched")]
         public async Task<ActionResult<EnrichedPlaceDto>> GetEnrichedPlace(int id)

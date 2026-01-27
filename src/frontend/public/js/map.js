@@ -1,6 +1,108 @@
 import { CONFIG } from './config.js';
 import { ApiService } from './api.js';
 
+// Track ongoing refresh operations to prevent duplicate calls
+const refreshInProgress = new Map(); // placeId -> Promise
+
+// Placeholder image for broken photos (data URI to avoid extra requests)
+const PLACEHOLDER_IMAGE = 'data:image/svg+xml;base64,' + btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <rect width="400" height="300" fill="#f0f0f0"/>
+  <g fill="#999" transform="translate(150, 100)">
+    <rect x="0" y="0" width="100" height="80" rx="5" fill="none" stroke="#999" stroke-width="3"/>
+    <circle cx="30" cy="25" r="10"/>
+    <polygon points="10,70 40,40 60,55 90,25 90,70"/>
+  </g>
+  <text x="200" y="220" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="14">Photo unavailable</text>
+</svg>`);
+
+/**
+ * Show placeholder image for broken photos
+ */
+function showPlaceholder(imgElement) {
+    imgElement.src = PLACEHOLDER_IMAGE;
+    imgElement.style.objectFit = 'contain';
+    imgElement.style.background = '#f0f0f0';
+    imgElement.removeAttribute('onerror'); // Prevent infinite loop on placeholder
+}
+
+/**
+ * Global handler for Google photo load errors.
+ * When a photo fails (e.g., expired reference), this automatically refreshes
+ * the place data and retries loading the photo.
+ * Uses a lock mechanism to prevent multiple photos triggering parallel refreshes.
+ */
+window.handlePhotoError = async function(imgElement) {
+    // Prevent infinite retry loop
+    if (imgElement.dataset.retried) {
+        console.warn('Photo already retried, showing placeholder');
+        showPlaceholder(imgElement);
+        return;
+    }
+    imgElement.dataset.retried = 'true';
+
+    const placeId = imgElement.dataset.placeId;
+    const photoIndex = parseInt(imgElement.dataset.photoIndex) || 0;
+
+    if (!placeId) {
+        console.warn('Photo error but no place ID available');
+        showPlaceholder(imgElement);
+        return;
+    }
+
+    console.log(`Photo failed for place ${placeId} (index ${photoIndex}), attempting auto-refresh...`);
+
+    try {
+        // Check if refresh is already in progress for this place
+        let refreshPromise = refreshInProgress.get(placeId);
+
+        if (!refreshPromise) {
+            // No refresh in progress, start one
+            console.log(`Starting refresh for place ${placeId}`);
+            refreshPromise = ApiService.refreshGoogleData(placeId)
+                .finally(() => {
+                    // Clean up after refresh completes (success or failure)
+                    refreshInProgress.delete(placeId);
+                });
+            refreshInProgress.set(placeId, refreshPromise);
+        } else {
+            console.log(`Refresh already in progress for place ${placeId}, waiting...`);
+        }
+
+        // Wait for the refresh to complete
+        await refreshPromise;
+
+        // Get fresh enriched data
+        const freshData = await ApiService.getEnrichedPlace(placeId, true);
+
+        // Store the old URL to detect if it changed
+        const oldUrl = imgElement.src;
+
+        // Try to get the new photo URL
+        let newUrl = null;
+        if (freshData?.googleData?.photos?.[photoIndex]?.photoUrl) {
+            newUrl = freshData.googleData.photos[photoIndex].photoUrl;
+        } else if (freshData?.googleData?.photos?.[0]?.photoUrl) {
+            newUrl = freshData.googleData.photos[0].photoUrl;
+        }
+
+        if (newUrl && newUrl !== oldUrl) {
+            console.log(`Got new photo URL for index ${photoIndex}, retrying...`);
+            imgElement.src = newUrl;
+        } else if (newUrl === oldUrl) {
+            // Same URL returned - Google didn't update the reference
+            console.warn('Google returned same photo reference, showing placeholder');
+            showPlaceholder(imgElement);
+        } else {
+            console.warn('No photos available after refresh');
+            showPlaceholder(imgElement);
+        }
+    } catch (error) {
+        console.error('Auto-refresh failed:', error);
+        showPlaceholder(imgElement);
+    }
+};
+
 export class MapService {
     constructor() {
         this.map = null;
@@ -1048,15 +1150,20 @@ export class MapService {
             return this.buildMobilePlacePopupContent(place, index, isNonRoute, lat, lng);
         }
 
-        // Build image carousel if Google Photos are available
+        // Build image carousel if Google Photos are available (with lazy loading)
+        // Added data-place-id for auto-refresh on error
         const imageGallery = place.googleData?.photos && place.googleData.photos.length > 0
             ? `<div class="popup-image-carousel">
                    <div class="carousel-container" id="place-carousel-${place.id || index}">
                        ${place.googleData.photos.slice(0, 5).map((photo, idx) => `
                            <img src="${photo.photoUrl}"
                                 alt="${place.name} photo ${idx + 1}"
-                                class="carousel-image ${idx === 0 ? 'active' : ''}"
-                                data-index="${idx}">
+                                class="carousel-image google-photo ${idx === 0 ? 'active' : ''}"
+                                data-index="${idx}"
+                                data-place-id="${place.id}"
+                                data-photo-index="${idx}"
+                                loading="lazy"
+                                onerror="handlePhotoError(this)">
                        `).join('')}
                    </div>
                    ${place.googleData.photos.length > 1
@@ -1288,8 +1395,12 @@ export class MapService {
                        ${photos.map((photo, idx) => `
                            <img src="${photo.photoUrl}"
                                 alt="${place.name}"
-                                class="carousel-image ${idx === 0 ? 'active' : ''}"
-                                data-index="${idx}">
+                                class="carousel-image google-photo ${idx === 0 ? 'active' : ''}"
+                                data-index="${idx}"
+                                data-place-id="${place.id}"
+                                data-photo-index="${idx}"
+                                loading="lazy"
+                                onerror="handlePhotoError(this)">
                        `).join('')}
                    </div>
                    ${photos.length > 1
@@ -1984,10 +2095,10 @@ export class MapService {
         this.galleryPhotos = photos;
         this.currentGalleryIndex = startIndex;
 
-        // Build gallery images
+        // Build gallery images with lazy loading
         const galleryHTML = photos.map((photo, idx) => `
             <div class="gallery-image ${idx === startIndex ? 'active' : ''}" data-index="${idx}">
-                <img src="${photo.photoUrl}" alt="Image ${idx + 1}">
+                <img src="${photo.photoUrl}" alt="Image ${idx + 1}" loading="lazy">
             </div>
         `).join('');
 

@@ -15,8 +15,8 @@ namespace RoutePlanner.API.Services
         private readonly ILogger<GoogleMapsService> _logger;
         private readonly GeometryFactory _geometryFactory;
 
-        // Cache TTL (365 days)
-        private readonly TimeSpan _cacheTtl = TimeSpan.FromDays(365);
+        // Cache TTL (30 days)
+        private readonly TimeSpan _cacheTtl = TimeSpan.FromDays(30);
 
         public GoogleMapsService(
             AppDbContext context,
@@ -151,16 +151,42 @@ namespace RoutePlanner.API.Services
             var json = await response.Content.ReadAsStringAsync();
             var data = JsonSerializer.Deserialize<JsonElement>(json);
 
-            var result = data.GetProperty("result");
-            var geometry = result.GetProperty("geometry").GetProperty("location");
+            // Check API status first
+            if (data.TryGetProperty("status", out var statusProp))
+            {
+                var status = statusProp.GetString();
+                if (status != "OK")
+                {
+                    var errorMsg = data.TryGetProperty("error_message", out var errProp)
+                        ? errProp.GetString()
+                        : "Unknown error";
+                    _logger.LogWarning($"Google API returned status {status} for place {placeId}: {errorMsg}");
+                    return null;
+                }
+            }
+
+            // Safely get result - API might not return it on error
+            if (!data.TryGetProperty("result", out var result))
+            {
+                _logger.LogWarning($"Google API response missing 'result' for place {placeId}");
+                return null;
+            }
+
+            // Safely get geometry
+            if (!result.TryGetProperty("geometry", out var geometryProp) ||
+                !geometryProp.TryGetProperty("location", out var geometry))
+            {
+                _logger.LogWarning($"Place {placeId} is missing geometry or location data");
+                return null;
+            }
 
             var placeResult = new PlaceSearchResult
             {
-                PlaceId = result.GetProperty("place_id").GetString() ?? "",
-                Name = result.GetProperty("name").GetString() ?? "",
-                FormattedAddress = result.GetProperty("formatted_address").GetString() ?? "",
-                Latitude = geometry.GetProperty("lat").GetDouble(),
-                Longitude = geometry.GetProperty("lng").GetDouble(),
+                PlaceId = result.TryGetProperty("place_id", out var placeIdProp) ? placeIdProp.GetString() ?? "" : placeId,
+                Name = result.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "" : "",
+                FormattedAddress = result.TryGetProperty("formatted_address", out var addressProp) ? addressProp.GetString() ?? "" : "",
+                Latitude = geometry.TryGetProperty("lat", out var latProp) ? latProp.GetDouble() : 0,
+                Longitude = geometry.TryGetProperty("lng", out var lngProp) ? lngProp.GetDouble() : 0,
                 Types = result.TryGetProperty("types", out var types)
                     ? types.EnumerateArray().Select(t => t.GetString() ?? "").ToList()
                     : new List<string>(),
@@ -174,9 +200,9 @@ namespace RoutePlanner.API.Services
                 Photos = result.TryGetProperty("photos", out var photos)
                     ? photos.EnumerateArray().Select(p => new DTOs.PlacePhotoDto
                     {
-                        PhotoReference = p.GetProperty("photo_reference").GetString() ?? "",
-                        Width = p.GetProperty("width").GetInt32(),
-                        Height = p.GetProperty("height").GetInt32()
+                        PhotoReference = p.TryGetProperty("photo_reference", out var photoRef) ? photoRef.GetString() ?? "" : "",
+                        Width = p.TryGetProperty("width", out var widthProp) ? widthProp.GetInt32() : 0,
+                        Height = p.TryGetProperty("height", out var heightProp) ? heightProp.GetInt32() : 0
                     }).ToList()
                     : new List<DTOs.PlacePhotoDto>()
             };
@@ -333,11 +359,14 @@ namespace RoutePlanner.API.Services
 
         /// <summary>
         /// Generate Google Photos URL from photo reference (public for use by other services)
+        /// Google's max allowed width is 1600, so we cap it to avoid 400 errors
         /// </summary>
         public string GeneratePhotoUrl(string photoReference, int maxWidth = 400)
         {
             var apiKey = _configuration["GoogleMaps:ApiKey"];
-            return $"https://maps.googleapis.com/maps/api/place/photo?maxwidth={maxWidth}&photo_reference={photoReference}&key={apiKey}";
+            // Cap maxWidth to Google's maximum of 1600 to avoid 400 Bad Request errors
+            var cappedWidth = Math.Min(maxWidth, 1600);
+            return $"https://maps.googleapis.com/maps/api/place/photo?maxwidth={cappedWidth}&photo_reference={photoReference}&key={apiKey}";
         }
 
         /// <summary>
@@ -355,7 +384,8 @@ namespace RoutePlanner.API.Services
                     continue;
                 }
 
-                photo.PhotoUrl = GeneratePhotoUrl(photo.PhotoReference, photo.Width);
+                // Use 400px for display URLs - GeneratePhotoUrl will cap to Google's max of 1600
+                photo.PhotoUrl = GeneratePhotoUrl(photo.PhotoReference, 400);
                 _logger.LogDebug($"Generated photo URL: {(photo.PhotoUrl?.Length > 80 ? photo.PhotoUrl.Substring(0, 80) + "..." : photo.PhotoUrl)}");
             }
 

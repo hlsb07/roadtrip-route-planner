@@ -2,6 +2,9 @@ import { ApiService } from './api.js';
 import { parseGoogleMapsLink, validateCoordinates, formatPlaceName, showError, showConfirm } from './utils.js';
 import { googleMapsBackendClient } from './google-maps-backend-client.js';
 
+// Small placeholder for search result thumbnails (pre-computed base64)
+const SEARCH_PLACEHOLDER = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgNzUiPjxyZWN0IGZpbGw9IiNmMGYwZjAiIHdpZHRoPSIxMDAiIGhlaWdodD0iNzUiLz48dGV4dCB4PSI1MCIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5OTkiIGZvbnQtc2l6ZT0iOCI+Tm8gcGhvdG88L3RleHQ+PC9zdmc+';
+
 export class SearchManager {
     constructor() {
         this.currentTab = 'search';
@@ -190,12 +193,16 @@ export class SearchManager {
                 priceLevelHtml = `<span class="place-price">${dollarSigns}</span>`;
             }
 
-            // Build photo thumbnail
+            // Build photo thumbnail with lazy loading to reduce API calls
+            // Note: Search results don't have saved place IDs, so show placeholder on error
             let photoHtml = '';
             if (result.photos && result.photos.length > 0 && result.photos[0].photoUrl) {
                 photoHtml = `
                     <div class="place-photo">
-                        <img src="${result.photos[0].photoUrl}" alt="${result.name}" />
+                        <img src="${result.photos[0].photoUrl}"
+                             alt="${result.name}"
+                             loading="lazy"
+                             onerror="this.src='${SEARCH_PLACEHOLDER}';this.onerror=null;" />
                     </div>
                 `;
             }
