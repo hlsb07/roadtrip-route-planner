@@ -401,7 +401,7 @@ export class PlaceManager {
 
                 // Update the modal with enriched data
                 if (enrichedPlace && enrichedPlace.googleData) {
-                    this.displayGoogleDataSection(enrichedPlace.googleData);
+                    this.displayGoogleDataSection(enrichedPlace.googleData, place.id);
                     infoSection.style.display = 'block';
                     return;
                 }
@@ -416,16 +416,24 @@ export class PlaceManager {
 
     /**
      * Display Google data section with photos, rating, etc.
+     * @param {Object} googleData - Google data object with photos, rating, etc.
+     * @param {number} placeId - Place ID for auto-refresh on photo error
      */
-    displayGoogleDataSection(googleData) {
+    displayGoogleDataSection(googleData, placeId = null) {
         const infoSection = document.getElementById('googlePlaceInfo');
         if (!infoSection || !googleData) return;
 
-        // Display photos
+        // Display photos with lazy loading and auto-refresh on error
         const photosGallery = document.getElementById('placePhotosGallery');
         if (photosGallery && googleData.photos && googleData.photos.length > 0) {
-            photosGallery.innerHTML = googleData.photos.slice(0, 5).map(photo =>
-                `<img src="${photo.photoUrl}" alt="${googleData.name}" />`
+            photosGallery.innerHTML = googleData.photos.slice(0, 5).map((photo, idx) =>
+                `<img src="${photo.photoUrl}"
+                      alt="${googleData.name}"
+                      loading="lazy"
+                      class="google-photo"
+                      data-place-id="${placeId || ''}"
+                      data-photo-index="${idx}"
+                      onerror="handlePhotoError(this)" />`
             ).join('');
             photosGallery.style.display = 'grid';
         } else if (photosGallery) {
@@ -598,11 +606,17 @@ export class PlaceManager {
 
         infoSection.style.display = 'block';
 
-        // Display photos
+        // Display photos with lazy loading and auto-refresh on error
         const photosGallery = document.getElementById('placePhotosGallery');
         if (photosGallery && place.photos && place.photos.length > 0) {
-            photosGallery.innerHTML = place.photos.slice(0, 5).map(photo =>
-                `<img src="${photo.photoUrl}" alt="${place.name}" />`
+            photosGallery.innerHTML = place.photos.slice(0, 5).map((photo, idx) =>
+                `<img src="${photo.photoUrl}"
+                      alt="${place.name}"
+                      loading="lazy"
+                      class="google-photo"
+                      data-place-id="${place.id || ''}"
+                      data-photo-index="${idx}"
+                      onerror="handlePhotoError(this)" />`
             ).join('');
             photosGallery.style.display = 'grid';
         } else if (photosGallery) {

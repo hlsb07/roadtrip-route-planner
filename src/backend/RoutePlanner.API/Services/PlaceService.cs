@@ -242,14 +242,21 @@ namespace RoutePlanner.API.Services
                 updatedFields.Add("OpeningHours");
             }
 
-            // Check for new photos
-            var existingPhotoRefs = place.GoogleData.Photos.Select(p => p.PhotoReference).ToHashSet();
-            var newPhotos = freshData.Photos
-                .Where(p => !string.IsNullOrEmpty(p.PhotoReference) && !existingPhotoRefs.Contains(p.PhotoReference))
-                .ToList();
+            // Replace all Google photos with fresh references (they expire over time)
+            // Keep user-uploaded photos, only replace Google-sourced photos
+            var userPhotos = place.GoogleData.Photos.Where(p => p.Source != "google").ToList();
+            var googlePhotos = place.GoogleData.Photos.Where(p => p.Source == "google").ToList();
 
-            int newPhotosAdded = 0;
-            foreach (var photoDto in newPhotos)
+            // Remove old Google photos (their references have likely expired)
+            foreach (var oldPhoto in googlePhotos)
+            {
+                place.GoogleData.Photos.Remove(oldPhoto);
+                _context.Entry(oldPhoto).State = EntityState.Deleted;
+            }
+
+            // Add fresh photos from Google with new references
+            int photosReplaced = 0;
+            foreach (var photoDto in freshData.Photos.Where(p => !string.IsNullOrEmpty(p.PhotoReference)))
             {
                 var photo = new PlacePhoto
                 {
@@ -258,17 +265,17 @@ namespace RoutePlanner.API.Services
                     PhotoUrl = string.Empty, // Don't store URL - generate dynamically from PhotoReference
                     Width = photoDto.Width,
                     Height = photoDto.Height,
-                    IsPrimary = false,
+                    IsPrimary = photosReplaced == 0 && userPhotos.Count == 0, // First photo is primary if no user photos
                     Source = "google",
-                    OrderIndex = place.GoogleData.Photos.Count + newPhotosAdded
+                    OrderIndex = userPhotos.Count + photosReplaced
                 };
                 place.GoogleData.Photos.Add(photo);
-                newPhotosAdded++;
+                photosReplaced++;
             }
 
-            if (newPhotosAdded > 0)
+            if (photosReplaced > 0 || googlePhotos.Count > 0)
             {
-                updatedFields.Add($"{newPhotosAdded} new photos");
+                updatedFields.Add($"photos refreshed ({photosReplaced} photos)");
             }
 
             // Update sync info
@@ -278,15 +285,15 @@ namespace RoutePlanner.API.Services
 
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation($"Refreshed place {placeId}: {updatedFields.Count} fields updated, {newPhotosAdded} photos added");
+            _logger.LogInformation($"Refreshed place {placeId}: {updatedFields.Count} fields updated, {photosReplaced} photos refreshed");
 
             return new RefreshGoogleDataResponse
             {
                 Success = true,
                 UpdatedFields = updatedFields,
-                NewPhotosAdded = newPhotosAdded,
+                NewPhotosAdded = photosReplaced,
                 LastSyncedAt = place.GoogleData.LastSyncedAt,
-                Message = updatedFields.Any() || newPhotosAdded > 0
+                Message = updatedFields.Any() || photosReplaced > 0
                     ? $"Updated: {string.Join(", ", updatedFields)}"
                     : "No changes detected"
             };
@@ -523,8 +530,9 @@ namespace RoutePlanner.API.Services
                     Photos = place.GoogleData.Photos.Select(p => new PlacePhotoDto
                     {
                         PhotoReference = p.PhotoReference ?? string.Empty,
+                        // Use 400px for display - the original width is stored separately
                         PhotoUrl = !string.IsNullOrEmpty(p.PhotoReference)
-                            ? _googleMapsService.GeneratePhotoUrl(p.PhotoReference, p.Width ?? 400)
+                            ? _googleMapsService.GeneratePhotoUrl(p.PhotoReference, 400)
                             : null,
                         Width = p.Width ?? 0,
                         Height = p.Height ?? 0

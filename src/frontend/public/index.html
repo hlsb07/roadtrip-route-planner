@@ -148,6 +148,9 @@
                 <button class="btn btn-primary" onclick="openManageTagsModal()">
                     <i class="fas fa-tags"></i> Manage Tags
                 </button>
+                <button class="btn" onclick="refreshStalePhotos()" title="Refresh expired Google photo references">
+                    <i class="fas fa-sync-alt"></i> Refresh Photos
+                </button>
                 <button class="btn" onclick="exportRoute()">
                     <i class="fas fa-download"></i> Export
                 </button>
@@ -459,6 +462,9 @@
                         </button>
                         <button class="btn btn-primary" onclick="openManageTagsModal()">
                             <i class="fas fa-tags"></i> Manage Tags
+                        </button>
+                        <button class="btn" onclick="refreshStalePhotos()" title="Refresh expired Google photo references">
+                            <i class="fas fa-sync-alt"></i> Refresh Photos
                         </button>
                         <button class="btn" onclick="exportRoute()">
                             <i class="fas fa-download"></i> Export
@@ -1166,6 +1172,58 @@
                 toggleFilterPanel();
             }
         });
+
+        // Refresh Stale Photos Function
+        window.refreshStalePhotos = async function() {
+            const confirmed = confirm(
+                'This will refresh Google photo references for all places not synced in the last 30 days.\n\n' +
+                'This may take a moment and will use API credits.\n\n' +
+                'Continue?'
+            );
+
+            if (!confirmed) return;
+
+            try {
+                // Show loading state
+                const btn = event.target.closest('button');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+                btn.disabled = true;
+
+                // Import ApiService dynamically
+                const { ApiService } = await import('./js/api.js');
+                const result = await ApiService.refreshStalePlaces(30);
+
+                // Show result
+                if (result.refreshed > 0 || result.failed > 0) {
+                    alert(
+                        `Photo Refresh Complete!\n\n` +
+                        `✅ Refreshed: ${result.refreshed} places\n` +
+                        `❌ Failed: ${result.failed} places\n` +
+                        `📊 Total stale: ${result.total} places`
+                    );
+                } else {
+                    alert('No stale places found! All photos are up to date.');
+                }
+
+                // Refresh the current view if needed
+                if (result.refreshed > 0 && window.app) {
+                    window.app.loadRoute(window.app.currentRouteId);
+                }
+
+                btn.innerHTML = originalHtml;
+                btn.disabled = false;
+            } catch (error) {
+                console.error('Failed to refresh stale photos:', error);
+                alert('Failed to refresh photos: ' + error.message);
+                // Reset button state
+                const btn = event.target.closest('button');
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Photos';
+                    btn.disabled = false;
+                }
+            }
+        };
 
         // Tag Management Modal Functions
         window.openManageTagsModal = function() {

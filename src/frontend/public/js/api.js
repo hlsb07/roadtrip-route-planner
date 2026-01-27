@@ -1,6 +1,10 @@
 import { CONFIG } from './config.js';
 import { AuthManager } from './authManager.js';
 
+// Cache for enriched place data to reduce Google Photos API calls
+const enrichedPlaceCache = new Map();
+const ENRICHED_PLACE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 // API service functions
 export class ApiService {
     /**
@@ -121,6 +125,8 @@ export class ApiService {
         if (!response.ok) {
             throw new Error('Failed to update place');
         }
+        // Clear cache so next getEnrichedPlace fetches fresh data
+        this.clearEnrichedPlaceCache(placeId);
     }
 
     static async deletePlace(placeId) {
@@ -477,15 +483,42 @@ export class ApiService {
 
     /**
      * Get enriched place data with Google information
+     * Uses caching to reduce duplicate API calls and Google Photos costs
      * @param {number} placeId - Place ID
+     * @param {boolean} forceRefresh - Force fetch from server, bypassing cache
      * @returns {Promise<Object>} Enriched place data
      */
-    static async getEnrichedPlace(placeId) {
+    static async getEnrichedPlace(placeId, forceRefresh = false) {
+        const cacheKey = String(placeId);
+        const cached = enrichedPlaceCache.get(cacheKey);
+
+        // Return cached data if valid and not forcing refresh
+        if (!forceRefresh && cached && (Date.now() - cached.timestamp < ENRICHED_PLACE_CACHE_TTL)) {
+            return cached.data;
+        }
+
         const response = await this.authenticatedFetch(`${CONFIG.API_BASE}/places/${placeId}/enriched`);
         if (!response.ok) {
             throw new Error('Failed to get enriched place data');
         }
-        return await response.json();
+        const data = await response.json();
+
+        // Cache the result
+        enrichedPlaceCache.set(cacheKey, { data, timestamp: Date.now() });
+
+        return data;
+    }
+
+    /**
+     * Clear the enriched place cache (e.g., after updates)
+     * @param {number|null} placeId - Specific place to clear, or null to clear all
+     */
+    static clearEnrichedPlaceCache(placeId = null) {
+        if (placeId !== null) {
+            enrichedPlaceCache.delete(String(placeId));
+        } else {
+            enrichedPlaceCache.clear();
+        }
     }
 
     /**
@@ -501,6 +534,27 @@ export class ApiService {
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.message || 'Failed to refresh Google data');
         }
+        // Clear cache so next getEnrichedPlace fetches fresh data
+        this.clearEnrichedPlaceCache(placeId);
+        return await response.json();
+    }
+
+    /**
+     * Refresh all stale places (older than X days) for the current user
+     * @param {number} olderThanDays - Refresh places not synced in this many days
+     * @returns {Promise<Object>} Result with refreshed/failed counts
+     */
+    static async refreshStalePlaces(olderThanDays = 30) {
+        const response = await this.authenticatedFetch(
+            `${CONFIG.API_BASE}/places/refresh-stale?olderThanDays=${olderThanDays}`,
+            { method: 'POST' }
+        );
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.message || 'Failed to refresh stale places');
+        }
+        // Clear all caches since multiple places were updated
+        this.clearEnrichedPlaceCache();
         return await response.json();
     }
 
@@ -519,6 +573,8 @@ export class ApiService {
         if (!response.ok) {
             throw new Error('Failed to update notes');
         }
+        // Clear cache so next getEnrichedPlace fetches fresh data
+        this.clearEnrichedPlaceCache(placeId);
     }
 
     /**
