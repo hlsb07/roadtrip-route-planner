@@ -1176,7 +1176,9 @@
         // Refresh Stale Photos Function
         window.refreshStalePhotos = async function() {
             const confirmed = confirm(
-                'This will refresh Google photo references for all places not synced in the last 30 days.\n\n' +
+                'This will:\n' +
+                '• Refresh Google photo references for places not synced in 30 days\n' +
+                '• Clear the search cache to remove stale data\n\n' +
                 'This may take a moment and will use API credits.\n\n' +
                 'Continue?'
             );
@@ -1195,12 +1197,14 @@
                 const result = await ApiService.refreshStalePlaces(30);
 
                 // Show result
-                if (result.refreshed > 0 || result.failed > 0) {
+                const cacheCleared = result.cacheEntriesCleared || 0;
+                if (result.refreshed > 0 || result.failed > 0 || cacheCleared > 0) {
                     alert(
                         `Photo Refresh Complete!\n\n` +
                         `✅ Refreshed: ${result.refreshed} places\n` +
                         `❌ Failed: ${result.failed} places\n` +
-                        `📊 Total stale: ${result.total} places`
+                        `📊 Total stale: ${result.total} places\n` +
+                        `🗑️ Search cache cleared: ${cacheCleared} entries`
                     );
                 } else {
                     alert('No stale places found! All photos are up to date.');
