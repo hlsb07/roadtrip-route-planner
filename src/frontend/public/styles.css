@@ -2957,6 +2957,15 @@ textarea.form-input {
     .custom-marker.selected .marker-icon {
         font-size: 1.4rem;
     }
+
+    .non-route-custom-marker {
+        width: 20px;
+        height: 20px;
+    }
+
+    .non-route-custom-marker .marker-icon {
+        font-size: 0.85rem;
+    }
 }
 /* ============================================
    PLACE ITEM ACTION BUTTONS
@@ -3980,7 +3989,43 @@ textarea.form-input {
    NON-ROUTE PLACES & DUAL MARKER SYSTEM
    ============================================ */
 
-/* Gray markers for non-route places */
+/* Non-route custom marker container */
+.non-route-marker-container {
+    background: transparent;
+    border: none;
+}
+
+/* Non-route custom marker - muted gray teardrop style */
+.non-route-custom-marker {
+    position: relative;
+    width: 25px;
+    height: 25px;
+    /* background: linear-gradient(135deg, #6c757d 0%, #8a939c 100%); */
+    border: 1px solid #2A9D8F ;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+    transition: all 0.3s;
+    cursor: pointer;
+    opacity: 0.9;
+}
+
+.non-route-custom-marker .marker-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.non-route-custom-marker:hover {
+    transform: rotate(-45deg) scale(1.15);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+    opacity: 1;
+}
+
+/* Legacy: Gray markers for non-route places (fallback) */
 .leaflet-marker-icon.non-route-marker {
     filter: grayscale(100%) brightness(0.7);
     opacity: 0.8;

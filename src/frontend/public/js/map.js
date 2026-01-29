@@ -1819,21 +1819,40 @@ export class MapService {
             }
         }
 
-        // Add gray markers for non-route places (no numbers, no polyline)
+        // Add custom markers for non-route places (no numbers, no polyline)
         if (nonRoutePlaces && nonRoutePlaces.length > 0) {
             nonRoutePlaces.forEach((place, index) => {
-                // Create gray custom icon
-                const grayIcon = L.icon({
-                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                    iconSize: [20, 33],
-                    iconAnchor: [10, 33],
-                    popupAnchor: [1, -28],
-                    shadowSize: [33, 33],
-                    className: 'non-route-marker'
-                });
+                // Check if place has a category with an icon
+                const categoryIcon = place.categories && place.categories.length > 0
+                    ? place.categories[0].icon
+                    : null;
 
-                const marker = L.marker([place.latitude, place.longitude], { icon: grayIcon })
+                let markerIcon;
+                if (categoryIcon) {
+                    // Use category icon in a custom marker
+                    markerIcon = L.divIcon({
+                        html: `<div class="non-route-custom-marker">
+                                <div class="marker-icon">${categoryIcon}</div>
+                               </div>`,
+                        className: 'non-route-marker-container',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 30],
+                        popupAnchor: [0, -30]
+                    });
+                } else {
+                    // Use default pin icon for places without category
+                    markerIcon = L.divIcon({
+                        html: `<div class="non-route-custom-marker">
+                                <div class="marker-icon">📍</div>
+                               </div>`,
+                        className: 'non-route-marker-container',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 30],
+                        popupAnchor: [0, -30]
+                    });
+                }
+
+                const marker = L.marker([place.latitude, place.longitude], { icon: markerIcon })
                     .addTo(this.map);
 
                 // Setup popup with lazy loading for Google data

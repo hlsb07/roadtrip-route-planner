@@ -17,13 +17,15 @@ namespace RoutePlanner.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IPlaceService _placeService;
+        private readonly GoogleMapsService _googleMapsService;
         private readonly GeometryFactory _geometryFactory;
         private readonly ILogger<PlacesController> _logger;
 
-        public PlacesController(AppDbContext context, IPlaceService placeService, ILogger<PlacesController> logger)
+        public PlacesController(AppDbContext context, IPlaceService placeService, GoogleMapsService googleMapsService, ILogger<PlacesController> logger)
         {
             _context = context;
             _placeService = placeService;
+            _googleMapsService = googleMapsService;
             _geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
             _logger = logger;
         }
@@ -598,10 +600,10 @@ namespace RoutePlanner.API.Controllers
         // POST: api/places/refresh-stale
         /// <summary>
         /// Refresh all stale places (not synced in X days) for the current user.
-        /// This updates expired Google photo references.
+        /// This updates expired Google photo references AND clears the search cache.
         /// </summary>
         [HttpPost("refresh-stale")]
-        public async Task<ActionResult> RefreshStalePlaces([FromQuery] int olderThanDays = 30)
+        public async Task<ActionResult> RefreshStalePlaces([FromQuery] int olderThanDays = 30, [FromQuery] bool clearSearchCache = true)
         {
             try
             {
@@ -637,13 +639,24 @@ namespace RoutePlanner.API.Controllers
                     }
                 }
 
-                _logger.LogInformation($"Refreshed {refreshed} places, {failed} failed");
+                // Also clear the GoogleMapsCache (search cache) to remove stale photo references
+                int cacheEntriesCleared = 0;
+                if (clearSearchCache)
+                {
+                    var cacheStats = await _googleMapsService.GetCacheStatistics();
+                    cacheEntriesCleared = cacheStats.TotalCachedPlaces;
+                    await _googleMapsService.ClearAllCache();
+                    _logger.LogInformation($"Cleared {cacheEntriesCleared} search cache entries");
+                }
+
+                _logger.LogInformation($"Refreshed {refreshed} places, {failed} failed, cleared {cacheEntriesCleared} cache entries");
 
                 return Ok(new
                 {
                     refreshed,
                     failed,
                     total = stalePlaces.Count,
+                    cacheEntriesCleared,
                     errors = errors.Take(10).ToList() // Return first 10 errors for debugging
                 });
             }
