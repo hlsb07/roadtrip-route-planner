@@ -800,6 +800,24 @@ export class ApiService {
     }
 
     /**
+     * Recalculate chain schedule (continuous timeline with no gaps)
+     * @param {number} routeId - Route ID
+     * @returns {Promise<Object>} Recalculation result
+     */
+    static async recalculateChainSchedule(routeId) {
+        const response = await this.authenticatedFetch(
+            `${CONFIG.API_BASE}/routes/${routeId}/schedule/recalculate-chain`,
+            {
+                method: 'POST'
+            }
+        );
+        if (!response.ok) {
+            throw new Error('Failed to recalculate chain schedule');
+        }
+        return await response.json();
+    }
+
+    /**
      * Reorder places with schedule recalculation options
      * @param {number} routeId - Route ID
      * @param {number[]} placeIds - Array of place IDs in new order

@@ -232,15 +232,16 @@ namespace RoutePlanner.API.Controllers
             route.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            // Auto-recalculate legs from OSRM after adding place
+            // Auto-recalculate legs from OSRM and chain schedule after adding place
             try
             {
                 await _legService.RecalculateLegsFromOsrm(id);
-                _logger.LogInformation($"Auto-recalculated legs after adding place to route {id}");
+                await _scheduleService.RecalculateChainSchedule(id);
+                _logger.LogInformation($"Auto-recalculated legs and chain schedule after adding place to route {id}");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs/schedule for route {id}");
                 // Don't fail the operation if recalculation fails
             }
 
@@ -281,15 +282,16 @@ namespace RoutePlanner.API.Controllers
 
             await _context.SaveChangesAsync();
 
-            // Auto-recalculate legs from OSRM after removing place
+            // Auto-recalculate legs from OSRM and chain schedule after removing place
             try
             {
                 await _legService.RecalculateLegsFromOsrm(id);
-                _logger.LogInformation($"Auto-recalculated legs after removing place from route {id}");
+                await _scheduleService.RecalculateChainSchedule(id);
+                _logger.LogInformation($"Auto-recalculated legs and chain schedule after removing place from route {id}");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs/schedule for route {id}");
                 // Don't fail the operation if recalculation fails
             }
 
@@ -352,38 +354,17 @@ namespace RoutePlanner.API.Controllers
                 }
             }
 
-            // Auto-recalculate legs from OSRM after reordering places
+            // Auto-recalculate legs from OSRM and chain schedule after reordering
             try
             {
                 await _legService.RecalculateLegsFromOsrm(id);
-                _logger.LogInformation($"Auto-recalculated legs after reordering places in route {id}");
+                await _scheduleService.RecalculateChainSchedule(id);
+                _logger.LogInformation($"Auto-recalculated legs and chain schedule after reordering route {id}");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, $"Failed to auto-recalculate legs for route {id}");
+                _logger.LogWarning(ex, $"Failed to auto-recalculate legs/schedule for route {id}");
                 // Don't fail the operation if recalculation fails
-            }
-
-            // Recalculate schedule if requested
-            if (request.RecalculateSchedule)
-            {
-                try
-                {
-                    await _scheduleService.RecalculateScheduleAfterReorder(
-                        id,
-                        request.PreserveLockedDays,
-                        ignoreLockedStops: true,  // Always ignore locks after manual reorder (OrderIndex is source of truth)
-                        movedPlaceId: movedPlaceId,
-                        oldIndex: oldIndex,
-                        newIndex: newIndex);
-
-                    _logger.LogInformation($"Recalculated schedule after reordering route {id}");
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, $"Failed to recalculate schedule for route {id}");
-                    // Don't fail the operation if schedule recalculation fails
-                }
             }
 
             return NoContent();
@@ -505,6 +486,7 @@ namespace RoutePlanner.API.Controllers
         }
 
         // PUT: api/routes/{routeId}/places/{routePlaceId}/schedule - Update stop schedule
+        // The chain recalculation (no-gaps enforcement) happens automatically in the service
         [HttpPut("{routeId}/places/{routePlaceId}/schedule")]
         public async Task<IActionResult> UpdateRoutePlaceSchedule(int routeId, int routePlaceId, [FromBody] RoutePlaceScheduleUpdateDto dto)
         {
@@ -515,30 +497,8 @@ namespace RoutePlanner.API.Controllers
                 if (!await _context.Routes.AnyAsync(r => r.Id == routeId && r.UserId == currentUserId))
                     return NotFound(new { message = "Route not found" });
 
-                // Check if this would create a conflict (before applying the change)
-                ScheduleChangeConflictDto? conflictCheck = null;
-                if (dto.PlannedStart.HasValue && dto.PlannedEnd.HasValue)
-                {
-                    conflictCheck = await _conflictService.CheckScheduleChangeConflict(
-                        routeId,
-                        routePlaceId,
-                        dto.PlannedStart.Value,
-                        dto.PlannedEnd.Value);
-                }
-
-                // Update the schedule
+                // Update the schedule (service automatically cascades chain forward)
                 await _scheduleService.UpdateRoutePlaceSchedule(routeId, routePlaceId, dto);
-
-                // Return conflict information if any
-                if (conflictCheck != null && conflictCheck.WouldCreateConflict)
-                {
-                    return Ok(new
-                    {
-                        success = true,
-                        conflict = conflictCheck,
-                        message = "Schedule updated but created ordering conflict"
-                    });
-                }
 
                 return NoContent();
             }
@@ -549,6 +509,29 @@ namespace RoutePlanner.API.Controllers
             catch (Exception ex)
             {
                 return BadRequest(new { message = "Error updating stop schedule", error = ex.Message });
+            }
+        }
+
+        // POST: api/routes/{id}/schedule/recalculate-chain - Recalculate entire chain schedule
+        [HttpPost("{id}/schedule/recalculate-chain")]
+        public async Task<ActionResult<RecalculateScheduleResultDto>> RecalculateChainSchedule(int id)
+        {
+            try
+            {
+                var currentUserId = GetCurrentUserId();
+                if (!await _context.Routes.AnyAsync(r => r.Id == id && r.UserId == currentUserId))
+                    return NotFound(new { message = "Route not found" });
+
+                var result = await _scheduleService.RecalculateChainSchedule(id);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = "Error recalculating chain schedule", error = ex.Message });
             }
         }
 

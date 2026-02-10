@@ -53,6 +53,16 @@ export async function initializeScheduleIfNeeded(routeId, route) {
         }
     }
 
+    // Recalculate chain schedule to ensure continuous timeline (no gaps)
+    if (itinerary.places && itinerary.places.length > 1) {
+        try {
+            console.log('Recalculating chain schedule for continuous timeline...');
+            await ApiService.recalculateChainSchedule(routeId);
+        } catch (error) {
+            console.error('Failed to recalculate chain schedule:', error);
+        }
+    }
+
     console.log('Schedule initialization complete');
 }
 

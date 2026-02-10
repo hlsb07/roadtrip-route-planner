@@ -1232,7 +1232,7 @@ class App {
             // Map to timeline coordinates
             const timelineStops = mapItineraryToTimelineStops(itinerary);
             const timelineLegs = mapItineraryToTimelineLegs(itinerary, timelineStops);
-            const totalDays = calculateTotalDays(timelineStops);
+            const totalDays = calculateTotalDays(timelineStops, timelineLegs);
             const routeStartUtc = itinerary.scheduleSettings?.startDateTime;
 
             // Render with conflict information and legs

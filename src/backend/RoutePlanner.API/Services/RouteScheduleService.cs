@@ -274,6 +274,146 @@ namespace RoutePlanner.API.Services
             };
         }
 
+        public async Task<RecalculateScheduleResultDto> RecalculateChainSchedule(int routeId, int fromOrderIndex = 0)
+        {
+            var route = await _context.Routes
+                .Include(r => r.Places.OrderBy(p => p.OrderIndex))
+                    .ThenInclude(rp => rp.Place)
+                .Include(r => r.Legs.OrderBy(l => l.OrderIndex))
+                .FirstOrDefaultAsync(r => r.Id == routeId);
+
+            if (route == null)
+            {
+                throw new InvalidOperationException($"Route {routeId} not found");
+            }
+
+            var orderedPlaces = route.Places.OrderBy(p => p.OrderIndex).ToList();
+            var orderedLegs = route.Legs.OrderBy(l => l.OrderIndex).ToList();
+
+            if (orderedPlaces.Count == 0)
+            {
+                return new RecalculateScheduleResultDto { UpdatedStops = 0 };
+            }
+
+            int updatedCount = 0;
+            var changes = new List<ScheduleChangeDetail>();
+
+            // Determine the anchor time: the PlannedStart of the place at fromOrderIndex
+            var anchorPlace = orderedPlaces.FirstOrDefault(p => p.OrderIndex >= fromOrderIndex);
+            if (anchorPlace == null)
+            {
+                _logger.LogInformation($"No place at or after OrderIndex {fromOrderIndex}, nothing to recalculate");
+                return new RecalculateScheduleResultDto { UpdatedStops = 0 };
+            }
+
+            // If anchor place has no PlannedStart, use route start or current time
+            DateTimeOffset currentTime;
+            if (anchorPlace.PlannedStart.HasValue)
+            {
+                currentTime = anchorPlace.PlannedStart.Value;
+            }
+            else
+            {
+                currentTime = route.StartDateTime ?? DateTimeOffset.UtcNow;
+            }
+
+            _logger.LogInformation($"RecalculateChainSchedule for route {routeId} from OrderIndex {fromOrderIndex}, anchor time: {currentTime}");
+
+            // Walk the chain from the anchor place forward
+            for (int i = 0; i < orderedPlaces.Count; i++)
+            {
+                var place = orderedPlaces[i];
+
+                // Skip places before fromOrderIndex
+                if (place.OrderIndex < fromOrderIndex)
+                    continue;
+
+                var oldStart = place.PlannedStart;
+                var oldEnd = place.PlannedEnd;
+
+                // Set start time
+                place.PlannedStart = currentTime;
+
+                // Compute place duration (preserve existing duration)
+                var placeDuration = ComputePlaceDuration(place, oldStart, oldEnd);
+                place.PlannedEnd = place.PlannedStart.Value.Add(placeDuration);
+                currentTime = place.PlannedEnd.Value;
+
+                updatedCount++;
+                _logger.LogInformation($"  Place [{place.OrderIndex}] {place.Place?.Name}: {oldStart} -> {place.PlannedStart}, end: {place.PlannedEnd}");
+
+                changes.Add(new ScheduleChangeDetail
+                {
+                    RoutePlaceId = place.Id,
+                    PlaceName = place.Place?.Name ?? "",
+                    OldStart = oldStart,
+                    OldEnd = oldEnd,
+                    NewStart = place.PlannedStart,
+                    NewEnd = place.PlannedEnd,
+                    WasLocked = place.IsStartLocked || place.IsEndLocked
+                });
+
+                // Find the leg that connects this place to the next one
+                var leg = orderedLegs.FirstOrDefault(l => l.FromRoutePlaceId == place.Id);
+                if (leg != null)
+                {
+                    leg.PlannedStart = currentTime;
+                    leg.PlannedEnd = currentTime.AddSeconds(leg.DurationSeconds);
+                    currentTime = leg.PlannedEnd.Value;
+
+                    _logger.LogInformation($"  Leg [{leg.OrderIndex}]: {leg.PlannedStart} -> {leg.PlannedEnd} ({leg.DurationSeconds}s)");
+                }
+            }
+
+            route.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation($"Chain schedule recalculated for route {routeId}: {updatedCount} places updated");
+
+            return new RecalculateScheduleResultDto
+            {
+                UpdatedStops = updatedCount,
+                Changes = changes,
+                PreservedLockedDays = false
+            };
+        }
+
+        /// <summary>
+        /// Compute the duration for a place, preserving existing duration if available.
+        /// Priority: existing PlannedEnd - PlannedStart > StayNights > StayDurationMinutes > default
+        /// </summary>
+        private TimeSpan ComputePlaceDuration(RoutePlace place, DateTimeOffset? oldStart, DateTimeOffset? oldEnd)
+        {
+            // 1. Use existing duration if both start and end were set
+            if (oldStart.HasValue && oldEnd.HasValue)
+            {
+                var duration = oldEnd.Value - oldStart.Value;
+                if (duration.TotalMinutes > 0)
+                    return duration;
+            }
+
+            // 2. Use StayNights if set
+            if (place.StayNights.HasValue && place.StayNights.Value > 0)
+            {
+                return TimeSpan.FromDays(place.StayNights.Value);
+            }
+
+            // 3. Use StayDurationMinutes if set
+            if (place.StayDurationMinutes.HasValue && place.StayDurationMinutes.Value > 0)
+            {
+                return TimeSpan.FromMinutes(place.StayDurationMinutes.Value);
+            }
+
+            // 4. Default based on StopType
+            return place.StopType switch
+            {
+                StopType.Overnight => TimeSpan.FromHours(24),
+                StopType.DayStop => TimeSpan.FromHours(2),
+                StopType.Waypoint => TimeSpan.FromMinutes(30),
+                _ => TimeSpan.FromHours(24)
+            };
+        }
+
         // ===== Manual Mapping Helpers =====
 
         private RouteScheduleSettingsDto MapToRouteScheduleSettingsDto(Models.Route route)
