@@ -539,9 +539,9 @@ export class TimelineService {
     cascadeFromStop(fromIndex) {
         let currentTime = this.timelineStops[fromIndex].endT;
 
-        for (let i = fromIndex; i < this.timelineStops.length - 1; i++) {
-            // Update leg between stop[i] and stop[i+1]
-            const leg = this.timelineLegs[i];
+        // Only update the immediately next leg and stop (not the entire chain)
+        if (fromIndex < this.timelineStops.length - 1) {
+            const leg = this.timelineLegs[fromIndex];
             if (leg) {
                 const legDuration = leg.durationSeconds / (24 * 60 * 60);
                 leg.startT = currentTime;
@@ -549,12 +549,10 @@ export class TimelineService {
                 currentTime = leg.endT;
             }
 
-            // Update next stop (preserve its duration)
-            const nextStop = this.timelineStops[i + 1];
+            const nextStop = this.timelineStops[fromIndex + 1];
             const nextDuration = nextStop.endT - nextStop.startT;
             nextStop.startT = currentTime;
             nextStop.endT = currentTime + nextDuration;
-            currentTime = nextStop.endT;
         }
     }
 
@@ -652,14 +650,31 @@ export class TimelineService {
 
             if (hasMoved) {
                 console.log(`Saving schedule for stop: ${stop.name}`);
-                // Save the edited stop - backend will cascade to all following items
+                // Save the edited stop
                 await this.saveStopSchedule(stop);
 
-                // If we cascaded backward, also save the preceding place
+                // Save adjacent places and legs affected by the drag
                 if ((mode === 'resizeL' || mode === 'move') && index > 0) {
+                    // Backward: save preceding stop and the leg between them
                     const prevStop = this.timelineStops[index - 1];
                     if (prevStop) {
                         await this.saveStopSchedule(prevStop);
+                    }
+                    const prevLeg = this.timelineLegs[index - 1];
+                    if (prevLeg) {
+                        await this.saveLegSchedule(prevLeg);
+                    }
+                }
+
+                if ((mode === 'resizeR' || mode === 'move') && index < this.timelineStops.length - 1) {
+                    // Forward: save next stop and the leg between them
+                    const nextStop = this.timelineStops[index + 1];
+                    if (nextStop) {
+                        await this.saveStopSchedule(nextStop);
+                    }
+                    const nextLeg = this.timelineLegs[index];
+                    if (nextLeg) {
+                        await this.saveLegSchedule(nextLeg);
                     }
                 }
 
@@ -719,6 +734,24 @@ export class TimelineService {
             console.log(`Successfully saved schedule for ${stop.name}`);
         } catch (error) {
             console.error(`Failed to save schedule for ${stop.name}:`, error);
+        }
+    }
+
+    async saveLegSchedule(leg) {
+        const { startUtc, endUtc } = timelineCoordsToUTC(
+            leg.startT,
+            leg.endT,
+            this.routeStartUtc
+        );
+
+        try {
+            await this.callbacks.onLegScheduleChanged(leg.legId, {
+                plannedStart: startUtc,
+                plannedEnd: endUtc
+            });
+            console.log(`Successfully saved leg schedule`);
+        } catch (error) {
+            console.error(`Failed to save leg schedule:`, error);
         }
     }
 

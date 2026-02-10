@@ -66,10 +66,6 @@ namespace RoutePlanner.API.Services
 
             await _context.SaveChangesAsync();
             _logger.LogInformation($"Updated schedule for RoutePlace {routePlaceId} in route {routeId}");
-
-            // Cascade chain recalculation: update all items AFTER this place
-            // to maintain the continuous chain (no gaps)
-            await RecalculateChainSchedule(routeId, routePlace.OrderIndex + 1);
         }
 
         public async Task<RouteItineraryDto?> GetItinerary(int routeId)
