@@ -328,8 +328,8 @@ export class TimelineService {
         // Position bar
         this.updateBarPosition(bar, leg);
 
-        // Drag handler (move only - no resize for legs)
-        this.attachLegDragHandler(bar, leg, index);
+        // Leg bars are display-only in chain mode (position determined by adjacent places)
+        bar.style.cursor = 'default';
 
         // Click to show segment popup on map
         bar.addEventListener('click', () => {
@@ -529,8 +529,72 @@ export class TimelineService {
 
         barEl.dataset.startT = stop.startT;
         barEl.dataset.endT = stop.endT;
+    }
 
-        console.log(`Bar position for ${stop.name}: dayWidth=${dayWidth}px, startT=${stop.startT.toFixed(2)}, endT=${stop.endT.toFixed(2)}, leftPx=${leftPx.toFixed(1)}px, widthPx=${widthPx.toFixed(1)}px`);
+    /**
+     * Cascade chain forward from a given stop index.
+     * Updates all subsequent legs and stops to maintain the continuous chain (no gaps).
+     * @param {number} fromIndex - Index of the stop whose endT is the starting point
+     */
+    cascadeFromStop(fromIndex) {
+        let currentTime = this.timelineStops[fromIndex].endT;
+
+        for (let i = fromIndex; i < this.timelineStops.length - 1; i++) {
+            // Update leg between stop[i] and stop[i+1]
+            const leg = this.timelineLegs[i];
+            if (leg) {
+                const legDuration = leg.durationSeconds / (24 * 60 * 60);
+                leg.startT = currentTime;
+                leg.endT = currentTime + legDuration;
+                currentTime = leg.endT;
+            }
+
+            // Update next stop (preserve its duration)
+            const nextStop = this.timelineStops[i + 1];
+            const nextDuration = nextStop.endT - nextStop.startT;
+            nextStop.startT = currentTime;
+            nextStop.endT = currentTime + nextDuration;
+            currentTime = nextStop.endT;
+        }
+    }
+
+    /**
+     * Cascade chain backward from a given stop index.
+     * Adjusts the preceding place's endT based on the current stop's startT.
+     * @param {number} stopIndex - Index of the stop whose startT changed
+     */
+    cascadeBackward(stopIndex) {
+        if (stopIndex <= 0) return;
+
+        const MIN_DUR = 0.05;
+        const stop = this.timelineStops[stopIndex];
+        const prevLeg = this.timelineLegs[stopIndex - 1];
+        const prevStop = this.timelineStops[stopIndex - 1];
+
+        if (prevLeg && prevStop) {
+            const legDuration = prevLeg.durationSeconds / (24 * 60 * 60);
+            // Leg must end at stop.startT
+            prevLeg.endT = stop.startT;
+            prevLeg.startT = stop.startT - legDuration;
+
+            // Previous stop must end when leg starts
+            prevStop.endT = Math.max(prevStop.startT + MIN_DUR, prevLeg.startT);
+        }
+    }
+
+    /**
+     * Update DOM positions of all bars (stops and legs)
+     */
+    updateAllBarPositions() {
+        this.timelineStops.forEach((stop, idx) => {
+            const bar = this.barElsByIndex.get(idx);
+            if (bar) this.updateBarPosition(bar, stop);
+        });
+
+        this.timelineLegs.forEach((leg, idx) => {
+            const bar = this.legBarElsByIndex.get(idx);
+            if (bar) this.updateBarPosition(bar, leg);
+        });
     }
 
     attachBarDragResize(barEl, stop, index) {
@@ -539,7 +603,7 @@ export class TimelineService {
         let startX = 0;
         let startStartT = 0;
         let startEndT = 0;
-        let hasMoved = false; // Track if user actually moved the bar
+        let hasMoved = false;
 
         const pxToT = (deltaPx) => {
             const rect = this.ganttWrapper.getBoundingClientRect();
@@ -550,23 +614,34 @@ export class TimelineService {
             const dx = e.clientX - startX;
             const dt = pxToT(dx);
 
-            // Mark as moved if there's any significant movement
             if (Math.abs(dx) > 2) {
                 hasMoved = true;
             }
 
             if (mode === 'resizeL') {
-                stop.startT = Math.max(0, Math.min(startStartT + dt, startEndT - MIN_DUR));
+                // Left resize: change start time, adjust preceding place
+                const newStart = Math.max(0, Math.min(startStartT + dt, stop.endT - MIN_DUR));
+                stop.startT = newStart;
+                // Cascade backward: adjust preceding place's end time through the preceding leg
+                this.cascadeBackward(index);
             } else if (mode === 'resizeR') {
-                stop.endT = Math.max(startStartT + MIN_DUR, Math.min(startEndT + dt, this.totalDays));
+                // Right resize: change end time, cascade everything forward
+                stop.endT = Math.max(stop.startT + MIN_DUR, startEndT + dt);
+                this.cascadeFromStop(index);
             } else if (mode === 'move') {
+                // Move: shift this stop, adjust preceding place, cascade forward
                 const dur = startEndT - startStartT;
-                const newStart = Math.max(0, Math.min(startStartT + dt, this.totalDays - dur));
+                const newStart = Math.max(0, startStartT + dt);
                 stop.startT = newStart;
                 stop.endT = newStart + dur;
+                // Cascade backward (adjust preceding place)
+                this.cascadeBackward(index);
+                // Cascade forward (adjust all following items)
+                this.cascadeFromStop(index);
             }
 
-            this.updateBarPosition(barEl, stop);
+            // Update ALL bar positions (chain cascade affects multiple bars)
+            this.updateAllBarPositions();
         };
 
         const onPointerUp = async () => {
@@ -575,13 +650,18 @@ export class TimelineService {
 
             barEl.classList.remove('resizing', 'moving');
 
-            // Only save if the user actually moved the bar
             if (hasMoved) {
                 console.log(`Saving schedule for stop: ${stop.name}`);
+                // Save the edited stop - backend will cascade to all following items
                 await this.saveStopSchedule(stop);
 
-                // Optionally recalculate legs
-                // this.callbacks.onNeedRecalculateLegs();
+                // If we cascaded backward, also save the preceding place
+                if ((mode === 'resizeL' || mode === 'move') && index > 0) {
+                    const prevStop = this.timelineStops[index - 1];
+                    if (prevStop) {
+                        await this.saveStopSchedule(prevStop);
+                    }
+                }
 
                 this.relayoutRows();
             }
@@ -594,22 +674,20 @@ export class TimelineService {
             const isLeft = e.target.classList.contains('left');
             const isRight = e.target.classList.contains('right');
 
-            // Allow drag on resize handles or on the bar itself (not on label)
             if (!isLeft && !isRight) {
-                // If clicking on the label, don't start drag mode
                 if (e.target.classList.contains('bar-label')) {
                     return;
                 }
             }
 
             e.preventDefault();
-            e.stopPropagation(); // Prevent click event
+            e.stopPropagation();
 
             mode = isLeft ? 'resizeL' : isRight ? 'resizeR' : 'move';
             startX = e.clientX;
             startStartT = stop.startT;
             startEndT = stop.endT;
-            hasMoved = false; // Reset movement flag
+            hasMoved = false;
 
             barEl.classList.add(mode === 'move' ? 'moving' : 'resizing');
             barEl.setPointerCapture(e.pointerId);
@@ -627,91 +705,50 @@ export class TimelineService {
         );
 
         try {
-            const response = await this.callbacks.onStopScheduleChanged(stop.routePlaceId, {
+            await this.callbacks.onStopScheduleChanged(stop.routePlaceId, {
                 stopType: stop.stopType,
-                timeZoneId: null, // Use route default
+                timeZoneId: null,
                 plannedStart: startUtc,
                 plannedEnd: endUtc,
-                stayNights: null, // Let backend recalculate
+                stayNights: null,
                 stayDurationMinutes: null,
-                isStartLocked: true, // Lock after manual edit
+                isStartLocked: true,
                 isEndLocked: true
             });
-
-            // Check if response contains conflict information
-            if (response && response.conflict && response.conflict.wouldCreateConflict) {
-                const userWantsReorder = await this.conflictUI.showScheduleChangeConflictPrompt(
-                    response.conflict
-                );
-
-                if (userWantsReorder) {
-                    await this.callbacks.onResolveConflictByReorder();
-                    this.conflictUI.showResolutionSuccess();
-                }
-            }
 
             console.log(`Successfully saved schedule for ${stop.name}`);
         } catch (error) {
             console.error(`Failed to save schedule for ${stop.name}:`, error);
-            // TODO: Show user notification
         }
     }
 
     relayoutRows() {
-        // Use day-based overlap detection for row assignment
-        const dayOccupancy = {};
-        let maxRow = 0;
+        // Chain mode: all items are on a single row (no overlaps in a continuous chain)
+        const PLACE_HEIGHT = 36;
+        const LEG_HEIGHT = 24;
+        const ROW_HEIGHT = 45;
 
-        // First, layout place bars (full height rows)
+        // Place bars at top of the single row
         this.timelineStops.forEach((stop, index) => {
-            const startDay = Math.floor(stop.startT) + 1;
-            const endDay = Math.max(startDay, Math.ceil(stop.endT));
-
-            // Find free row
-            let row = 0;
-            while (true) {
-                let ok = true;
-                for (let d = startDay; d <= endDay; d++) {
-                    if (dayOccupancy[d] && dayOccupancy[d][row]) {
-                        ok = false;
-                        break;
-                    }
-                }
-                if (ok) break;
-                row++;
-            }
-
-            // Mark occupied
-            for (let d = startDay; d <= endDay; d++) {
-                if (!dayOccupancy[d]) dayOccupancy[d] = {};
-                dayOccupancy[d][row] = true;
-            }
-
-            maxRow = Math.max(maxRow, row);
-
             const barEl = this.barElsByIndex.get(index);
             if (barEl) {
-                barEl.style.top = (row * 45) + 'px';
+                barEl.style.top = '0px';
+                barEl.style.height = `${PLACE_HEIGHT}px`;
             }
         });
 
-        // Then, layout leg bars in a dedicated row below place bars
-        // Leg bars are thinner (24px) so they get their own row with less spacing
-        if (this.timelineLegs.length > 0) {
-            const legRowTop = (maxRow + 1) * 45 + 8; // 8px gap after place bars
+        // Leg bars vertically centered within the same row
+        const legTop = (PLACE_HEIGHT - LEG_HEIGHT) / 2;
+        this.timelineLegs.forEach((leg, index) => {
+            const barEl = this.legBarElsByIndex.get(index);
+            if (barEl) {
+                barEl.style.top = `${legTop}px`;
+                barEl.style.height = `${LEG_HEIGHT}px`;
+            }
+        });
 
-            this.timelineLegs.forEach((leg, index) => {
-                const barEl = this.legBarElsByIndex.get(index);
-                if (barEl) {
-                    barEl.style.top = `${legRowTop}px`;
-                }
-            });
-
-            // Adjust container height to include leg row
-            this.ganttBarsContainer.style.height = (legRowTop + 34) + 'px'; // 24px bar + 10px padding
-        } else {
-            this.ganttBarsContainer.style.height = ((maxRow + 1) * 45 + 10) + 'px';
-        }
+        // Set container height for the single row
+        this.ganttBarsContainer.style.height = `${ROW_HEIGHT + 10}px`;
     }
 
     configureSlider() {

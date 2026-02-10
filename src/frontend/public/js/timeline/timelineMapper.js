@@ -151,17 +151,19 @@ export function mapItineraryToTimelineLegs(itinerary, timelineStops) {
 }
 
 /**
- * Calculate total days for the timeline based on stops
+ * Calculate total days for the timeline based on stops and legs
  * Adds 1 extra day at the end to allow extending the trip
  * @param {Array} timelineStops - Array of timeline stops
+ * @param {Array} timelineLegs - Array of timeline legs (optional)
  * @returns {number} Total days (rounded up + 1 extra day for extension)
  */
-export function calculateTotalDays(timelineStops) {
-    if (!timelineStops || timelineStops.length === 0) {
+export function calculateTotalDays(timelineStops, timelineLegs = []) {
+    const allItems = [...(timelineStops || []), ...(timelineLegs || [])];
+    if (allItems.length === 0) {
         return 2; // 1 day minimum + 1 extra day for extension
     }
 
-    const maxEndT = Math.max(...timelineStops.map(s => s.endT));
+    const maxEndT = Math.max(...allItems.map(s => s.endT));
     const baseDays = Math.ceil(maxEndT);
     const totalDays = baseDays + 1; // Add 1 extra day for trip extension
 

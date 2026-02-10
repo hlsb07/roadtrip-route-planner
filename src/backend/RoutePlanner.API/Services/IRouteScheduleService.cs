@@ -36,5 +36,17 @@ namespace RoutePlanner.API.Services
             int? movedPlaceId = null,
             int? oldIndex = null,
             int? newIndex = null);
+
+        /// <summary>
+        /// Recalculates the entire route as a continuous chain with no gaps.
+        /// Chain: Place[0] -> Leg[0] -> Place[1] -> Leg[1] -> ...
+        /// Each item starts exactly when the previous ends.
+        /// Leg durations are fixed (from OSRM). Place durations are preserved.
+        /// </summary>
+        /// <param name="routeId">The route ID</param>
+        /// <param name="fromOrderIndex">Start recalculation from this order index (0 = full recalc).
+        /// The item at this index uses its current PlannedStart as the anchor.</param>
+        /// <returns>Result with details of what was changed</returns>
+        Task<RecalculateScheduleResultDto> RecalculateChainSchedule(int routeId, int fromOrderIndex = 0);
     }
 }
