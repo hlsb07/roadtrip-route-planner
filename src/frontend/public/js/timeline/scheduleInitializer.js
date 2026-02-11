@@ -74,12 +74,12 @@ export async function initializeScheduleIfNeeded(routeId, route) {
 function calculateDefaultStart(route) {
     const now = new Date();
 
-    // Use default arrival time if set, otherwise 09:00
+    // Use default arrival time if set, otherwise 09:00 (UTC)
     if (route.defaultArrivalTime) {
         const [hours, minutes] = route.defaultArrivalTime.split(':').map(Number);
-        now.setHours(hours, minutes, 0, 0);
+        now.setUTCHours(hours, minutes, 0, 0);
     } else {
-        now.setHours(9, 0, 0, 0); // Default to 09:00
+        now.setUTCHours(9, 0, 0, 0); // Default to 09:00 UTC
     }
 
     return now;
@@ -118,8 +118,8 @@ async function generateDefaultStopSchedules(routeId, itinerary) {
         const dayOffset = place.orderIndex;
 
         const plannedStart = new Date(startDateTime);
-        plannedStart.setDate(plannedStart.getDate() + dayOffset);
-        plannedStart.setHours(9, 0, 0, 0); // 09:00 arrival
+        plannedStart.setUTCDate(plannedStart.getUTCDate() + dayOffset);
+        plannedStart.setUTCHours(9, 0, 0, 0); // 09:00 UTC arrival
 
         const plannedEnd = new Date(plannedStart);
 
@@ -127,9 +127,9 @@ async function generateDefaultStopSchedules(routeId, itinerary) {
         const stopType = 0; // Overnight enum value
 
         if (stopType === 0) { // Overnight
-            plannedEnd.setDate(plannedEnd.getDate() + 1); // Next day 09:00
+            plannedEnd.setUTCDate(plannedEnd.getUTCDate() + 1); // Next day 09:00
         } else {
-            plannedEnd.setHours(plannedEnd.getHours() + 2); // 2 hours later
+            plannedEnd.setUTCHours(plannedEnd.getUTCHours() + 2); // 2 hours later
         }
 
         console.log(`Setting schedule for place ${place.orderIndex + 1} (${place.placeName}): ${plannedStart.toISOString()} to ${plannedEnd.toISOString()}`);

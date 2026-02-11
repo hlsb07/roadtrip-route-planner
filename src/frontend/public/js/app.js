@@ -1320,9 +1320,8 @@ class App {
 
         if (!dateInput || !dateInput.value) return;
 
-        // Parse the new date and set time to 09:00 (default arrival time)
-        const newDate = new Date(dateInput.value);
-        newDate.setHours(9, 0, 0, 0);
+        // Parse the new date and set time to 09:00 UTC (default arrival time)
+        const newDate = new Date(dateInput.value + 'T09:00:00.000Z');
 
         try {
             // Show loading state
@@ -1475,8 +1474,8 @@ class App {
             // Render list view with places and leg dividers
             let html = '';
             itinerary.places.forEach((place, idx) => {
-                const startDate = place.plannedStart ? new Date(place.plannedStart).toLocaleString() : 'Not scheduled';
-                const endDate = place.plannedEnd ? new Date(place.plannedEnd).toLocaleString() : 'Not scheduled';
+                const startDate = place.plannedStart ? this.formatUtcDateTime(new Date(place.plannedStart)) : 'Not scheduled';
+                const endDate = place.plannedEnd ? this.formatUtcDateTime(new Date(place.plannedEnd)) : 'Not scheduled';
                 const stopTypeLabel = place.stopType === 0 ? 'Overnight' : place.stopType === 1 ? 'Day Stop' : 'Waypoint';
 
                 // Store ISO strings for editing
@@ -1580,7 +1579,7 @@ class App {
         if (startISO) {
             const startDate = new Date(startISO);
             arrivalDateInput.value = startDate.toISOString().split('T')[0];
-            arrivalTimeInput.value = startDate.toTimeString().slice(0, 5);
+            arrivalTimeInput.value = startDate.toISOString().slice(11, 16);
         } else {
             arrivalDateInput.value = '';
             arrivalTimeInput.value = '';
@@ -1589,7 +1588,7 @@ class App {
         if (endISO) {
             const endDate = new Date(endISO);
             departureDateInput.value = endDate.toISOString().split('T')[0];
-            departureTimeInput.value = endDate.toTimeString().slice(0, 5);
+            departureTimeInput.value = endDate.toISOString().slice(11, 16);
         } else {
             departureDateInput.value = '';
             departureTimeInput.value = '';
@@ -1619,9 +1618,9 @@ class App {
             return;
         }
 
-        // Construct ISO strings
-        const plannedStart = new Date(`${arrivalDate}T${arrivalTime}`).toISOString();
-        const plannedEnd = new Date(`${departureDate}T${departureTime}`).toISOString();
+        // Construct ISO strings (use Z suffix to ensure UTC interpretation)
+        const plannedStart = new Date(`${arrivalDate}T${arrivalTime}:00.000Z`).toISOString();
+        const plannedEnd = new Date(`${departureDate}T${departureTime}:00.000Z`).toISOString();
 
         // Validate that departure is after arrival
         if (new Date(plannedEnd) <= new Date(plannedStart)) {
@@ -1639,6 +1638,16 @@ class App {
             console.error('Failed to save schedule:', error);
             showError('Failed to save schedule');
         }
+    }
+
+    formatUtcDateTime(date) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[date.getUTCMonth()];
+        const day = date.getUTCDate();
+        const year = date.getUTCFullYear();
+        const hh = String(date.getUTCHours()).padStart(2, '0');
+        const mm = String(date.getUTCMinutes()).padStart(2, '0');
+        return `${month} ${day}, ${year} · ${hh}:${mm}`;
     }
 
     getColorForIndex(idx) {
