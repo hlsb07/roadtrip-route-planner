@@ -310,6 +310,10 @@ export class TimelineService {
     }
 
     createLegBar(leg, index) {
+        // Wrapper to hold both the bar and the label below it
+        const wrapper = document.createElement('div');
+        wrapper.className = 'gantt-leg-wrapper';
+
         const bar = document.createElement('div');
         bar.className = 'gantt-bar gantt-leg-bar';
         bar.dataset.index = index;
@@ -319,25 +323,28 @@ export class TimelineService {
         const distanceKm = (leg.distanceMeters / 1000).toFixed(1);
         bar.dataset.tooltip = `${leg.fromPlaceName} → ${leg.toPlaceName} (${distanceKm} km)`;
 
-        // Label with car icon and duration
+        wrapper.appendChild(bar);
+
+        // Label below the bar with car icon and duration
         const label = document.createElement('div');
-        label.className = 'bar-label';
+        label.className = 'gantt-leg-label';
         label.innerHTML = `<i class="fas fa-car"></i> ${this.formatDuration(leg.durationSeconds)}`;
-        bar.appendChild(label);
+        wrapper.appendChild(label);
 
-        // Position bar
-        this.updateBarPosition(bar, leg);
+        // Position wrapper (same as bar positioning)
+        this.updateBarPosition(wrapper, leg);
 
-        // Leg bars are display-only in chain mode (position determined by adjacent places)
-        bar.style.cursor = 'default';
+        // Enable dragging to shift the leg in time (adjusts adjacent places)
+        bar.style.cursor = 'grab';
+        this.attachLegDragHandler(wrapper, leg, index);
 
         // Click to show segment popup on map
         bar.addEventListener('click', () => {
-            if (bar.classList.contains('moving')) return;
+            if (wrapper.classList.contains('moving')) return;
             this.callbacks.onLegClicked(index, leg);
         });
 
-        return bar;
+        return wrapper;
     }
 
     formatDuration(seconds) {
@@ -349,15 +356,13 @@ export class TimelineService {
         return `${minutes}m`;
     }
 
-    attachLegDragHandler(barEl, leg, index) {
+    attachLegDragHandler(wrapperEl, leg, index) {
         let startX = 0;
         let startStartT = 0;
         let startEndT = 0;
         let hasMoved = false;
 
-        // Store original place positions for restoring on cancel
-        let originalFromStopEndT = null;
-        let originalToStopStartT = null;
+        const innerBar = wrapperEl.querySelector('.gantt-leg-bar');
 
         const pxToT = (deltaPx) => {
             const rect = this.ganttWrapper.getBoundingClientRect();
@@ -381,9 +386,7 @@ export class TimelineService {
             const toStop = this.timelineStops.find(s => s.routePlaceId === leg.toRoutePlaceId);
 
             // Clamp leg to valid range
-            // Leg can't start before fromPlace starts (minimum the beginning of fromPlace)
             const minStart = fromStop ? fromStop.startT + 0.01 : 0;
-            // Leg can't end after toPlace ends (maximum the end of toPlace)
             const maxEnd = toStop ? toStop.endT - 0.01 : this.totalDays;
 
             newStart = Math.max(minStart, Math.min(newStart, maxEnd - duration));
@@ -394,27 +397,27 @@ export class TimelineService {
 
             // NO-GAPS ENFORCEMENT: Update connected places in real-time
             if (fromStop) {
-                fromStop.endT = leg.startT; // fromPlace ends when leg starts
+                fromStop.endT = leg.startT;
                 const fromBarIndex = this.timelineStops.findIndex(s => s === fromStop);
                 const fromBar = this.barElsByIndex.get(fromBarIndex);
                 if (fromBar) this.updateBarPosition(fromBar, fromStop);
             }
 
             if (toStop) {
-                toStop.startT = leg.endT; // toPlace starts when leg ends
+                toStop.startT = leg.endT;
                 const toBarIndex = this.timelineStops.findIndex(s => s === toStop);
                 const toBar = this.barElsByIndex.get(toBarIndex);
                 if (toBar) this.updateBarPosition(toBar, toStop);
             }
 
-            this.updateBarPosition(barEl, leg);
+            this.updateBarPosition(wrapperEl, leg);
         };
 
         const onPointerUp = async () => {
             document.removeEventListener('pointermove', onPointerMove);
             document.removeEventListener('pointerup', onPointerUp);
 
-            barEl.classList.remove('moving');
+            wrapperEl.classList.remove('moving');
 
             if (hasMoved) {
                 console.log(`Saving leg and connected places`);
@@ -425,12 +428,7 @@ export class TimelineService {
             hasMoved = false;
         };
 
-        barEl.addEventListener('pointerdown', (e) => {
-            // Don't start drag on label click
-            if (e.target.classList.contains('bar-label')) {
-                return;
-            }
-
+        innerBar.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             e.stopPropagation();
 
@@ -439,14 +437,8 @@ export class TimelineService {
             startEndT = leg.endT;
             hasMoved = false;
 
-            // Store original positions for connected places
-            const fromStop = this.timelineStops.find(s => s.routePlaceId === leg.fromRoutePlaceId);
-            const toStop = this.timelineStops.find(s => s.routePlaceId === leg.toRoutePlaceId);
-            originalFromStopEndT = fromStop ? fromStop.endT : null;
-            originalToStopStartT = toStop ? toStop.startT : null;
-
-            barEl.classList.add('moving');
-            barEl.setPointerCapture(e.pointerId);
+            wrapperEl.classList.add('moving');
+            innerBar.setPointerCapture(e.pointerId);
 
             document.addEventListener('pointermove', onPointerMove);
             document.addEventListener('pointerup', onPointerUp);
@@ -770,18 +762,17 @@ export class TimelineService {
             }
         });
 
-        // Leg bars vertically centered within the same row
+        // Leg wrappers: bar vertically centered, label hangs below
         const legTop = (PLACE_HEIGHT - LEG_HEIGHT) / 2;
         this.timelineLegs.forEach((leg, index) => {
-            const barEl = this.legBarElsByIndex.get(index);
-            if (barEl) {
-                barEl.style.top = `${legTop}px`;
-                barEl.style.height = `${LEG_HEIGHT}px`;
+            const wrapperEl = this.legBarElsByIndex.get(index);
+            if (wrapperEl) {
+                wrapperEl.style.top = `${legTop}px`;
             }
         });
 
-        // Set container height for the single row
-        this.ganttBarsContainer.style.height = `${ROW_HEIGHT + 10}px`;
+        // Set container height for the single row (extra space for leg labels)
+        this.ganttBarsContainer.style.height = `${ROW_HEIGHT + 20}px`;
     }
 
     configureSlider() {
