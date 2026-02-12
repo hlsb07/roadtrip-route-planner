@@ -1189,6 +1189,20 @@ export class MapService {
      * @param {boolean} isNonRoute - Whether this is a non-route place
      * @returns {string} HTML content for popup
      */
+    getGoogleMapsUrl(place, lat, lng) {
+        if (place.googlePlaceId) {
+            return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.googlePlaceId}`;
+        }
+        return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    }
+
+    getGoogleNavUrl(place, lat, lng) {
+        if (place.googlePlaceId) {
+            return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.name)}&destination_place_id=${place.googlePlaceId}`;
+        }
+        return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    }
+
     buildPlacePopupContent(place, index = null, isNonRoute = false, isMobile = false) {
         const lat = place.coords ? place.coords[0] : place.latitude;
         const lng = place.coords ? place.coords[1] : place.longitude;
@@ -1363,13 +1377,13 @@ export class MapService {
         // External links (Google Maps, Navigation)
         const externalLinks = `
             <div class="map-popup-links">
-                <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}"
+                <a href="${this.getGoogleMapsUrl(place, lat, lng)}"
                    target="_blank"
                    class="link-btn google-maps"
                    onclick="event.stopPropagation()">
                     <i class="fas fa-map"></i> Google Maps
                 </a>
-                <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"
+                <a href="${this.getGoogleNavUrl(place, lat, lng)}"
                    target="_blank"
                    class="link-btn google-nav"
                    onclick="event.stopPropagation()">
@@ -1650,13 +1664,13 @@ export class MapService {
         // Action buttons (sticky at bottom)
         const externalLinks = `
             <div class="expanded-external-links">
-                <a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}"
+                <a href="${this.getGoogleMapsUrl(place, lat, lng)}"
                    target="_blank"
                    class="link-btn google-maps"
                    onclick="event.stopPropagation()">
                     <i class="fas fa-map"></i> Google Maps
                 </a>
-                <a href="https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}"
+                <a href="${this.getGoogleNavUrl(place, lat, lng)}"
                    target="_blank"
                    class="link-btn google-nav"
                    onclick="event.stopPropagation()">

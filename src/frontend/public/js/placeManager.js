@@ -1090,13 +1090,17 @@ export class PlaceManager {
                 </div>
                 ${!this.sortingEnabled ? `
                 <div class="place-links">
-                    <a href="https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}"
+                    <a href="${place.googlePlaceId
+                        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.googlePlaceId}`
+                        : `https://www.google.com/maps/search/?api=1&query=${place.coords[0]},${place.coords[1]}`}"
                     target="_blank"
                     class="link-btn google-maps"
                     onclick="event.stopPropagation()">
                         <i class="fas fa-map"></i> Maps
                     </a>
-                    <a href="https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}"
+                    <a href="${place.googlePlaceId
+                        ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.name)}&destination_place_id=${place.googlePlaceId}`
+                        : `https://www.google.com/maps/dir/?api=1&destination=${place.coords[0]},${place.coords[1]}`}"
                     target="_blank"
                     class="link-btn google-nav"
                     onclick="event.stopPropagation()">
