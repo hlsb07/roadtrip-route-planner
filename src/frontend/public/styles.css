@@ -620,6 +620,43 @@ body {
     margin-bottom: 10px;
 }
 
+/* Schedule section in popup */
+.map-popup-schedule {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    color: #2A9D8F;
+    padding: 6px 12px;
+    margin: 4px 0;
+    background: #f0faf8;
+    border-radius: 6px;
+}
+
+.map-popup-schedule i {
+    font-size: 0.85rem;
+}
+
+/* Schedule in expanded mobile popup */
+.schedule-times {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.schedule-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.schedule-label {
+    font-weight: 600;
+    color: #555;
+    min-width: 75px;
+}
+
 /* Notes section in popup */
 .map-popup-notes {
     margin: 12px 0;
@@ -2153,7 +2190,8 @@ textarea.form-input {
         display: block;
     }
 
-    /* Show expand button only for Place List and Campsites modes */
+    /* Show expand button for Place List, Campsites, and Routes modes */
+    .mobile-content-panel[data-mode="routes"] .mobile-panel-expand,
     .mobile-content-panel[data-mode="places"] .mobile-panel-expand,
     .mobile-content-panel[data-mode="campsites"] .mobile-panel-expand {
         display: block;

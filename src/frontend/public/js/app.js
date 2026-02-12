@@ -1248,6 +1248,20 @@ class App {
             // Populate the start date picker with current value
             this.populateStartDateFromItinerary(itinerary);
 
+            // Store schedule data on mapService for popup display
+            this.mapService.placeScheduleMap = {};
+            if (itinerary.places) {
+                for (const p of itinerary.places) {
+                    if (p.placeId) {
+                        this.mapService.placeScheduleMap[p.placeId] = {
+                            plannedStart: p.plannedStart,
+                            plannedEnd: p.plannedEnd,
+                            stopType: p.stopType
+                        };
+                    }
+                }
+            }
+
             // Map to timeline coordinates
             const timelineStops = mapItineraryToTimelineStops(itinerary);
             const timelineLegs = mapItineraryToTimelineLegs(itinerary, timelineStops);

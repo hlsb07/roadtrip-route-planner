@@ -130,6 +130,7 @@ export class MapService {
         this.onRouteCalculated = null; // Callback when route is calculated
         this.routeSegments = []; // Array to store individual segment data
         this.segmentPolylines = []; // Array of polyline objects for each segment
+        this.placeScheduleMap = {}; // placeId -> { plannedStart, plannedEnd, stopType }
     }
 
     init() {
@@ -1210,6 +1211,46 @@ export class MapService {
         return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     }
 
+    /**
+     * Build schedule HTML section for a place popup
+     */
+    buildScheduleSection(place, isExpanded = false) {
+        const schedule = this.placeScheduleMap[place.id];
+        if (!schedule || !schedule.plannedStart) return '';
+
+        const formatDT = (isoStr) => {
+            const d = new Date(isoStr);
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const day = d.getUTCDate();
+            const mon = months[d.getUTCMonth()];
+            const hh = String(d.getUTCHours()).padStart(2, '0');
+            const mm = String(d.getUTCMinutes()).padStart(2, '0');
+            return `${mon} ${day} · ${hh}:${mm}`;
+        };
+
+        const arrival = formatDT(schedule.plannedStart);
+        const departure = schedule.plannedEnd ? formatDT(schedule.plannedEnd) : 'Not set';
+
+        if (isExpanded) {
+            return `
+                <div class="expanded-info-section">
+                    <div class="info-section-title"><i class="fas fa-calendar-alt"></i> Schedule</div>
+                    <div class="schedule-times">
+                        <div class="schedule-row"><span class="schedule-label">Arrival:</span> <span>${arrival}</span></div>
+                        <div class="schedule-row"><span class="schedule-label">Departure:</span> <span>${departure}</span></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="map-popup-schedule">
+                <i class="fas fa-calendar-alt"></i>
+                <span>${arrival}</span> → <span>${departure}</span>
+            </div>
+        `;
+    }
+
     buildPlacePopupContent(place, index = null, isNonRoute = false, isMobile = false) {
         const lat = place.coords ? place.coords[0] : place.latitude;
         const lng = place.coords ? place.coords[1] : place.longitude;
@@ -1417,6 +1458,7 @@ export class MapService {
                         ${isNonRoute ? '<span class="non-route-badge">Not in Route</span>' : ''}
                     </div>
                 </div>
+                ${!isNonRoute ? this.buildScheduleSection(place) : ''}
                 ${place.notes ? `
                     <div class="map-popup-notes">
                         <div class="notes-header">
@@ -1728,6 +1770,7 @@ export class MapService {
         // All content scrolls together - no separate scroll wrapper
         return `
             <div class="expanded-view" data-visible-when="expanded">
+                ${!isNonRoute ? this.buildScheduleSection(place, true) : ''}
                 ${notesSection}
                 ${ratingSection}
                 ${statusSection}
