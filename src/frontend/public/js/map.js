@@ -1189,6 +1189,13 @@ export class MapService {
      * @param {boolean} isNonRoute - Whether this is a non-route place
      * @returns {string} HTML content for popup
      */
+    linkifyText(text) {
+        const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return escaped
+            .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" onclick="event.stopPropagation()">$1</a>')
+            .replace(/\n/g, '<br>');
+    }
+
     getGoogleMapsUrl(place, lat, lng) {
         if (place.googlePlaceId) {
             return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name)}&query_place_id=${place.googlePlaceId}`;
@@ -1410,6 +1417,15 @@ export class MapService {
                         ${isNonRoute ? '<span class="non-route-badge">Not in Route</span>' : ''}
                     </div>
                 </div>
+                ${place.notes ? `
+                    <div class="map-popup-notes">
+                        <div class="notes-header">
+                            <i class="fas fa-sticky-note"></i>
+                            <strong>Notes</strong>
+                        </div>
+                        <div class="notes-content">${this.linkifyText(place.notes)}</div>
+                    </div>
+                ` : ''}
                 ${ratingDisplay || priceDisplay ? `
                     <div class="popup-quick-info">
                         ${ratingDisplay}
@@ -1421,15 +1437,6 @@ export class MapService {
                 ${countries ? `<div class="map-popup-countries">${countries}</div>` : ''}
                 ${contactSection}
                 ${openingHoursSection}
-                ${place.notes ? `
-                    <div class="map-popup-notes">
-                        <div class="notes-header">
-                            <i class="fas fa-sticky-note"></i>
-                            <strong>Notes</strong>
-                        </div>
-                        <div class="notes-content">${place.notes.replace(/\n/g, '<br>')}</div>
-                    </div>
-                ` : ''}
                 <div class="map-popup-coords">
                     <i class="fas fa-map-pin"></i> ${lat.toFixed(6)}, ${lng.toFixed(6)}
                 </div>
@@ -1520,6 +1527,11 @@ export class MapService {
 
         // Build expanded view content
         const expandedView = this.buildExpandedMobileContent(place, index, isNonRoute, lat, lng);
+
+        // Notes snippet for compact view
+        const compactNotes = place.notes
+            ? `<div class="compact-notes">${this.linkifyText(place.notes)}</div>`
+            : '';
 
         // Return object with header and unified content (both compact and expanded views)
         return {
@@ -1708,7 +1720,7 @@ export class MapService {
         const notesSection = place.notes
             ? `<div class="expanded-info-section">
                    <div class="info-section-title"><i class="fas fa-sticky-note"></i> Notes</div>
-                   <div class="info-section-content notes-text">${place.notes.replace(/\n/g, '<br>')}</div>
+                   <div class="info-section-content notes-text">${this.linkifyText(place.notes)}</div>
                </div>`
             : '';
 
@@ -1716,13 +1728,13 @@ export class MapService {
         // All content scrolls together - no separate scroll wrapper
         return `
             <div class="expanded-view" data-visible-when="expanded">
+                ${notesSection}
                 ${ratingSection}
                 ${statusSection}
                 ${addressSection}
                 ${contactSection.join('')}
                 ${hoursSection}
                 ${metadataSection.join('')}
-                ${notesSection}
                 ${coordsSection}
                 ${externalLinks}
                 ${actionButtons}

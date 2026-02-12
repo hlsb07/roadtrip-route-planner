@@ -656,6 +656,31 @@ body {
     line-height: 1.6;
 }
 
+/* Notes links */
+.notes-content a,
+.notes-text a,
+.compact-notes a {
+    color: #6366f1;
+    text-decoration: underline;
+    word-break: break-all;
+}
+
+/* Compact notes in mobile popup */
+.compact-notes {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    color: #495057;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 60px;
+    overflow: hidden;
+    border-left: 3px solid #6366f1;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin: 4px 12px 8px;
+}
+
 .map-popup-links {
     display: flex;
     gap: 8px;

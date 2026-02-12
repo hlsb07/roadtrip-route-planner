@@ -367,8 +367,8 @@ class App {
                         this.updateRoutesList();
                     });
                 }
-                // Enter in place edit modal saves
-                if (e.key === 'Enter' && document.getElementById('editPlaceModal')?.classList.contains('active')) {
+                // Enter in place edit modal saves (but not when typing in textarea)
+                if (e.key === 'Enter' && document.getElementById('editPlaceModal')?.classList.contains('active') && e.target.tagName !== 'TEXTAREA') {
                     this.placeManager.savePlaceEdit();
                 }
                 return; // Don't process other shortcuts when modal is open
