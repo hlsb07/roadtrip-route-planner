@@ -321,8 +321,8 @@ export class AllPlacesManager {
 
         const mapService = window.app.mapService;
 
-        // Center map on the place
-        mapService.map.setView([place.latitude, place.longitude], 13);
+        // Center map on the place (offset for overlays)
+        mapService.centerMapOnPoint([place.latitude, place.longitude], 13);
 
         // Find the gray marker for this place and open its popup
         const marker = mapService.nonRouteMarkers.find(m => {

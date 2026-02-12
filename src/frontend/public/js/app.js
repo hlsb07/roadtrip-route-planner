@@ -1748,8 +1748,8 @@ class App {
         // Show docked popup
         this.mapService.showMobileDockedPopup(mobileContent, place.id, { place, index, isNonRoute });
 
-        // Center map on place
-        this.mapService.map.setView(place.coords, this.mapService.map.getZoom());
+        // Center map on place (offset for overlays)
+        this.mapService.centerMapOnPoint(place.coords, this.mapService.map.getZoom());
     }
 
     async showAllPlaceInMobilePopup(index) {
@@ -1783,8 +1783,8 @@ class App {
         // Show docked popup
         this.mapService.showMobileDockedPopup(mobileContent, place.id, { place: placeWithCoords, index: null, isNonRoute: true });
 
-        // Center map on place
-        this.mapService.map.setView([place.latitude, place.longitude], this.mapService.map.getZoom());
+        // Center map on place (offset for overlays)
+        this.mapService.centerMapOnPoint([place.latitude, place.longitude], this.mapService.map.getZoom());
     }
 
     updatePopupPositionIndicator(current, total) {

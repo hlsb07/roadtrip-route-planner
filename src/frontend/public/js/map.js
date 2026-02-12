@@ -736,10 +736,58 @@ export class MapService {
         }
     }
 
+    getOverlayPadding() {
+        let bottom = 0, right = 0;
+
+        // Desktop: timeline panel (expanded)
+        const timeline = document.querySelector('.timeline-panel.visible:not(.collapsed)');
+        if (timeline) bottom = Math.max(bottom, timeline.offsetHeight);
+
+        // Desktop: place details sidebar
+        const detailsSidebar = document.querySelector('.place-details-sidebar.active');
+        if (detailsSidebar) right = Math.max(right, detailsSidebar.offsetWidth);
+
+        // Mobile: docked popup (highest priority, covers content panel)
+        const dockedPopup = document.querySelector('.mobile-docked-popup.show');
+        if (dockedPopup) bottom = Math.max(bottom, dockedPopup.offsetHeight);
+
+        // Mobile: content panel (only if no docked popup)
+        const contentPanel = document.querySelector('.mobile-content-panel.active');
+        if (contentPanel && !dockedPopup) bottom = Math.max(bottom, contentPanel.offsetHeight);
+
+        // Mobile: nav bar
+        const mobileNav = document.querySelector('.mobile-nav');
+        if (mobileNav && window.innerWidth <= 768) bottom += mobileNav.offsetHeight;
+
+        return { top: 0, left: 0, bottom, right };
+    }
+
+    centerMapOnPoint(latlng, zoom) {
+        const padding = this.getOverlayPadding();
+        if (padding.bottom > 0 || padding.right > 0) {
+            // Calculate adjusted center so the point appears in the visual center
+            // of the unobstructed map area (single setView avoids animation conflicts)
+            const targetPoint = this.map.project(L.latLng(latlng), zoom);
+            const offsetX = padding.right / 2;
+            const offsetY = padding.bottom / 2;
+            const adjustedCenter = this.map.unproject(
+                targetPoint.add([offsetX, offsetY]),
+                zoom
+            );
+            this.map.setView(adjustedCenter, zoom);
+        } else {
+            this.map.setView(latlng, zoom);
+        }
+    }
+
     centerMap(places) {
         if (places.length === 0) return;
         const bounds = L.latLngBounds(places.map(place => place.coords));
-        this.map.fitBounds(bounds, { padding: [50, 50] });
+        const padding = this.getOverlayPadding();
+        this.map.fitBounds(bounds, {
+            paddingTopLeft: [50 + padding.left, 50 + padding.top],
+            paddingBottomRight: [50 + padding.right, 50 + padding.bottom]
+        });
     }
 
     toggleRoute() {
@@ -788,7 +836,7 @@ export class MapService {
         const targetZoom = this.map.getZoom() < CONFIG.PLACE_SELECTION_ZOOM
             ? CONFIG.PLACE_SELECTION_ZOOM
             : this.map.getZoom();
-        this.map.setView(marker.getLatLng(), targetZoom);
+        this.centerMapOnPoint(marker.getLatLng(), targetZoom);
     }
 
     deselectPlace() {
