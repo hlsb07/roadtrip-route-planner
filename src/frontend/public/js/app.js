@@ -1425,6 +1425,46 @@ class App {
     async handleTimelineStopSelected(index, stop) {
         // Select place on map (which will also update timeline)
         this.selectPlace(index);
+
+        // Update mobile gantt schedule info panel
+        this.updateMobileGanttScheduleInfo(stop);
+    }
+
+    updateMobileGanttScheduleInfo(stop) {
+        const panel = document.getElementById('mobileGanttScheduleInfo');
+        if (!panel) return;
+
+        if (!stop) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        const formatDT = (isoStr) => {
+            if (!isoStr) return 'Not scheduled';
+            const d = new Date(isoStr);
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const day = d.getUTCDate();
+            const mon = months[d.getUTCMonth()];
+            const hh = String(d.getUTCHours()).padStart(2, '0');
+            const mm = String(d.getUTCMinutes()).padStart(2, '0');
+            return `${mon} ${day} · ${hh}:${mm}`;
+        };
+
+        const arrival = formatDT(stop.originalStart);
+        const departure = formatDT(stop.originalEnd);
+        const stopTypeLabel = stop.stopType === 0 ? 'Overnight' : stop.stopType === 1 ? 'Day Stop' : 'Waypoint';
+
+        panel.innerHTML = `
+            <div class="gantt-schedule-header">
+                <strong>${stop.name}</strong>
+                <span class="gantt-schedule-badge">${stopTypeLabel}</span>
+            </div>
+            <div class="gantt-schedule-times">
+                <div><i class="fas fa-sign-in-alt"></i> ${arrival}</div>
+                <div><i class="fas fa-sign-out-alt"></i> ${departure}</div>
+            </div>
+        `;
+        panel.style.display = 'flex';
     }
 
     handleTimelineLegClicked(index) {
