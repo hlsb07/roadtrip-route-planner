@@ -295,7 +295,7 @@
                         <div class="timeline-track">
                             <div class="timeline-progress" id="timelineProgress"></div>
                         </div>
-                        <input type="range" id="timelineSlider" />
+                        <input type="range" class="timeline-slider" id="timelineSlider" />
                     </div>
 
                     <!-- Cursor -->
@@ -442,14 +442,43 @@
                 </div>
 
                 <!-- Timeline Section (Mobile) -->
-                <div class="mobile-section timeline-mobile-section" data-section="timeline" style="display: none; padding: 10px; background: #fafafa; overflow-y: auto; height: 100%;">
-                    <div class="timeline-mobile-wrapper">
-                        <!-- Timeline will be cloned here for mobile or rendered separately -->
-                        <div class="mobile-timeline-info">
-                            <p>Switch to the desktop view for the interactive timeline, or view the schedule below:</p>
-                        </div>
+                <div class="mobile-section timeline-mobile-section" data-section="timeline" style="display: none; background: #fafafa; overflow-y: auto; height: 100%;">
+                    <!-- Toggle bar: List / Gantt -->
+                    <div class="mobile-timeline-view-toggle">
+                        <button class="toggle-btn active" data-view="list">
+                            <i class="fas fa-list"></i> List
+                        </button>
+                        <button class="toggle-btn" data-view="gantt">
+                            <i class="fas fa-chart-gantt"></i> Gantt
+                        </button>
+                    </div>
+
+                    <!-- List View (existing) -->
+                    <div class="mobile-timeline-view" data-view="list" style="padding: 10px;">
                         <div id="mobileTimelineContent">
-                            <!-- Timeline content will be rendered here -->
+                            <!-- Timeline list content rendered here -->
+                        </div>
+                    </div>
+
+                    <!-- Gantt View (new) -->
+                    <div class="mobile-timeline-view" data-view="gantt" style="display: none;">
+                        <div class="mobile-gantt-container">
+                            <div class="timeline-content">
+                                <div class="gantt-wrapper">
+                                    <div class="day-labels"></div>
+                                    <div class="gantt-grid"></div>
+                                    <div class="gantt-content">
+                                        <div class="gantt-bars"></div>
+                                        <div class="timeline-track">
+                                            <div class="timeline-progress"></div>
+                                        </div>
+                                        <input type="range" class="timeline-slider" />
+                                    </div>
+                                    <div class="timeline-cursor">
+                                        <div class="timeline-cursor-label"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

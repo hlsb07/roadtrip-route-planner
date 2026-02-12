@@ -550,6 +550,19 @@ body:has(.place-details-sidebar.active) .timeline-panel {
         background: white;
     }
 
+    .timeline-track {
+        bottom: 12px;
+    }
+    .gantt-bar .resize-handle.left {
+        left: 3px;
+        cursor: ew-resize;
+    }
+
+    .gantt-bar .resize-handle.right {
+        right: 3px;
+        cursor: ew-resize;
+    }
+
     /* Adjust timeline sizing for mobile */
     .gantt-content {
         min-height: 150px;
@@ -583,6 +596,73 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     .timeline-panel {
         left: 0;
     }
+}
+
+/* ===== Mobile Timeline View Toggle ===== */
+
+.mobile-timeline-view-toggle {
+    display: flex;
+    padding: 8px 10px;
+    gap: 8px;
+    background: #f0f2f5;
+    border-bottom: 1px solid #e0e0e0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.mobile-timeline-view-toggle .toggle-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.mobile-timeline-view-toggle .toggle-btn.active {
+    background: #2A9D8F;
+    color: white;
+    border-color: #2A9D8F;
+}
+
+.mobile-timeline-view-toggle .toggle-btn:not(.active):hover {
+    background: #f5f5f5;
+}
+
+/* ===== Mobile Gantt Container ===== */
+
+.mobile-gantt-container {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 0;
+}
+
+.mobile-gantt-container .gantt-bar {
+    height: 28px;
+}
+
+.mobile-gantt-container .bar-label {
+    font-size: 10px;
+}
+
+.mobile-gantt-container .day-label {
+    font-size: 10px;
+}
+
+/* Hide slider, cursor, and track in mobile Gantt - not needed without info header */
+.mobile-gantt-container .timeline-slider,
+.mobile-gantt-container .timeline-cursor,
+.mobile-gantt-container .timeline-track {
+    display: none;
 }
 
 /* ===== Mobile Timeline Styles ===== */
@@ -876,6 +956,7 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     box-shadow: 0 1px 3px rgba(102, 126, 234, 0.3);
     padding: 0;
     pointer-events: auto;
+    touch-action: none;
 }
 
 .gantt-leg-bar:hover {
@@ -900,6 +981,10 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     z-index: 10;
 }
 
+.gantt-leg-wrapper.moving .gantt-leg-label {
+    cursor: grabbing;
+}
+
 /* Label below the leg bar */
 .gantt-leg-label {
     font-size: 10px;
@@ -907,7 +992,11 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     color: #667eea;
     white-space: nowrap;
     margin-top: 35px;
-    pointer-events: none;
+    margin-bottom: 5px;
+    padding: 10px 8px;
+    pointer-events: auto;
+    cursor: grab;
+    touch-action: none;
 }
 
 .gantt-leg-label i {

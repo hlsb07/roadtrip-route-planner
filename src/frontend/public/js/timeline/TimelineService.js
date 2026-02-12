@@ -5,7 +5,8 @@ import { ConflictUIManager } from './conflictUI.js';
  * TimelineService - Handles timeline UI rendering and user interactions
  */
 export class TimelineService {
-    constructor(callbacks) {
+    constructor(callbacks, containerEl = null) {
+        this.container = containerEl || document;
         this.callbacks = {
             onStopSelected: callbacks.onStopSelected || (() => {}),
             onStopScheduleChanged: callbacks.onStopScheduleChanged || (() => {}),
@@ -40,15 +41,16 @@ export class TimelineService {
     }
 
     initDOM() {
-        this.ganttWrapper = document.querySelector('.gantt-wrapper');
-        this.ganttBarsContainer = document.getElementById('ganttBars');
-        this.dayLabelsContainer = document.getElementById('dayLabels');
-        this.ganttGrid = document.getElementById('ganttGrid');
-        this.cursor = document.getElementById('timelineCursor');
-        this.cursorLabel = document.getElementById('timelineCursorLabel');
-        this.slider = document.getElementById('timelineSlider');
-        this.progress = document.getElementById('timelineProgress');
-        this.timelineContent = document.getElementById('timelineContent');
+        const root = this.container;
+        this.ganttWrapper = root.querySelector('.gantt-wrapper');
+        this.ganttBarsContainer = root.querySelector('.gantt-bars');
+        this.dayLabelsContainer = root.querySelector('.day-labels');
+        this.ganttGrid = root.querySelector('.gantt-grid');
+        this.cursor = root.querySelector('.timeline-cursor');
+        this.cursorLabel = root.querySelector('.timeline-cursor-label');
+        this.slider = root.querySelector('.timeline-slider');
+        this.progress = root.querySelector('.timeline-progress');
+        this.timelineContent = root.querySelector('.timeline-content');
 
         // Check if elements exist
         if (!this.ganttWrapper || !this.ganttBarsContainer) {
@@ -61,9 +63,9 @@ export class TimelineService {
     }
 
     initZoomControls() {
-        const zoomInBtn = document.getElementById('timelineZoomIn');
-        const zoomOutBtn = document.getElementById('timelineZoomOut');
-        const zoomLabel = document.getElementById('timelineZoomLabel');
+        const zoomInBtn = this.container.querySelector('#timelineZoomIn');
+        const zoomOutBtn = this.container.querySelector('#timelineZoomOut');
+        const zoomLabel = this.container.querySelector('#timelineZoomLabel');
 
         if (zoomInBtn) {
             zoomInBtn.addEventListener('click', () => this.zoomIn());
@@ -125,11 +127,11 @@ export class TimelineService {
         this.ganttWrapper.style.minWidth = `${totalWidth}px`;
 
         // Set explicit widths for slider, track, and gantt-content to match timeline width
-        const ganttContent = document.querySelector('.gantt-content');
-        const timelineTrack = document.querySelector('.timeline-track');
-        const timelineSlider = document.getElementById('timelineSlider');
-        const dayLabels = document.querySelector('.day-labels');
-        const ganttGrid = document.querySelector('.gantt-grid');
+        const ganttContent = this.container.querySelector('.gantt-content');
+        const timelineTrack = this.container.querySelector('.timeline-track');
+        const timelineSlider = this.container.querySelector('.timeline-slider');
+        const dayLabels = this.container.querySelector('.day-labels');
+        const ganttGrid = this.container.querySelector('.gantt-grid');
 
         if (ganttContent) {
             ganttContent.style.width = `${totalWidth}px`;
@@ -428,7 +430,7 @@ export class TimelineService {
             hasMoved = false;
         };
 
-        innerBar.addEventListener('pointerdown', (e) => {
+        const onPointerDown = (e) => {
             e.preventDefault();
             e.stopPropagation();
 
@@ -438,11 +440,18 @@ export class TimelineService {
             hasMoved = false;
 
             wrapperEl.classList.add('moving');
-            innerBar.setPointerCapture(e.pointerId);
+            e.target.setPointerCapture(e.pointerId);
 
             document.addEventListener('pointermove', onPointerMove);
             document.addEventListener('pointerup', onPointerUp);
-        });
+        };
+
+        innerBar.addEventListener('pointerdown', onPointerDown);
+
+        const label = wrapperEl.querySelector('.gantt-leg-label');
+        if (label) {
+            label.addEventListener('pointerdown', onPointerDown);
+        }
     }
 
     async saveLegAndConnectedPlaces(leg) {
@@ -849,7 +858,7 @@ export class TimelineService {
         }
 
         // Update current day label with calendar date
-        const currentDayLabel = document.getElementById('currentDayLabel');
+        const currentDayLabel = this.container.querySelector('#currentDayLabel');
         if (currentDayLabel && this.routeStartUtc) {
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                                'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -872,7 +881,7 @@ export class TimelineService {
             return dayInt >= startDay && dayInt <= endDay;
         });
 
-        const container = document.getElementById('currentPlaces');
+        const container = this.container.querySelector('#currentPlaces');
         if (!container) return;
 
         container.innerHTML = placesOnDay.map((stop, i) => `
@@ -907,9 +916,9 @@ export class TimelineService {
             return;
         }
 
-        const selectedPlaceTime = document.getElementById('selectedPlaceTime');
-        const selectedPlaceName = document.getElementById('selectedPlaceName');
-        const selectedPlaceTimeRange = document.getElementById('selectedPlaceTimeRange');
+        const selectedPlaceTime = this.container.querySelector('#selectedPlaceTime');
+        const selectedPlaceName = this.container.querySelector('#selectedPlaceName');
+        const selectedPlaceTimeRange = this.container.querySelector('#selectedPlaceTimeRange');
 
         if (!selectedPlaceTime || !selectedPlaceName || !selectedPlaceTimeRange) {
             return;
@@ -925,7 +934,7 @@ export class TimelineService {
     }
 
     hideSelectedPlaceTime() {
-        const selectedPlaceTime = document.getElementById('selectedPlaceTime');
+        const selectedPlaceTime = this.container.querySelector('#selectedPlaceTime');
         if (selectedPlaceTime) {
             selectedPlaceTime.style.display = 'none';
         }

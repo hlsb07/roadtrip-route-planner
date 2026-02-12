@@ -37,7 +37,8 @@ class App {
         // Track original start date for change detection
         this.originalStartDate = null;
 
-        // Initialize Timeline Service
+        // Initialize Timeline Service (desktop)
+        const desktopTimelineContainer = document.getElementById('timelinePanel');
         this.timelineService = new TimelineService({
             onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),
             onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),
@@ -45,7 +46,10 @@ class App {
             onNeedRecalculateLegs: () => this.handleRecalculateLegs(),
             onResolveConflictByReorder: () => this.handleResolveConflictByReorder(),
             onLegClicked: (index, leg) => this.handleTimelineLegClicked(index, leg)
-        });
+        }, desktopTimelineContainer);
+
+        // Mobile Gantt (lazy-initialized)
+        this.mobileTimelineService = null;
 
         // Set callback for search result selection (save to database, don't add to route)
         this.searchManager.setOnSelectCallback((place) => this.addPlace(place));
@@ -238,6 +242,15 @@ class App {
             });
         }
                     */
+        // Mobile timeline view toggle buttons
+        document.addEventListener('click', (e) => {
+            const toggleBtn = e.target.closest('.mobile-timeline-view-toggle .toggle-btn');
+            if (toggleBtn) {
+                mobileTimelineSubView = toggleBtn.dataset.view;
+                updateMobileTimelineView();
+            }
+        });
+
         document.addEventListener('change', async (e) => {
             if (e.target.id === 'routeSelect' || e.target.id === 'mobileRouteSelect') {
                 if (e.target.value) {
@@ -1243,6 +1256,14 @@ class App {
                 itinerary.conflictInfo,
                 timelineLegs
             );
+
+            // Also refresh mobile Gantt if it's been initialized
+            if (this.mobileTimelineService) {
+                this.mobileTimelineService.renderWithConflicts(
+                    timelineStops, totalDays, routeStartUtc,
+                    itinerary.conflictInfo, timelineLegs
+                );
+            }
         } catch (error) {
             console.error('Failed to load timeline:', error);
             showError('Failed to load timeline');
@@ -1550,6 +1571,46 @@ class App {
             if (container) {
                 container.innerHTML = '<p style="text-align: center; padding: 20px; color: #f44336;">Failed to load timeline</p>';
             }
+        }
+    }
+
+    async renderMobileGantt() {
+        const routeId = this.routeManager.currentRouteId;
+        if (!routeId) return;
+
+        // Lazy-initialize mobile TimelineService
+        if (!this.mobileTimelineService) {
+            const container = document.querySelector('.mobile-gantt-container');
+            if (!container) {
+                console.warn('Mobile gantt container not found');
+                return;
+            }
+            this.mobileTimelineService = new TimelineService({
+                onStopSelected: (index, stop) => this.handleTimelineStopSelected(index, stop),
+                onStopScheduleChanged: (routePlaceId, dto) => this.handleStopScheduleChanged(routePlaceId, dto),
+                onLegScheduleChanged: (legId, dto) => this.handleLegScheduleChanged(legId, dto),
+                onNeedRecalculateLegs: () => this.handleRecalculateLegs(),
+                onResolveConflictByReorder: () => this.handleResolveConflictByReorder(),
+                onLegClicked: (index, leg) => this.handleTimelineLegClicked(index, leg)
+            }, container);
+        }
+
+        try {
+            const route = await ApiService.getRoute(routeId);
+            await initializeScheduleIfNeeded(routeId, route);
+            const itinerary = await ApiService.getItineraryWithConflicts(routeId);
+
+            const timelineStops = mapItineraryToTimelineStops(itinerary);
+            const timelineLegs = mapItineraryToTimelineLegs(itinerary, timelineStops);
+            const totalDays = calculateTotalDays(timelineStops, timelineLegs);
+            const routeStartUtc = itinerary.scheduleSettings?.startDateTime;
+
+            this.mobileTimelineService.renderWithConflicts(
+                timelineStops, totalDays, routeStartUtc,
+                itinerary.conflictInfo, timelineLegs
+            );
+        } catch (error) {
+            console.error('Failed to render mobile gantt:', error);
         }
     }
 
@@ -1978,8 +2039,46 @@ window.addEventListener('load', () => {
     }, 100);
 });
 // Mobile mode switching function
+let currentMobileMode = null;
+let mobileTimelineSubView = 'list';
+
+function updateMobileTimelineView() {
+    const listView = document.querySelector('.mobile-timeline-view[data-view="list"]');
+    const ganttView = document.querySelector('.mobile-timeline-view[data-view="gantt"]');
+    const toggleBtns = document.querySelectorAll('.mobile-timeline-view-toggle .toggle-btn');
+
+    if (mobileTimelineSubView === 'list') {
+        if (listView) listView.style.display = 'block';
+        if (ganttView) ganttView.style.display = 'none';
+        if (window.app) window.app.renderMobileTimeline();
+    } else {
+        if (listView) listView.style.display = 'none';
+        if (ganttView) ganttView.style.display = 'block';
+        if (window.app) window.app.renderMobileGantt();
+    }
+
+    // Update toggle button active states
+    toggleBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === mobileTimelineSubView);
+    });
+}
+
 window.switchMobileMode = function(mode) {
     console.log('Switching to mobile mode:', mode);
+
+    // If clicking Timeline while already on Timeline, toggle sub-view
+    if (mode === 'timeline' && currentMobileMode === 'timeline') {
+        mobileTimelineSubView = mobileTimelineSubView === 'list' ? 'gantt' : 'list';
+        updateMobileTimelineView();
+        return;
+    }
+
+    // If switching TO timeline from another tab, reset to list view
+    if (mode === 'timeline') {
+        mobileTimelineSubView = 'list';
+    }
+
+    currentMobileMode = mode;
 
     // Update nav items
     const navItems = document.querySelectorAll('.mobile-nav-item');
@@ -1995,11 +2094,9 @@ window.switchMobileMode = function(mode) {
     const panel = document.getElementById('mobilePanel');
 
     // Show panel in 'active' state when navigation item is clicked
-    // Use SwipeHandler's changeState method if available (proper way)
     if (window.app && window.app.panelSwipeHandler) {
         window.app.panelSwipeHandler.changeState('active');
     } else {
-        // Fallback: Direct class manipulation if SwipeHandler not yet initialized
         if (panel) {
             panel.classList.remove('hidden', 'expanded');
             panel.classList.add('active');
@@ -2032,12 +2129,10 @@ window.switchMobileMode = function(mode) {
         titleEl.textContent = titles[mode];
     }
 
-    // If timeline mode, ensure timeline is rendered for mobile
+    // If timeline mode, render the active sub-view
     if (mode === 'timeline' && window.app) {
-        // The timeline will use the same TimelineService instance
-        // Just make sure it's visible and rendered
         setTimeout(() => {
-            window.app.renderMobileTimeline();
+            updateMobileTimelineView();
         }, 100);
     }
 };
