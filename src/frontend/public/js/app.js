@@ -192,12 +192,18 @@ class App {
             });
         }
 
-        // Route start date picker
-        const dateInput = document.getElementById('routeStartDate');
-        if (dateInput) {
-            dateInput.addEventListener('change', () => {
-                this.updateApplyDateButtonState();
-            });
+        // Route start date pickers (desktop + mobile)
+        for (const id of ['routeStartDate', 'mobileRouteStartDate']) {
+            const dateInput = document.getElementById(id);
+            if (dateInput) {
+                dateInput.addEventListener('change', () => {
+                    // Sync both inputs
+                    const otherId = id === 'routeStartDate' ? 'mobileRouteStartDate' : 'routeStartDate';
+                    const otherInput = document.getElementById(otherId);
+                    if (otherInput) otherInput.value = dateInput.value;
+                    this.updateApplyDateButtonState();
+                });
+            }
         }
 
         // Campsite URL input (desktop)
@@ -1274,20 +1280,26 @@ class App {
      * Update the route start date picker state (enable/disable based on route selection)
      */
     updateRouteStartDatePicker() {
-        const dateInput = document.getElementById('routeStartDate');
-        const applyBtn = document.getElementById('applyStartDateBtn');
+        const inputs = [
+            { input: document.getElementById('routeStartDate'), btn: document.getElementById('applyStartDateBtn') },
+            { input: document.getElementById('mobileRouteStartDate'), btn: document.getElementById('mobileApplyStartDateBtn') }
+        ];
 
-        if (!dateInput) return;
+        for (const { input, btn } of inputs) {
+            if (!input) continue;
 
-        if (!this.routeManager.currentRouteId) {
-            dateInput.value = '';
-            dateInput.disabled = true;
-            if (applyBtn) applyBtn.disabled = true;
-            this.originalStartDate = null;
-            return;
+            if (!this.routeManager.currentRouteId) {
+                input.value = '';
+                input.disabled = true;
+                if (btn) btn.disabled = true;
+            } else {
+                input.disabled = false;
+            }
         }
 
-        dateInput.disabled = false;
+        if (!this.routeManager.currentRouteId) {
+            this.originalStartDate = null;
+        }
     }
 
     /**
@@ -1295,24 +1307,24 @@ class App {
      * @param {Object} itinerary - Route itinerary with schedule settings
      */
     populateStartDateFromItinerary(itinerary) {
-        const dateInput = document.getElementById('routeStartDate');
-        if (!dateInput) return;
-
         const startDateTime = itinerary?.scheduleSettings?.startDateTime;
+        let dateValue;
         if (startDateTime) {
-            // Convert to local date format (YYYY-MM-DD)
             const date = new Date(startDateTime);
-            const localDate = date.toISOString().split('T')[0];
-            dateInput.value = localDate;
-            this.originalStartDate = localDate;
+            dateValue = date.toISOString().split('T')[0];
         } else {
-            // Default to today if no start date set
-            const today = new Date().toISOString().split('T')[0];
-            dateInput.value = today;
-            this.originalStartDate = today;
+            dateValue = new Date().toISOString().split('T')[0];
         }
 
-        dateInput.disabled = false;
+        this.originalStartDate = dateValue;
+
+        for (const id of ['routeStartDate', 'mobileRouteStartDate']) {
+            const dateInput = document.getElementById(id);
+            if (!dateInput) continue;
+            dateInput.value = dateValue;
+            dateInput.disabled = false;
+        }
+
         this.updateApplyDateButtonState();
     }
 
@@ -1320,13 +1332,15 @@ class App {
      * Update the apply button state based on whether date has changed
      */
     updateApplyDateButtonState() {
-        const dateInput = document.getElementById('routeStartDate');
-        const applyBtn = document.getElementById('applyStartDateBtn');
+        const pairs = [
+            { input: document.getElementById('routeStartDate'), btn: document.getElementById('applyStartDateBtn') },
+            { input: document.getElementById('mobileRouteStartDate'), btn: document.getElementById('mobileApplyStartDateBtn') }
+        ];
 
-        if (!dateInput || !applyBtn) return;
-
-        const hasChanged = dateInput.value !== this.originalStartDate;
-        applyBtn.disabled = !hasChanged;
+        for (const { input, btn } of pairs) {
+            if (!input || !btn) continue;
+            btn.disabled = input.value === this.originalStartDate;
+        }
     }
 
     /**
@@ -1336,19 +1350,20 @@ class App {
         const routeId = this.routeManager.currentRouteId;
         if (!routeId) return;
 
-        const dateInput = document.getElementById('routeStartDate');
-        const applyBtn = document.getElementById('applyStartDateBtn');
+        const dateInputs = ['routeStartDate', 'mobileRouteStartDate'].map(id => document.getElementById(id)).filter(Boolean);
+        const applyBtns = ['applyStartDateBtn', 'mobileApplyStartDateBtn'].map(id => document.getElementById(id)).filter(Boolean);
 
-        if (!dateInput || !dateInput.value) return;
+        const dateValue = dateInputs.find(i => i.value)?.value;
+        if (!dateValue) return;
 
         // Parse the new date and set time to 09:00 UTC (default arrival time)
-        const newDate = new Date(dateInput.value + 'T09:00:00.000Z');
+        const newDate = new Date(dateValue + 'T09:00:00.000Z');
 
         try {
             // Show loading state
-            if (applyBtn) {
-                applyBtn.classList.add('loading');
-                applyBtn.querySelector('i').className = 'fas fa-spinner';
+            for (const btn of applyBtns) {
+                btn.classList.add('loading');
+                btn.querySelector('i').className = 'fas fa-spinner';
             }
 
             // Get current route to preserve other schedule settings
@@ -1380,14 +1395,14 @@ class App {
             showError('Failed to update start date: ' + error.message);
 
             // Restore original date on error
-            if (dateInput && this.originalStartDate) {
-                dateInput.value = this.originalStartDate;
+            if (this.originalStartDate) {
+                for (const input of dateInputs) input.value = this.originalStartDate;
             }
         } finally {
             // Reset button state
-            if (applyBtn) {
-                applyBtn.classList.remove('loading');
-                applyBtn.querySelector('i').className = 'fas fa-check';
+            for (const btn of applyBtns) {
+                btn.classList.remove('loading');
+                btn.querySelector('i').className = 'fas fa-check';
             }
             this.updateApplyDateButtonState();
         }
