@@ -643,7 +643,23 @@ body:has(.place-details-sidebar.active) .timeline-panel {
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
-    padding: 10px 0;
+    padding: 5px 0;
+}
+
+.mobile-gantt-container .timeline-content {
+    max-height: none;
+    padding: 5px 10px;
+}
+
+.mobile-gantt-container .gantt-wrapper {
+    min-height: auto;
+    padding-top: 25px;
+    margin-bottom: 5px;
+}
+
+.mobile-gantt-container .gantt-content {
+    min-height: auto;
+    padding-top: 20px;
 }
 
 .mobile-gantt-container .gantt-bar {
@@ -768,7 +784,7 @@ body:has(.place-details-sidebar.active) .timeline-panel {
 }
 
 .timeline-mobile-section .gantt-wrapper {
-    min-height: 200px;
+    min-height: auto;
 }
 
 .timeline-mobile-section .gantt-bar {
