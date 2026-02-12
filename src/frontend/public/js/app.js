@@ -1925,6 +1925,26 @@ class App {
     }
 
     /**
+     * Handle password change request via email
+     */
+    async handleChangePassword() {
+        const confirmed = await showConfirm(
+            'Reset your password?',
+            'A password reset link will be sent to your email address.'
+        );
+
+        if (confirmed) {
+            try {
+                await AuthManager.requestPasswordReset();
+                showSuccess('Password reset email sent! Check your inbox.');
+            } catch (error) {
+                console.error('Password reset error:', error);
+                showError(error.message || 'Failed to send password reset email');
+            }
+        }
+    }
+
+    /**
      * Handle user logout
      */
     async handleLogout() {
@@ -1962,6 +1982,7 @@ window.addEventListener('load', async () => {
 window.handleSearch = () => window.app?.handleSearch();
 window.handleAddCampsite = () => window.app?.handleAddCampsite();
 window.handleLogout = () => window.app?.handleLogout();
+window.handleChangePassword = () => window.app?.handleChangePassword();
 window.switchTab = (tab) => window.app?.switchTab(tab);
 window.showCreateRouteModal = () => window.app?.showCreateRouteModal();
 window.showRenameRouteModal = () => window.app?.showRenameRouteModal();

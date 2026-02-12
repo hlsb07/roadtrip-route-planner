@@ -280,4 +280,26 @@ export class AuthManager {
 
         return user;
     }
+
+    /**
+     * Request a password reset email for the current user
+     */
+    static async requestPasswordReset() {
+        const user = this.getUser();
+        if (!user?.email) {
+            throw new Error('No user email found. Please log in again.');
+        }
+
+        const response = await fetch(`${CONFIG.API_BASE}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: user.email })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to request password reset');
+        }
+
+        return await response.json();
+    }
 }
