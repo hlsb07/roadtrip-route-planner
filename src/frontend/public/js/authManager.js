@@ -282,6 +282,24 @@ export class AuthManager {
     }
 
     /**
+     * Request a password reset email for a given address (unauthenticated - used from login screen)
+     * @param {string} email - Email address to send the reset link to
+     */
+    static async requestPasswordResetForEmail(email) {
+        const response = await fetch(`${CONFIG.API_BASE}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to request password reset');
+        }
+
+        return await response.json();
+    }
+
+    /**
      * Request a password reset email for the current user
      */
     static async requestPasswordReset() {

@@ -1,4 +1,5 @@
 import { AuthManager } from './authManager.js';
+import { showSuccess, showError } from './utils.js';
 
 /**
  * Login Modal Manager
@@ -29,6 +30,7 @@ export class LoginModal {
         this.demoButton = document.getElementById('demo-submit');
         this.errorMessage = document.getElementById('login-error');
         this.closeButton = document.getElementById('login-close');
+        this.forgotPasswordLink = document.getElementById('forgot-password-link');
 
         if (!this.modal) {
             console.error('Login modal not found in DOM');
@@ -64,6 +66,14 @@ export class LoginModal {
         // Close button
         if (this.closeButton) {
             this.closeButton.addEventListener('click', () => this.hide());
+        }
+
+        // Forgot password link
+        if (this.forgotPasswordLink) {
+            this.forgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.handleForgotPassword();
+            });
         }
 
         // Click outside modal to close
@@ -122,6 +132,36 @@ export class LoginModal {
             if (this.loginButton) {
                 this.loginButton.disabled = false;
                 this.loginButton.textContent = 'Login';
+            }
+        }
+    }
+
+    /**
+     * Handle "Forgot password?" link click - sends reset email for the entered address
+     */
+    async handleForgotPassword() {
+        const email = this.emailInput?.value.trim();
+
+        if (!email) {
+            this.showError('Enter your email address above, then click "Forgot password?"');
+            return;
+        }
+
+        this.clearError();
+
+        if (this.forgotPasswordLink) {
+            this.forgotPasswordLink.textContent = 'Sending...';
+        }
+
+        try {
+            await AuthManager.requestPasswordResetForEmail(email);
+            showSuccess('If that email exists, a password reset link has been sent.');
+        } catch (error) {
+            console.error('Forgot password request failed:', error);
+            showError(error.message || 'Failed to send password reset email');
+        } finally {
+            if (this.forgotPasswordLink) {
+                this.forgotPasswordLink.textContent = 'Forgot password?';
             }
         }
     }
