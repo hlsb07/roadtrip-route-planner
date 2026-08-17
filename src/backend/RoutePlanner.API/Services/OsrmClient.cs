@@ -26,6 +26,13 @@ namespace RoutePlanner.API.Services
 
             var timeout = int.Parse(_configuration["Osrm:TimeoutSeconds"] ?? "30");
             _httpClient.Timeout = TimeSpan.FromSeconds(timeout);
+
+            // The public OSRM demo server requires an identifying User-Agent
+            // and rejects requests without one (403 Forbidden).
+            if (_httpClient.DefaultRequestHeaders.UserAgent.Count == 0)
+            {
+                _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RoadtripRoutePlanner/1.0");
+            }
         }
 
         public async Task<OsrmRouteResponse> GetRoute(
